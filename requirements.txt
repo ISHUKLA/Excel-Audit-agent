@@ -1,0 +1,12 @@
+openpyxl
+pandas
+numpy
+networkx
+anthropic
+pydantic
+streamlit
+jinja2
+weasyprint
+python-dotenv
+pytest
+rapidfuzz

@@ -1,0 +1,213 @@
+<!-- Jinja2 template for the four-section audit report: actuary, CRO, CFO, and auditor views. -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Audit Report {{ report.report_id }}</title>
+<style>
+  body { font-family: Helvetica, Arial, sans-serif; font-size: 10pt; color: #1a1a1a; }
+  h1 { font-size: 18pt; margin-bottom: 2pt; }
+  h2 { font-size: 13pt; margin-top: 20pt; border-bottom: 1pt solid #ccc; padding-bottom: 3pt; }
+  h3 { font-size: 11pt; margin-top: 12pt; }
+  table { width: 100%; border-collapse: collapse; margin-top: 6pt; margin-bottom: 10pt; }
+  th, td { border: 0.5pt solid #999; padding: 4pt 6pt; text-align: left; font-size: 8.5pt; vertical-align: top; }
+  th { background-color: #eee; }
+  .header-table td { border: none; padding: 1pt 6pt 1pt 0; font-size: 9pt; }
+  .banner { padding: 10pt; font-size: 13pt; font-weight: bold; border-radius: 3pt; margin: 8pt 0; }
+  .banner-pass { background-color: #d4edda; color: #155724; }
+  .banner-warn { background-color: #fff3cd; color: #856404; }
+  .banner-block { background-color: #f8d7da; color: #721c24; }
+  .banner-not_performed { background-color: #e2e3e5; color: #383d41; }
+  .badge { display: inline-block; padding: 3pt 8pt; border-radius: 3pt; font-size: 9pt; font-weight: bold; margin-right: 6pt; }
+  .badge-pass { background-color: #d4edda; color: #155724; }
+  .badge-warn { background-color: #fff3cd; color: #856404; }
+  .badge-block { background-color: #f8d7da; color: #721c24; }
+  .badge-not_performed, .badge-na { background-color: #e2e3e5; color: #383d41; }
+  .verdict-pass { color: #155724; font-weight: bold; }
+  .verdict-warn { color: #856404; font-weight: bold; }
+  .verdict-block { color: #721c24; font-weight: bold; }
+  .tag-ambiguous { display: inline-block; background-color: #fff3cd; color: #856404; font-size: 7.5pt; padding: 1pt 5pt; border-radius: 2pt; margin-left: 4pt; }
+  .note { font-style: italic; color: #555; font-size: 9pt; }
+  .not-performed { padding: 8pt; background-color: #e2e3e5; color: #383d41; font-style: italic; }
+  .footer { margin-top: 24pt; padding-top: 8pt; border-top: 0.5pt solid #999; font-size: 8pt; color: #555; }
+</style>
+</head>
+<body>
+
+<h1>Excel Audit Report</h1>
+<table class="header-table">
+  <tr><td><strong>Filename:</strong></td><td>{{ report.file_context.filename }}</td></tr>
+  <tr><td><strong>Report ID:</strong></td><td>{{ report.report_id }}</td></tr>
+  <tr><td><strong>Generated at:</strong></td><td>{{ generated_at.isoformat() }}</td></tr>
+  <tr><td><strong>Signed by:</strong></td><td>{{ report.signed_by or "Not signed" }}</td></tr>
+  <tr><td><strong>Role:</strong></td><td>{{ report.signed_role or "-" }}</td></tr>
+</table>
+
+<div class="banner banner-{{ report.overall_verdict }}">
+  Overall verdict: {{ report.overall_verdict|upper }}
+</div>
+<div>
+  <span class="badge badge-{{ report.internal_verdict }}">Internal consistency: {{ report.internal_verdict|upper|replace("_", " ") }}</span>
+  {% if report.reference_figures %}
+  <span class="badge badge-{{ report.external_verdict }}">Accounts reconciliation (CFO): {{ report.external_verdict|upper|replace("_", " ") }}</span>
+  {% else %}
+  <span class="badge badge-na">Accounts reconciliation (CFO): NOT PERFORMED</span>
+  {% endif %}
+</div>
+
+<h2>Section 1 — File overview</h2>
+<table class="header-table">
+  <tr><td><strong>Description:</strong></td><td>{{ report.file_context.description }}</td></tr>
+  <tr><td><strong>Prepared for role:</strong></td><td>{{ report.file_context.user_role }}</td></tr>
+  <tr><td><strong>Tabs:</strong></td><td>{{ report.parsed_file.tab_names|join(", ") if report.parsed_file.tab_names else "None" }}</td></tr>
+  <tr><td><strong>VBA present:</strong></td><td>{{ "Yes" if report.parsed_file.has_vba else "No" }}</td></tr>
+  <tr><td><strong>External links:</strong></td><td>{{ report.parsed_file.external_links|join(", ") if report.parsed_file.external_links else "None" }}</td></tr>
+</table>
+
+<h2>Section 2 — Findings</h2>
+{% if report.findings %}
+<table>
+  <tr>
+    <th>ID</th><th>Severity</th><th>Tab</th><th>Cell</th><th>Description</th>
+    <th>Human decision</th><th>Reason</th><th>Decided by</th><th>Decided at</th>
+  </tr>
+  {% for f in report.findings %}
+  <tr>
+    <td>{{ f.finding_id }}</td>
+    <td>{{ f.severity }}</td>
+    <td>{{ f.tab }}</td>
+    <td>{{ f.cell_ref }}</td>
+    <td>{{ f.description }}</td>
+    <td>{{ f.human_decision or "Not decided" }}</td>
+    <td>{{ f.human_reason or "-" }}</td>
+    <td>{{ f.decided_by or "-" }}</td>
+    <td>{{ f.decided_at.isoformat() if f.decided_at else "-" }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<p class="note">No findings were raised for this file.</p>
+{% endif %}
+
+<h2>Section 3a — Internal consistency (Excel vs Python)</h2>
+{% if internal_lines %}
+<table>
+  <tr><th>Label</th><th>Excel value</th><th>Python value</th><th>Delta</th><th>Delta %</th><th>Verdict</th></tr>
+  {% for line in internal_lines %}
+  <tr>
+    <td>{{ line.label }}</td>
+    <td>{{ "%.4f"|format(line.source_value) }}</td>
+    <td>{{ "%.4f"|format(line.target_value) }}</td>
+    <td>{{ "%.4f"|format(line.delta) }}</td>
+    <td>{{ "%.2f"|format(line.delta_pct * 100) }}%</td>
+    <td class="verdict-{{ line.verdict }}">{{ line.verdict|upper }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<p class="note">No internal comparisons were produced for this file.</p>
+{% endif %}
+
+<h2>Section 3b — Accounts reconciliation (For CFO review)</h2>
+{% if report.reference_figures %}
+  <p><strong>Reference source:</strong> {{ report.reference_figures.source_label }}</p>
+  {% if external_lines %}
+  <table>
+    <tr><th>Label</th><th>Python value</th><th>Accounts value</th><th>Delta</th><th>Delta %</th><th>Verdict</th></tr>
+    {% for line in external_lines %}
+    <tr>
+      <td>
+        {{ line.label }}
+        {% if line.match_note %}<span class="tag-ambiguous" title="{{ line.match_note }}">match confidence: low</span>{% endif %}
+      </td>
+      <td>{{ "%.4f"|format(line.source_value) }}</td>
+      <td>{{ "%.4f"|format(line.target_value) }}</td>
+      <td>{{ "%.4f"|format(line.delta) }}</td>
+      <td>{{ "%.2f"|format(line.delta_pct * 100) }}%</td>
+      <td class="verdict-{{ line.verdict }}">{{ line.verdict|upper }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="note">No accounts figures could be matched to a computed value.</p>
+  {% endif %}
+
+  <h3>Reference figures that could not be matched</h3>
+  {% if report.unmatched_reference_items %}
+  <ul>
+    {% for item in report.unmatched_reference_items %}
+    <li>{{ item }}</li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="note">All reference figures were matched.</p>
+  {% endif %}
+{% else %}
+  <p class="not-performed">Not performed — no reference figures provided</p>
+{% endif %}
+
+<h2>Section 4 — Tab documentation</h2>
+{% if report.documentation %}
+  {% for doc in report.documentation %}
+  <h3>{{ doc.tab_name }}</h3>
+  <p><strong>Method summary:</strong> {{ doc.method_summary }}</p>
+  <p><strong>Assumptions:</strong>
+    {% if doc.assumptions %}{{ doc.assumptions|join("; ") }}{% else %}None noted{% endif %}
+  </p>
+  <p><strong>Data sources:</strong>
+    {% if doc.data_sources %}{{ doc.data_sources|join("; ") }}{% else %}None noted{% endif %}
+  </p>
+  <p><strong>Anomalies noted:</strong>
+    {% if doc.anomalies_noted %}{{ doc.anomalies_noted|join("; ") }}{% else %}None noted{% endif %}
+  </p>
+  <p><strong>Role notes:</strong> {{ doc.role_notes or "None" }}</p>
+  {% endfor %}
+{% else %}
+<p class="note">No tab documentation was generated.</p>
+{% endif %}
+
+<h2>Section 5 — Traceability index (For auditor review)</h2>
+<p class="note">Use this table to independently verify any figure in this report without contacting the preparer.</p>
+{% if report.traceability_index %}
+<table>
+  <tr><th>Figure</th><th>Value</th><th>Source tab</th><th>Source cell</th><th>Source formula</th><th>Derivation note</th></tr>
+  {% for entry in report.traceability_index %}
+  <tr>
+    <td>{{ entry.report_figure_label }}</td>
+    <td>{{ "%.4f"|format(entry.report_value) }}</td>
+    <td>{{ entry.source_tab if entry.source_tab else "Not traceable" }}</td>
+    <td>{{ entry.source_cell if entry.source_cell else "Not traceable" }}</td>
+    <td>{{ entry.source_formula or "-" }}</td>
+    <td>{{ entry.derivation_note }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<p class="note">No traceable figures were produced for this file.</p>
+{% endif %}
+
+<h2>Section 6 — Audit trail</h2>
+{% if decisions %}
+<table>
+  <tr><th>Gate</th><th>Finding</th><th>Action</th><th>Reason</th><th>User</th><th>Timestamp</th></tr>
+  {% for d in decisions %}
+  <tr>
+    <td>{{ d.gate_number }}</td>
+    <td>{{ d.finding_id or "-" }}</td>
+    <td>{{ d.action }}</td>
+    <td>{{ d.reason or "-" }}</td>
+    <td>{{ d.user_name }}</td>
+    <td>{{ d.timestamp }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<p class="note">No audit trail entries were recorded for this report.</p>
+{% endif %}
+
+<div class="footer">
+  This report was generated by Excel Audit Agent. All findings were reviewed and approved by a named human before publication.
+</div>
+
+</body>
+</html>
