@@ -119,6 +119,7 @@ class _FakeMessagesAPI:
         return SimpleNamespace(
             content=[
                 SimpleNamespace(
+                    type="text",
                     text=json.dumps(
                         {
                             "method_summary": "Reserve calculation derived from a technical hypothesis.",

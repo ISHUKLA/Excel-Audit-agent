@@ -15,7 +15,7 @@ class _FakeMessagesAPI:
 
     def create(self, **kwargs):
         self.calls.append(kwargs)
-        return SimpleNamespace(content=[SimpleNamespace(text=next(self._responses))])
+        return SimpleNamespace(content=[SimpleNamespace(type="text", text=next(self._responses))])
 
 
 class _FakeClient:
@@ -69,6 +69,27 @@ def test_valid_json_parses_into_tab_documentation(monkeypatch):
     assert doc.method_summary == "Applies a 25% growth factor to the base reserve."
     assert doc.assumptions == ["25% growth factor"]
     assert doc.role_notes == "Actuary should confirm the growth factor is current."
+
+
+def test_extended_thinking_block_before_text_is_handled(monkeypatch):
+    # Real API responses can prepend a ThinkingBlock (no .text attribute at all) before
+    # the actual text block. response.content[0] is therefore not reliably the text.
+    monkeypatch.setattr("agents.documentation.time.sleep", lambda seconds: None)
+
+    class _ThinkingClient:
+        class messages:
+            @staticmethod
+            def create(**kwargs):
+                return SimpleNamespace(
+                    content=[
+                        SimpleNamespace(type="thinking", thinking="reasoning about the tab..."),
+                        SimpleNamespace(type="text", text=_valid_json()),
+                    ]
+                )
+
+    result = document_tabs(_parsed_file(), _file_context(), client=_ThinkingClient())
+
+    assert result[0].method_summary == "Applies a 25% growth factor to the base reserve."
 
 
 def test_invalid_json_triggers_fallback_message(monkeypatch):

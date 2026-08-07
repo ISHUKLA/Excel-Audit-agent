@@ -47,7 +47,11 @@ def document_tabs(
             system=_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": json.dumps(payload)}],
         )
-        raw_text = response.content[0].text
+        # response.content[0] isn't reliably the text block -- e.g. extended
+        # thinking prepends a ThinkingBlock with no .text attribute at all.
+        raw_text = "".join(
+            block.text for block in response.content if getattr(block, "type", None) == "text"
+        )
         documentation.append(_parse_response(tab, raw_text))
 
     return documentation

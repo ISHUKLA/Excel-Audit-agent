@@ -22,7 +22,7 @@ class _FakeMessagesAPI:
 
     def create(self, **kwargs):
         self.calls.append(kwargs)
-        return SimpleNamespace(content=[SimpleNamespace(text=next(self._responses))])
+        return SimpleNamespace(content=[SimpleNamespace(type="text", text=next(self._responses))])
 
 
 class _FakeClient:
