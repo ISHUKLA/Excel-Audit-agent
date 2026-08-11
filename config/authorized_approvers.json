@@ -1,0 +1,18 @@
+{
+  "_comment": [
+    "This file is NOT authentication and NOT a security control.",
+    "It is a local registry of names, checked against whatever is typed at",
+    "Gate 4, so that an unregistered name or a typo is caught before an",
+    "approval record is written to the report.",
+    "It proves nothing about who was actually sitting at the keyboard.",
+    "Anyone with write access to this file can add a name to it.",
+    "Treat it as a spell-checker for approver names, not as a gate on identity."
+  ],
+  "approvers": [
+    {
+      "name": "Isaac Shukla",
+      "role": "actuary",
+      "registered_at": "2026-08-10"
+    }
+  ]
+}

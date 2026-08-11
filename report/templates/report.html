@@ -1,213 +1,316 @@
-<!-- Jinja2 template for the four-section audit report: actuary, CRO, CFO, and auditor views. -->
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Audit Report {{ report.report_id }}</title>
+<title>Translation &amp; Reconciliation Report - {{ report.report_id }}</title>
 <style>
-  body { font-family: Helvetica, Arial, sans-serif; font-size: 10pt; color: #1a1a1a; }
-  h1 { font-size: 18pt; margin-bottom: 2pt; }
-  h2 { font-size: 13pt; margin-top: 20pt; border-bottom: 1pt solid #ccc; padding-bottom: 3pt; }
-  h3 { font-size: 11pt; margin-top: 12pt; }
-  table { width: 100%; border-collapse: collapse; margin-top: 6pt; margin-bottom: 10pt; }
-  th, td { border: 0.5pt solid #999; padding: 4pt 6pt; text-align: left; font-size: 8.5pt; vertical-align: top; }
-  th { background-color: #eee; }
-  .header-table td { border: none; padding: 1pt 6pt 1pt 0; font-size: 9pt; }
-  .banner { padding: 10pt; font-size: 13pt; font-weight: bold; border-radius: 3pt; margin: 8pt 0; }
-  .banner-pass { background-color: #d4edda; color: #155724; }
-  .banner-warn { background-color: #fff3cd; color: #856404; }
-  .banner-block { background-color: #f8d7da; color: #721c24; }
-  .banner-not_performed { background-color: #e2e3e5; color: #383d41; }
-  .badge { display: inline-block; padding: 3pt 8pt; border-radius: 3pt; font-size: 9pt; font-weight: bold; margin-right: 6pt; }
-  .badge-pass { background-color: #d4edda; color: #155724; }
-  .badge-warn { background-color: #fff3cd; color: #856404; }
-  .badge-block { background-color: #f8d7da; color: #721c24; }
-  .badge-not_performed, .badge-na { background-color: #e2e3e5; color: #383d41; }
-  .verdict-pass { color: #155724; font-weight: bold; }
-  .verdict-warn { color: #856404; font-weight: bold; }
-  .verdict-block { color: #721c24; font-weight: bold; }
-  .tag-ambiguous { display: inline-block; background-color: #fff3cd; color: #856404; font-size: 7.5pt; padding: 1pt 5pt; border-radius: 2pt; margin-left: 4pt; }
-  .note { font-style: italic; color: #555; font-size: 9pt; }
-  .not-performed { padding: 8pt; background-color: #e2e3e5; color: #383d41; font-style: italic; }
-  .footer { margin-top: 24pt; padding-top: 8pt; border-top: 0.5pt solid #999; font-size: 8pt; color: #555; }
+  @page {
+    size: A4;
+    margin: 18mm 14mm 25mm 14mm;
+    @bottom-right { content: "Page " counter(page) " of " counter(pages); font-size: 7.5pt; color: #667085; }
+  }
+  * { box-sizing: border-box; }
+  body { font-family: Arial, Helvetica, sans-serif; font-size: 9pt; line-height: 1.4; color: #17212b; margin: 0; }
+  h1 { font-size: 23pt; line-height: 1.1; margin: 0 0 8pt; color: #173b57; }
+  h2 { font-size: 14pt; margin: 22pt 0 7pt; padding-bottom: 4pt; color: #173b57; border-bottom: 1.5pt solid #9db2c3; break-after: avoid; }
+  h3 { font-size: 10.5pt; margin: 13pt 0 5pt; color: #294f6b; break-after: avoid; }
+  p { margin: 4pt 0 7pt; }
+  ul, ol { margin: 4pt 0 7pt 16pt; padding-left: 7pt; }
+  li { margin: 2pt 0; }
+  a { color: #155d86; text-decoration: underline; overflow-wrap: anywhere; }
+  table { width: 100%; border-collapse: collapse; margin: 6pt 0 11pt; table-layout: fixed; }
+  thead { display: table-header-group; }
+  tr { break-inside: avoid; }
+  th, td { border: 0.5pt solid #aab5bf; padding: 4pt; vertical-align: top; overflow-wrap: anywhere; font-size: 7.5pt; }
+  th { background: #eaf0f4; color: #173b57; font-weight: 700; }
+  .meta { table-layout: auto; }
+  .meta td { border: none; border-bottom: 0.4pt solid #d9e0e5; padding: 3pt 5pt 3pt 0; font-size: 8.3pt; }
+  .meta td:first-child { width: 31mm; color: #52616d; font-weight: 700; }
+  .disclaimer { border-left: 4pt solid #173b57; background: #edf4f7; padding: 8pt 10pt; margin: 5pt 0; }
+  .independence { border-left-color: #687783; background: #f2f4f5; }
+  .definition { font-size: 8pt; color: #475467; margin: 5pt 0 10pt; }
+  .banner { padding: 10pt 12pt; margin: 11pt 0 7pt; font-size: 14pt; font-weight: 700; border: 1pt solid; }
+  .banner-pass, .badge-pass { background: #dff3e4; border-color: #2d7a43; color: #185c2c; }
+  .banner-warn, .badge-warn { background: #fff2c9; border-color: #a96f00; color: #754b00; }
+  .banner-block, .badge-block { background: #f9d9da; border-color: #a7272b; color: #7c1c20; }
+  .banner-incomplete, .badge-incomplete { background: #dfe8ee; border-color: #536f82; color: #304f63; }
+  .badge-not_performed, .badge-na { background: #eceff1; border-color: #7b8790; color: #44515b; }
+  .badge { display: inline-block; border: 0.7pt solid; padding: 4pt 7pt; margin: 1pt 5pt 4pt 0; font-size: 8pt; font-weight: 700; }
+  .explanation { margin: 5pt 0 8pt; font-weight: 700; color: #304f63; }
+  .warning { padding: 7pt 9pt; margin: 7pt 0; background: #fff2c9; border-left: 4pt solid #a96f00; }
+  .danger { padding: 8pt 10pt; margin: 7pt 0; background: #f9d9da; border-left: 4pt solid #a7272b; font-weight: 700; }
+  .not-performed { padding: 8pt 10pt; background: #eceff1; border-left: 4pt solid #7b8790; }
+  .muted { color: #667085; font-style: italic; }
+  .status { font-weight: 700; text-transform: uppercase; white-space: nowrap; overflow-wrap: normal; font-size: 7pt; }
+  .status-pass { color: #185c2c; }
+  .status-warn { color: #754b00; }
+  .status-block { color: #7c1c20; }
+  .status-incomplete { color: #304f63; }
+  .context-grid, .gap-grid { display: table; width: 100%; table-layout: fixed; margin: 6pt 0 10pt; }
+  .context-column, .gap-column { display: table-cell; width: 50%; vertical-align: top; padding-right: 5pt; }
+  .context-column + .context-column, .gap-column + .gap-column { padding-left: 5pt; padding-right: 0; }
+  .doc-block, .trace-entry { border: 0.6pt solid #b7c3cc; padding: 7pt 9pt; margin: 7pt 0; break-inside: avoid; }
+  .doc-block { padding: 5pt 8pt; }
+  .doc-block h3 { margin: 4pt 0; }
+  .doc-block p { margin: 2pt 0 3pt; }
+  .doc-block .warning { margin: 4pt 0; padding: 5pt 7pt; }
+  details { margin: 3pt 0; }
+  summary { font-weight: 700; color: #304f63; }
+  .small { font-size: 7.5pt; }
+  .section-six { break-inside: avoid; }
+  .footer-note { position: fixed; bottom: -18mm; left: 0; right: 22mm; font-size: 6.8pt; color: #667085; border-top: 0.5pt solid #aab5bf; padding-top: 3pt; }
 </style>
 </head>
 <body>
 
-<h1>Excel Audit Report</h1>
-<table class="header-table">
-  <tr><td><strong>Filename:</strong></td><td>{{ report.file_context.filename }}</td></tr>
-  <tr><td><strong>Report ID:</strong></td><td>{{ report.report_id }}</td></tr>
-  <tr><td><strong>Generated at:</strong></td><td>{{ generated_at.isoformat() }}</td></tr>
-  <tr><td><strong>Signed by:</strong></td><td>{{ report.signed_by or "Not signed" }}</td></tr>
-  <tr><td><strong>Role:</strong></td><td>{{ report.signed_role or "-" }}</td></tr>
+<h1>Translation &amp; Reconciliation Report</h1>
+<div class="disclaimer" id="actuarial-scope-disclaimer">{{ report.disclaimer }}</div>
+<div class="disclaimer independence" id="independence-disclosure">{{ report.independence_disclosure }}</div>
+
+<p><strong>Named approval record:</strong> Approved by {{ report.report_approval_name }}
+  ({{ report.report_approval_role }}) at {{ report.report_approval_at|timestamp }}.</p>
+<p class="definition">A named approval record is a typed identity confirmation captured with a timestamp, checked
+against a local registry of expected names. It is not a signature, an attestation engagement, or any other formal or legal instrument.</p>
+<p class="definition"><strong>Tamper-evident:</strong> Tamper-evident means any modification to the underlying log after the fact can be detected by re-verifying its hash chain - it does not mean the log file itself cannot be edited by someone with direct access to this machine.</p>
+
+<table class="meta" aria-label="Report header">
+  <tr><td>Filename</td><td>{{ report.file_context.filename }}</td></tr>
+  <tr><td>Report ID</td><td>{{ report.report_id }}</td></tr>
+  <tr><td>Run ID</td><td>{{ report.validation_run_id }}</td></tr>
+  <tr><td>Generated at</td><td>{{ report.generated_at|timestamp }}</td></tr>
+  <tr><td>Approved by</td><td>{{ report.report_approval_name }}</td></tr>
+  <tr><td>Approval role</td><td>{{ report.report_approval_role }}</td></tr>
+  <tr><td>Workbook hash</td><td>{{ short_workbook_hash }}</td></tr>
+  <tr><td>Code version</td><td>{{ report.code_version }}</td></tr>
 </table>
 
-<div class="banner banner-{{ report.overall_verdict }}">
-  Overall verdict: {{ report.overall_verdict|upper }}
+<div class="banner banner-{{ report.translation_and_reconciliation_verdict }}">
+  Overall translation and reconciliation verdict: {{ report.translation_and_reconciliation_verdict|upper }}
 </div>
+{% if report.translation_and_reconciliation_verdict == "incomplete" and incomplete_pct is not none %}
+<p class="explanation">{{ "%.1f"|format(incomplete_pct) }}% of this calculation could not be reconstructed from supported formula elements - see Section 3a for details.</p>
+{% endif %}
 <div>
-  <span class="badge badge-{{ report.internal_verdict }}">Internal consistency: {{ report.internal_verdict|upper|replace("_", " ") }}</span>
+  <span class="badge badge-{{ report.internal_verdict }}">Internal consistency: {{ report.internal_verdict|upper }}</span>
   {% if report.reference_figures %}
   <span class="badge badge-{{ report.external_verdict }}">Accounts reconciliation (CFO): {{ report.external_verdict|upper|replace("_", " ") }}</span>
   {% else %}
-  <span class="badge badge-na">Accounts reconciliation (CFO): NOT PERFORMED</span>
+  <span class="badge badge-na">Accounts reconciliation (CFO): Not performed - no reference figures provided</span>
   {% endif %}
 </div>
 
-<h2>Section 1 — File overview</h2>
-<table class="header-table">
-  <tr><td><strong>Description:</strong></td><td>{{ report.file_context.description }}</td></tr>
-  <tr><td><strong>Prepared for role:</strong></td><td>{{ report.file_context.user_role }}</td></tr>
-  <tr><td><strong>Tabs:</strong></td><td>{{ report.parsed_file.tab_names|join(", ") if report.parsed_file.tab_names else "None" }}</td></tr>
-  <tr><td><strong>VBA present:</strong></td><td>{{ "Yes" if report.parsed_file.has_vba else "No" }}</td></tr>
-  <tr><td><strong>External links:</strong></td><td>{{ report.parsed_file.external_links|join(", ") if report.parsed_file.external_links else "None" }}</td></tr>
+<h2>Section 1 - File overview</h2>
+<table class="meta">
+  <tr><td>Description</td><td>{{ report.file_context.description }}</td></tr>
+  <tr><td>Prepared for role</td><td>{{ report.file_context.user_role }}</td></tr>
+  <tr><td>Tabs</td><td>{{ report.parsed_file.tab_names|join(", ") if report.parsed_file.tab_names else "None" }}</td></tr>
+  <tr><td>VBA present</td><td>{{ "Yes" if report.parsed_file.has_vba else "No" }}</td></tr>
+  <tr><td>External links</td><td>{{ report.parsed_file.external_links|join(", ") if report.parsed_file.external_links else "None" }}</td></tr>
+  <tr><td>Workbook calculation mode</td><td>{{ report.parsed_file.workbook_meta.calc_mode }}</td></tr>
 </table>
+{% if report.parsed_file.workbook_meta.calc_mode in ("manual", "unknown") %}
+<div class="warning">Workbook calculation mode is {{ report.parsed_file.workbook_meta.calc_mode }}. Cached formula values may not be current.</div>
+{% endif %}
+<h3>Stale formula cells</h3>
+{% if stale_cells %}
+<ul>{% for cell in stale_cells %}<li>{{ cell.cell_ref }}</li>{% endfor %}</ul>
+{% else %}<p class="muted">None.</p>{% endif %}
 
-<h2>Section 2 — Findings</h2>
+{% if report.reference_figures %}
+<h2>Section 1b - Accounting reconciliation context</h2>
+{% if report.context_match_verdict == "mismatch" %}
+<div class="danger" id="context-mismatch-banner">Entity, period, or currency does not match between the workbook and the reference figures. The accounts reconciliation below cannot be relied upon.</div>
+{% endif %}
+<div class="context-grid">
+  <div class="context-column">
+    <h3>Workbook context</h3>
+    <table class="meta">
+      <tr><td>Entity</td><td>{{ report.file_context.entity or "Not supplied" }}</td></tr>
+      <tr><td>Period</td><td>{{ report.file_context.period or "Not supplied" }}</td></tr>
+      <tr><td>Currency</td><td>{{ report.file_context.currency or "Not supplied" }}</td></tr>
+      <tr><td>Basis</td><td>{{ report.file_context.basis or "Not supplied" }}</td></tr>
+    </table>
+  </div>
+  <div class="context-column">
+    <h3>Reference figures context</h3>
+    <table class="meta">
+      <tr><td>Entity</td><td>{{ report.reference_figures.entity }}</td></tr>
+      <tr><td>Period</td><td>{{ report.reference_figures.period }}</td></tr>
+      <tr><td>Currency</td><td>{{ report.reference_figures.currency }}</td></tr>
+      <tr><td>Basis</td><td>{{ report.reference_figures.basis or "Not supplied" }}</td></tr>
+    </table>
+  </div>
+</div>
+{% if report.reference_figures.control_total is not none %}
+<table>
+  <thead><tr><th>Control total</th><th>Sum of extract lines</th><th>Confirmed by human</th></tr></thead>
+  <tbody><tr>
+    <td>{{ report.reference_figures.control_total|number }}</td>
+    <td>{{ reference_line_total|number }}</td>
+    <td>{{ "Yes" if report.reference_figures.control_total_confirmed_by_human else "No" }}</td>
+  </tr></tbody>
+</table>
+{% if not report.reference_figures.control_total_confirmed_by_human %}
+<div class="warning">This extract's tie-out to its control total has not been confirmed.</div>
+{% endif %}
+{% endif %}
+{% endif %}
+
+<section id="section-2-findings">
+<h2>Section 2 - Findings</h2>
+<p>Every finding below was reviewed and dispositioned by a named human - confirmed, overridden, or dismissed - before this report was generated. An overridden or dismissed disposition is a reviewed outcome, not a lesser one; it is not an endorsement. The actual disposition is shown for every finding.</p>
 {% if report.findings %}
 <table>
-  <tr>
-    <th>ID</th><th>Severity</th><th>Tab</th><th>Cell</th><th>Description</th>
-    <th>Human decision</th><th>Reason</th><th>Decided by</th><th>Decided at</th>
-  </tr>
-  {% for f in report.findings %}
-  <tr>
-    <td>{{ f.finding_id }}</td>
-    <td>{{ f.severity }}</td>
-    <td>{{ f.tab }}</td>
-    <td>{{ f.cell_ref }}</td>
-    <td>{{ f.description }}</td>
-    <td>{{ f.human_decision or "Not decided" }}</td>
-    <td>{{ f.human_reason or "-" }}</td>
-    <td>{{ f.decided_by or "-" }}</td>
-    <td>{{ f.decided_at.isoformat() if f.decided_at else "-" }}</td>
-  </tr>
-  {% endfor %}
+  <thead><tr><th>ID</th><th>Severity</th><th>Tab</th><th>Cell</th><th>Description</th><th>Human decision</th><th>Reason</th><th>Decided by</th><th>Decided at</th></tr></thead>
+  <tbody>{% for finding in report.findings %}<tr>
+    <td>{{ finding.finding_id }}</td><td>{{ finding.severity }}</td><td>{{ finding.tab }}</td><td>{{ finding.cell_ref }}</td>
+    <td>{{ finding.description }}</td><td>{{ finding.human_decision or "Not decided" }}</td><td>{{ finding.human_reason or "-" }}</td>
+    <td>{{ finding.decided_by or "-" }}</td><td>{{ finding.decided_at|timestamp }}</td>
+  </tr>{% endfor %}</tbody>
 </table>
-{% else %}
-<p class="note">No findings were raised for this file.</p>
-{% endif %}
+{% else %}<p class="muted">No findings were raised for this file.</p>{% endif %}
+</section>
 
-<h2>Section 3a — Internal consistency (Excel vs Python)</h2>
+<section id="section-3a-internal">
+<h2>Section 3a - Internal reconciliation (Excel vs Python)</h2>
 {% if internal_lines %}
 <table>
-  <tr><th>Label</th><th>Excel value</th><th>Python value</th><th>Delta</th><th>Delta %</th><th>Verdict</th></tr>
-  {% for line in internal_lines %}
-  <tr>
+  <thead><tr><th>Label</th><th>Excel value</th><th>Python value</th><th>Delta</th><th>Delta %</th><th>Verdict</th><th>Coverage</th></tr></thead>
+  <tbody>{% for line in internal_lines %}<tr>
     <td>{{ line.label }}</td>
-    <td>{{ "%.4f"|format(line.source_value) }}</td>
-    <td>{{ "%.4f"|format(line.target_value) }}</td>
-    <td>{{ "%.4f"|format(line.delta) }}</td>
-    <td>{{ "%.2f"|format(line.delta_pct * 100) }}%</td>
-    <td class="verdict-{{ line.verdict }}">{{ line.verdict|upper }}</td>
+    <td>{{ line.source_value|number }}</td><td>{{ line.target_value|number }}</td>
+    {% if line.verdict == "incomplete" %}<td>not comparable</td><td>not comparable</td>{% else %}<td>{{ line.delta|number }}</td><td>{{ line.delta_pct|percentage }}</td>{% endif %}
+    <td class="status status-{{ line.verdict }}">{{ line.verdict }}</td>
+    <td>{{ "%.1f"|format(line.reconstruction_coverage_pct) }}%</td>
   </tr>
-  {% endfor %}
+  {% if line.reconstruction_coverage_pct < 100 %}<tr><td colspan="7">
+    <details open><summary>Unsupported formula elements</summary>
+      {% if line.unsupported_elements %}<ul>{% for element in line.unsupported_elements %}<li>{{ element }}</li>{% endfor %}</ul>{% else %}<p>Reason not recorded.</p>{% endif %}
+    </details>
+  </td></tr>{% endif %}
+  {% endfor %}</tbody>
 </table>
-{% else %}
-<p class="note">No internal comparisons were produced for this file.</p>
-{% endif %}
+{% else %}<p class="muted">No internal comparisons were produced.</p>{% endif %}
+</section>
 
-<h2>Section 3b — Accounts reconciliation (For CFO review)</h2>
+<h2>Section 3b - Accounts reconciliation</h2>
 {% if report.reference_figures %}
-  <p><strong>Reference source:</strong> {{ report.reference_figures.source_label }}</p>
-  {% if external_lines %}
-  <table>
-    <tr><th>Label</th><th>Python value</th><th>Accounts value</th><th>Delta</th><th>Delta %</th><th>Verdict</th></tr>
-    {% for line in external_lines %}
-    <tr>
-      <td>
-        {{ line.label }}
-        {% if line.match_note %}<span class="tag-ambiguous" title="{{ line.match_note }}">match confidence: low</span>{% endif %}
-      </td>
-      <td>{{ "%.4f"|format(line.source_value) }}</td>
-      <td>{{ "%.4f"|format(line.target_value) }}</td>
-      <td>{{ "%.4f"|format(line.delta) }}</td>
-      <td>{{ "%.2f"|format(line.delta_pct * 100) }}%</td>
-      <td class="verdict-{{ line.verdict }}">{{ line.verdict|upper }}</td>
-    </tr>
-    {% endfor %}
-  </table>
-  {% else %}
-  <p class="note">No accounts figures could be matched to a computed value.</p>
-  {% endif %}
-
-  <h3>Reference figures that could not be matched</h3>
-  {% if report.unmatched_reference_items %}
-  <ul>
-    {% for item in report.unmatched_reference_items %}
-    <li>{{ item }}</li>
-    {% endfor %}
-  </ul>
-  {% else %}
-  <p class="note">All reference figures were matched.</p>
-  {% endif %}
-{% else %}
-  <p class="not-performed">Not performed — no reference figures provided</p>
-{% endif %}
-
-<h2>Section 4 — Tab documentation</h2>
-{% if report.documentation %}
-  {% for doc in report.documentation %}
-  <h3>{{ doc.tab_name }}</h3>
-  <p><strong>Method summary:</strong> {{ doc.method_summary }}</p>
-  <p><strong>Assumptions:</strong>
-    {% if doc.assumptions %}{{ doc.assumptions|join("; ") }}{% else %}None noted{% endif %}
-  </p>
-  <p><strong>Data sources:</strong>
-    {% if doc.data_sources %}{{ doc.data_sources|join("; ") }}{% else %}None noted{% endif %}
-  </p>
-  <p><strong>Anomalies noted:</strong>
-    {% if doc.anomalies_noted %}{{ doc.anomalies_noted|join("; ") }}{% else %}None noted{% endif %}
-  </p>
-  <p><strong>Role notes:</strong> {{ doc.role_notes or "None" }}</p>
-  {% endfor %}
-{% else %}
-<p class="note">No tab documentation was generated.</p>
-{% endif %}
-
-<h2>Section 5 — Traceability index (For auditor review)</h2>
-<p class="note">Use this table to independently verify any figure in this report without contacting the preparer.</p>
-{% if report.traceability_index %}
-<table>
-  <tr><th>Figure</th><th>Value</th><th>Source tab</th><th>Source cell</th><th>Source formula</th><th>Derivation note</th></tr>
-  {% for entry in report.traceability_index %}
-  <tr>
-    <td>{{ entry.report_figure_label }}</td>
-    <td>{{ "%.4f"|format(entry.report_value) }}</td>
-    <td>{{ entry.source_tab if entry.source_tab else "Not traceable" }}</td>
-    <td>{{ entry.source_cell if entry.source_cell else "Not traceable" }}</td>
-    <td>{{ entry.source_formula or "-" }}</td>
-    <td>{{ entry.derivation_note }}</td>
-  </tr>
-  {% endfor %}
+<h3>For CFO review</h3>
+{% if approved_mapping_rows %}
+<table id="approved-mappings-table">
+  <thead><tr><th>Label</th><th>Account</th><th>Python value</th><th>Accounts value</th><th>Delta</th><th>Delta %</th><th>Verdict</th><th>Approved by</th><th>Source</th></tr></thead>
+  <tbody>{% for row in approved_mapping_rows %}<tr>
+    <td>{{ row.label }}</td><td>{{ row.account_number or "-" }}</td><td>{{ row.python_value|number }}</td><td>{{ row.accounts_value|number }}</td>
+    <td>{{ row.delta|number }}</td><td>{{ row.delta_pct|percentage }}</td><td class="status status-{{ row.verdict }}">{{ row.verdict }}</td>
+    <td>{{ row.approved_by }}</td><td>{{ row.source_label }}</td>
+  </tr>{% endfor %}</tbody>
 </table>
-{% else %}
-<p class="note">No traceable figures were produced for this file.</p>
-{% endif %}
+{% else %}<p class="muted">None - no accounting mappings were approved.</p>{% endif %}
 
-<h2>Section 6 — Audit trail</h2>
-{% if decisions %}
-<table>
-  <tr><th>Gate</th><th>Finding</th><th>Action</th><th>Reason</th><th>User</th><th>Timestamp</th></tr>
-  {% for d in decisions %}
-  <tr>
-    <td>{{ d.gate_number }}</td>
-    <td>{{ d.finding_id or "-" }}</td>
-    <td>{{ d.action }}</td>
-    <td>{{ d.reason or "-" }}</td>
-    <td>{{ d.user_name }}</td>
-    <td>{{ d.timestamp }}</td>
-  </tr>
-  {% endfor %}
+<h3>Proposed but not yet approved - excluded from verdict</h3>
+{% if proposed_mapping_rows %}
+<table id="proposed-mappings-table">
+  <thead><tr><th>Label</th><th>Account</th><th>Python value</th><th>Accounts value</th><th>Delta</th><th>Delta %</th><th>Verdict</th><th>Confidence</th><th>Mapping type</th></tr></thead>
+  <tbody>{% for row in proposed_mapping_rows %}<tr>
+    <td>{{ row.label }}</td><td>{{ row.account_number or "-" }}</td><td>{{ row.python_value|number }}</td><td>{{ row.accounts_value|number }}</td>
+    <td>{{ row.delta|number }}</td><td>{{ row.delta_pct|percentage }}</td><td class="status status-{{ row.verdict }}">{{ row.verdict }}</td>
+    <td>{{ "%.1f"|format(row.suggested_confidence) ~ "%" if row.suggested_confidence is not none else "-" }}</td><td>{{ row.mapping_type }}</td>
+  </tr>{% endfor %}</tbody>
 </table>
-{% else %}
-<p class="note">No audit trail entries were recorded for this report.</p>
-{% endif %}
+{% else %}<p class="muted">None - every proposal used by the report has a recorded approval.</p>{% endif %}
 
-<div class="footer">
-  This report was generated by Excel Audit Agent. All findings were reviewed and approved by a named human before publication.
+<h3>Bidirectional completeness</h3>
+<div class="gap-grid">
+  <div class="gap-column"><strong>Reference figures with no Python counterpart</strong>
+    {% if report.unmatched_reference_items %}<ul>{% for item in report.unmatched_reference_items %}<li>{{ item }}</li>{% endfor %}</ul>{% else %}<p>None - every reference figure was mapped.</p>{% endif %}
+  </div>
+  <div class="gap-column"><strong>Designated outputs with no accounting counterpart</strong>
+    {% if report.unmapped_python_outputs %}<ul>{% for item in report.unmapped_python_outputs %}<li>{{ item }}</li>{% endfor %}</ul>{% else %}<p>None - every designated output was mapped.</p>{% endif %}
+  </div>
 </div>
 
+<h3>Requires manual reconciliation (aggregation not computed)</h3>
+{% if manual_mapping_rows %}<ul>{% for row in manual_mapping_rows %}<li>{{ row.label }} - {{ row.mapping_type }}: {{ row.approval_note or "Manual treatment reason not recorded." }}</li>{% endfor %}</ul>
+{% else %}<p class="muted">None.</p>{% endif %}
+{% else %}
+<p class="not-performed">Not performed - no reference figures provided</p>
+{% endif %}
+
+<h2>Section 4 - Tab documentation</h2>
+{% if report.documentation %}
+{% for document in report.documentation %}
+<div class="doc-block">
+  <h3>{{ document.tab_name }}</h3>
+  <p class="warning">This is an AI-generated description of what the formulas do, not an assessment of whether the methodology is appropriate.</p>
+  <p><strong>Method summary:</strong> {{ document.method_summary }}</p>
+  <p><strong>Assumptions:</strong> {{ document.assumptions|join("; ") if document.assumptions else "None noted" }}</p>
+  <p><strong>Data sources:</strong> {{ document.data_sources|join("; ") if document.data_sources else "None noted" }}</p>
+  <p><strong>Anomalies:</strong> {{ document.anomalies_noted|join("; ") if document.anomalies_noted else "None noted" }}</p>
+  <p><strong>Role notes:</strong> {{ document.role_notes or "None" }}</p>
+</div>
+{% endfor %}
+{% else %}<p class="muted">No tab documentation was generated.</p>{% endif %}
+
+<h2>Section 5 - Traceability index (For auditor review)</h2>
+{% if report.traceability_index %}
+{% for entry in report.traceability_index %}
+<div class="trace-entry">
+  <h3>{{ entry.report_figure_label }}</h3>
+  <p><strong>Value:</strong> {{ entry.report_value|number }} &nbsp; <strong>Trace status:</strong> {{ entry.trace_status }}</p>
+  <strong>Excel derivation chain</strong>
+  {% if entry.derivation %}<ol>{% for step in entry.derivation %}<li><strong>{{ step.cell_ref }}</strong>{% if step.formula %} - {{ step.formula }}{% endif %}{% if not step.is_supported %} (unsupported){% endif %}</li>{% endfor %}</ol>
+  {% else %}<p>Not traceable - no derivation chain was available.</p>{% endif %}
+  {% if entry.accounting_provenance %}
+  <strong>Accounting provenance</strong>
+  <table class="meta">
+    <tr><td>Account number</td><td>{{ entry.accounting_provenance.account_number or "-" }}</td></tr>
+    <tr><td>Ledger source</td><td>{{ entry.accounting_provenance.ledger_source }}</td></tr>
+    <tr><td>Entity / period / currency</td><td>{{ entry.accounting_provenance.entity }} / {{ entry.accounting_provenance.period }} / {{ entry.accounting_provenance.currency }}</td></tr>
+    <tr><td>Evidence reference</td><td>{{ entry.accounting_provenance.evidence_ref or "-" }}</td></tr>
+    <tr><td>Approved by</td><td>{{ entry.accounting_provenance.approved_by }}</td></tr>
+  </table>
+  {% endif %}
+</div>
+{% endfor %}
+{% else %}<p>Not traceable - no traceability entries were produced.</p>{% endif %}
+
+<section class="section-six">
+<h2>Section 6 - Data sent to third-party AI service</h2>
+<p>Documentation for this report was generated using the Anthropic API under Anthropic's commercial terms. Only the cell ranges listed below were transmitted; free-text cells over 40 characters and external-link references were withheld by default. See <a href="{{ anthropic_retention_url }}">Anthropic's current API data retention documentation</a> for Anthropic's data handling terms - this report does not constitute a legal or regulatory determination that this transmission is compliant with any specific jurisdiction's data protection requirements; that determination is the preparer's responsibility.</p>
+{% if report.llm_data_manifest %}
+<table>
+  <thead><tr><th>Tab</th><th>Cells included</th><th>Cells excluded</th><th>Exclusion reasons</th></tr></thead>
+  <tbody>{% for manifest in report.llm_data_manifest %}<tr>
+    <td>{{ manifest.tab_name }}</td><td>{{ manifest.cell_refs_included|length }}<br><span class="small">{{ manifest.cell_refs_included|join(", ") or "None" }}</span></td>
+    <td>{{ manifest.cell_refs_excluded|length }}</td>
+    <td>{% if manifest.exclusion_reasons %}<ul>{% for ref, reason in manifest.exclusion_reasons.items() %}<li>{{ ref }}: {{ reason }}</li>{% endfor %}</ul>{% else %}None{% endif %}</td>
+  </tr>{% endfor %}</tbody>
+</table>
+{% else %}<p class="muted">No Anthropic API calls were recorded for this report.</p>{% endif %}
+</section>
+
+<h2>Section 7 - Audit trail and evidence integrity</h2>
+<p><strong>Tamper-evident:</strong> Tamper-evident means any modification to the underlying log after the fact can be detected by re-verifying its hash chain - it does not mean the log file itself cannot be edited by someone with direct access to this machine.</p>
+<p>{{ report.audit_log_verification_note }}</p>
+<p><strong>Gate 3 incomplete-result acknowledgement:</strong>
+{% if acknowledge_incomplete is sameas true %}Yes{% elif acknowledge_incomplete is sameas false %}No{% else %}Not recorded{% endif %}</p>
+{% if audit_rows %}
+<table>
+  <thead><tr><th>Row</th><th>Event type</th><th>Gate</th><th>Action / outcome</th><th>Actor</th><th>Timestamp</th><th>Row hash</th></tr></thead>
+  <tbody>{% for row in audit_rows %}<tr>
+    <td>{{ row.row_id }}</td><td>{{ row.event_type }}</td><td>{{ row.gate }}</td><td>{{ row.action }}</td><td>{{ row.actor }}</td><td>{{ row.timestamp }}</td><td>{{ row.row_hash[:12] }}{% if row.row_hash|length > 12 %}…{% endif %}</td>
+  </tr>{% endfor %}</tbody>
+</table>
+{% else %}<p class="muted">No audit trail entries were supplied to the generator.</p>{% endif %}
+
+<h2>Appendix - Evidence identifiers</h2>
+<table class="meta">
+  <tr><td>Full workbook hash</td><td>{{ report.workbook_hash }}</td></tr>
+  <tr><td>Code version</td><td>{{ report.code_version }}</td></tr>
+  <tr><td>Report ID</td><td>{{ report.report_id }}</td></tr>
+  <tr><td>Run ID</td><td>{{ report.validation_run_id }}</td></tr>
+</table>
+
+<div class="footer-note">Translation and reconciliation result, not an actuarial validation - see page 1. Named approval record, not a formal or legal instrument; tamper-evident, not protected from direct file editing - see page 1. Every finding was reviewed and dispositioned (confirmed, overridden, or dismissed) by a named human - see Section 2 for each actual disposition.</div>
 </body>
 </html>

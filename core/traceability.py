@@ -1,164 +1,166 @@
-"""Builds the cell-level traceability index an auditor can follow independently."""
+"""Builds the traceability index — where every figure in the report came from.
 
-import re
+There is no value matching anywhere in this module, and that absence is the
+point. The original design located a figure's source by searching the workbook
+for a cell holding the same number, which picks the wrong cell whenever a value
+repeats — and zeros, round numbers, and coincidental equalities are ordinary in
+a real workbook. Every entry here is built from a chain something upstream
+already constructed while it knew exactly where the number came from.
 
-from core.models import AnomalyFinding, FileContext, ParsedFile, ReconciliationLine, TraceabilityEntry
+`trace_status` carries a specific reason rather than a yes/no. When an auditor
+hits a gap in the index, "there is no trace" is not the useful fact; "the
+mapping exists but nobody has approved it" is.
+"""
 
-_FIRST_CELL_REF = re.compile(
-    r"(?:'([^']+)'!|([A-Za-z_][A-Za-z0-9_. ]*)!)?\$?([A-Za-z]{1,3})\$?(\d{1,7})"
+from typing import Optional
+
+from core.models import (
+    AccountingProvenance,
+    AccountMapping,
+    AnomalyFinding,
+    DerivationStep,
+    ParsedFile,
+    ReconciliationLine,
+    ReconciliationResult,
+    ReferenceFigures,
+    TraceabilityEntry,
 )
-_NUMERIC_LITERAL = re.compile(r"^-?[\d,]+\.?\d*%?$")
 
 
 def build_traceability_index(
     parsed_file: ParsedFile,
-    reconciliation: list[ReconciliationLine],
+    result: ReconciliationResult,
     findings: list[AnomalyFinding],
-    file_context: FileContext,
+    reference_figures: Optional[ReferenceFigures] = None,
 ) -> list[TraceabilityEntry]:
-    entries: dict[tuple, TraceabilityEntry] = {}
+    """One entry per figure the report depends on. Nothing is ever omitted."""
+    entries: list[TraceabilityEntry] = []
+    mappings_by_id = {mapping.mapping_id: mapping for mapping in result.mappings}
+    reference_lines_by_id = (
+        {line.line_id: line for line in reference_figures.lines} if reference_figures else {}
+    )
 
-    for line in reconciliation:
-        _add_entry(entries, _trace_source_value(parsed_file, line))
-        _add_entry(entries, _trace_target_value(parsed_file, line))
+    for line in result.lines:
+        if line.check_type == "excel_vs_python":
+            entries.append(_excel_entry(line))
+        else:
+            entries.append(_accounts_entry(line, mappings_by_id, reference_lines_by_id))
+
+    for line_id in result.unmatched_reference_items:
+        reference_line = reference_lines_by_id.get(line_id)
+        entries.append(
+            TraceabilityEntry(
+                report_figure_label=(
+                    f"{reference_line.label} ({line_id})" if reference_line else line_id
+                ),
+                report_value=reference_line.amount if reference_line else None,
+                derivation=[],
+                accounting_provenance=None,
+                # The ledger side of the same gap Step 7 recorded in
+                # unmatched_reference_items, made visible here too.
+                trace_status="unmapped",
+            )
+        )
 
     for finding in findings:
-        entry = _trace_finding(parsed_file, finding)
-        if entry is not None:
-            _add_entry(entries, entry)
+        entries.append(_finding_entry(finding, parsed_file))
 
-    return list(entries.values())
+    return entries
 
 
-def _add_entry(entries: dict[tuple, TraceabilityEntry], entry: TraceabilityEntry) -> None:
-    key = (
-        entry.source_tab,
-        entry.source_cell,
-        entry.report_figure_label if entry.source_cell is None else None,
-        round(entry.report_value, 9),
-    )
-    entries.setdefault(key, entry)
+def _excel_entry(line: ReconciliationLine) -> TraceabilityEntry:
+    """A reconstruction chain is already a trace. Nothing more is needed.
 
-
-def _trace_source_value(parsed_file: ParsedFile, line: ReconciliationLine) -> TraceabilityEntry:
-    if line.check_type == "excel_vs_python":
-        # Excel's own cached result for the formula cell -- a direct read.
-        return _entry_for_cell(
-            parsed_file,
-            label=line.label,
-            value=line.source_value,
-            cell_key=line.source_cell,
-            derivation_note="Read directly from cell (Excel's cached formula result).",
-        )
-    # python_vs_accounts: source_value is the Pass 1 Python reconstruction,
-    # not a direct cell read -- trace to its primary input cell instead.
-    return _entry_for_primary_input(
-        parsed_file, label=line.label, value=line.source_value, formula_cell_key=line.source_cell
-    )
-
-
-def _trace_target_value(parsed_file: ParsedFile, line: ReconciliationLine) -> TraceabilityEntry:
-    if line.check_type == "excel_vs_python":
-        return _entry_for_primary_input(
-            parsed_file, label=line.label, value=line.target_value, formula_cell_key=line.source_cell
-        )
-    # python_vs_accounts: target_value is an external reference figure,
-    # never present in the workbook at all.
+    A partial chain is included in full, with its unsupported nodes visible as
+    is_supported=False rather than dropped — a reviewer needs to see how far the
+    reconstruction got and precisely where it stopped.
+    """
     return TraceabilityEntry(
         report_figure_label=line.label,
+        report_value=line.target_value if line.target_value is not None else line.source_value,
+        derivation=line.derivation,
+        accounting_provenance=None,
+        trace_status="traced" if line.completeness == "complete" else "partially_traced",
+    )
+
+
+def _accounts_entry(
+    line: ReconciliationLine,
+    mappings_by_id: dict[str, AccountMapping],
+    reference_lines_by_id: dict,
+) -> TraceabilityEntry:
+    """The accounting side, which needs its own provenance to point at.
+
+    Checked in precedence order, stopping at the first that applies, so each
+    gap reports the specific reason it is a gap.
+    """
+    entry = TraceabilityEntry(
+        report_figure_label=line.label,
         report_value=line.target_value,
-        source_tab=None,
-        source_cell=None,
-        source_formula=None,
-        derivation_note="External reference figure supplied by the user, not sourced from the workbook.",
+        derivation=line.derivation,
+        accounting_provenance=None,
+        trace_status="not_traceable",
     )
 
+    if line.mapping_id is None:
+        entry.trace_status = "unmapped"
+        return entry
 
-def _entry_for_cell(
-    parsed_file: ParsedFile, label: str, value: float, cell_key: str | None, derivation_note: str
-) -> TraceabilityEntry:
-    if not cell_key or "!" not in cell_key:
-        return TraceabilityEntry(
-            report_figure_label=label,
-            report_value=value,
-            source_tab=None,
-            source_cell=None,
-            source_formula=None,
-            derivation_note="No source cell could be identified for this figure.",
-        )
-    tab, cell_ref = cell_key.split("!", 1)
-    formula = parsed_file.cells.get(cell_key)
-    formula_text = formula if isinstance(formula, str) and formula.startswith("=") else None
+    mapping = mappings_by_id.get(line.mapping_id)
+    if mapping is None:
+        # A line naming a mapping that isn't in the result. Recorded as a
+        # specific fact rather than quietly dropped.
+        entry.trace_status = "not_traceable"
+        return entry
+
+    if not mapping.is_approved:
+        entry.trace_status = "mapping_pending_approval"
+        return entry
+
+    if mapping.mapping_type != "one_to_one":
+        # Aggregation is explicitly not computed by this tool, so an approved
+        # aggregate mapping still cannot produce a traced figure.
+        entry.trace_status = "mapping_rejected"
+        return entry
+
+    reference_line = reference_lines_by_id.get(mapping.reference_line_id)
+    if reference_line is None:
+        entry.trace_status = "not_traceable"
+        return entry
+
+    # Built from the two objects that were actually used, never a fresh lookup.
+    entry.accounting_provenance = AccountingProvenance(
+        reference_line_id=reference_line.line_id,
+        account_number=reference_line.account_number,
+        ledger_source=reference_line.ledger_source,
+        entity=reference_line.entity,
+        period=reference_line.period,
+        currency=reference_line.currency,
+        evidence_ref=reference_line.evidence_ref,
+        mapping_id=mapping.mapping_id,
+        approved_by=mapping.approved_by or "",
+    )
+    entry.trace_status = "traced"
+    return entry
+
+
+def _finding_entry(finding: AnomalyFinding, parsed_file: ParsedFile) -> TraceabilityEntry:
+    """A finding already knows its exact cell. No reconstruction is involved."""
+    full_ref = f"{finding.tab}!{finding.cell_ref}" if finding.cell_ref else finding.tab
+    record = parsed_file.cells.get(full_ref)
+
     return TraceabilityEntry(
-        report_figure_label=label,
-        report_value=value,
-        source_tab=tab,
-        source_cell=cell_ref,
-        source_formula=formula_text,
-        derivation_note=derivation_note,
-    )
-
-
-def _entry_for_primary_input(
-    parsed_file: ParsedFile, label: str, value: float, formula_cell_key: str | None
-) -> TraceabilityEntry:
-    if not formula_cell_key or "!" not in formula_cell_key:
-        return TraceabilityEntry(
-            report_figure_label=label,
-            report_value=value,
-            source_tab=None,
-            source_cell=None,
-            source_formula=None,
-            derivation_note="No source cell could be identified for this computed figure.",
-        )
-
-    tab, cell_ref = formula_cell_key.split("!", 1)
-    formula = parsed_file.cells.get(formula_cell_key)
-
-    if isinstance(formula, str) and formula.startswith("="):
-        match = _FIRST_CELL_REF.search(formula[1:])
-        if match:
-            quoted_tab, unquoted_tab, col, row = match.groups()
-            input_tab = quoted_tab or unquoted_tab or tab
-            return TraceabilityEntry(
-                report_figure_label=label,
-                report_value=value,
-                source_tab=input_tab,
-                source_cell=f"{col.upper()}{row}",
-                source_formula=formula,
-                derivation_note=(
-                    f"Computed as {formula} (see Agent 3 reconstruction); cell shown is its "
-                    f"primary input, not a direct read."
-                ),
+        report_figure_label=f"Finding {finding.finding_id}: {finding.description}",
+        report_value=None,
+        derivation=[
+            DerivationStep(
+                cell_ref=full_ref,
+                formula=record.formula if record else None,
+                depends_on=list(parsed_file.cell_dependency_graph.get(full_ref, [])),
+                resolved_value=None,
+                is_supported=True,
             )
-
-    return TraceabilityEntry(
-        report_figure_label=label,
-        report_value=value,
-        source_tab=tab,
-        source_cell=cell_ref,
-        source_formula=formula if isinstance(formula, str) else None,
-        derivation_note=(
-            "Computed in Python; no formula was found on its originating cell to identify a "
-            "primary input."
-        ),
-    )
-
-
-def _trace_finding(parsed_file: ParsedFile, finding: AnomalyFinding) -> TraceabilityEntry | None:
-    raw = finding.raw_value.strip()
-    if raw.startswith("=") or not _NUMERIC_LITERAL.match(raw):
-        return None  # not a single traceable figure (a formula, error code, or non-numeric note)
-
-    value = float(raw.replace(",", "").replace("%", ""))
-    cell_key = f"{finding.tab}!{finding.cell_ref}"
-    formula = parsed_file.cells.get(cell_key)
-
-    return TraceabilityEntry(
-        report_figure_label=finding.description,
-        report_value=value,
-        source_tab=finding.tab,
-        source_cell=finding.cell_ref,
-        source_formula=formula if isinstance(formula, str) and formula.startswith("=") else None,
-        derivation_note="Read directly from cell.",
+        ],
+        accounting_provenance=None,
+        trace_status="traced",
     )

@@ -16,6 +16,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+# The audit log and pipeline snapshots share this SQLite file. Keep it outside
+# the image filesystem so evidence and sensitive workbook content live only in
+# the explicitly mounted data volume.
+ENV AUDIT_DB_PATH=/data/audit.db
+RUN mkdir -p /data
+VOLUME ["/data"]
+
 EXPOSE 8501
 
 CMD ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0"]

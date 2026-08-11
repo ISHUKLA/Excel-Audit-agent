@@ -1,0 +1,4 @@
+{
+  "default_pct_threshold": 0.01,
+  "default_absolute_threshold": 100.0
+}

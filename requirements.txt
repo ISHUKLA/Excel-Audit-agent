@@ -1,3 +1,9 @@
+# sqlite3 backs the audit log (core/audit_log.py). It is part of the Python
+# standard library — no package line below, nothing to install.
+#
+# libreoffice is a SYSTEM dependency needed only to build test fixtures with
+# real cached formula values. See README.md — it is not needed to run app.py.
+
 openpyxl
 pandas
 numpy

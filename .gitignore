@@ -10,5 +10,7 @@ venv/
 .streamlit/secrets.toml
 audit.db
 *.db
+.local-data/
+pkcs11.txt
 
 .DS_Store

@@ -1,22 +1,57 @@
-"""Runs two independent reconciliation passes: Excel-vs-Python (internal) and Python-vs-accounts (external, for the CFO)."""
+"""Agent 3 — two independent reconciliation passes.
+
+Pass 1 compares the workbook's own cached values against a Python
+reconstruction of its formulas. Pass 2 compares those Python values against
+accounting figures. They are separate functions and produce separately-labelled
+lines, because collapsing them into one verdict destroys the distinction between
+"this spreadsheet doesn't agree with itself" and "this spreadsheet doesn't agree
+with the ledger" — two very different problems.
+
+EVERY verdict this module produces is a PREVIEW, computed against whatever
+thresholds were passed in before any human approved them. `verdicts_are_final`
+is False on the returned object and Gate 3 is the only place it becomes True.
+
+Pass 2 produces PROPOSALS, never approvals. A fuzzy match — at any confidence —
+creates an AccountMapping with is_approved=False. There is no code path here
+that sets it True.
+"""
 
 import ast
 import operator
 import re
+from typing import Optional
 
 from openpyxl.utils import column_index_from_string, get_column_letter
 from openpyxl.utils.cell import coordinate_from_string
 from rapidfuzz import fuzz
 
-from core.models import FileContext, ParsedFile, ReconciliationLine, ReferenceFigures
-
-_CONFIDENT_THRESHOLD = 85.0
-_AMBIGUOUS_THRESHOLD = 60.0
-_CLOSE_CANDIDATE_MARGIN = 5.0
-
-_CELL_REF_TOKEN = re.compile(
-    r"(?:'([^']+)'!|([A-Za-z_][A-Za-z0-9_. ]*)!)?\$?([A-Za-z]{1,3})\$?(\d{1,7})"
+# Single source of truth for how a cell reference is parsed. Imported rather
+# than re-declared so the graph the parser built and the substitutions made here
+# can never drift apart.
+from agents.parser import _CELL_REF_PATTERN, _expand_range, _normalize
+from core.models import (
+    AccountMapping,
+    CellRecord,
+    DerivationStep,
+    ParsedFile,
+    ReconciliationLine,
+    ReconciliationResult,
+    ReferenceFigureLine,
+    ReferenceFigures,
 )
+from core.verdict_logic import compute_verdict
+
+DEFAULT_PCT_THRESHOLD = 0.01
+DEFAULT_ABSOLUTE_THRESHOLD = 100.0
+
+# Deliberately small. Anything outside it is reported as unsupported rather than
+# approximated — a partially-interpreted VLOOKUP is a wrong number wearing a
+# right number's clothes.
+_SUPPORTED_FUNCTIONS = {"SUM"}
+
+_FUNCTION_PATTERN = re.compile(r"([A-Za-z_][A-Za-z0-9_.]*)\s*\(")
+_SUM_PATTERN = re.compile(r"SUM\(([^()]*)\)", re.IGNORECASE)
+_STRING_LITERAL_PATTERN = re.compile(r'"[^"]*"')
 
 _ALLOWED_OPERATORS = {
     ast.Add: operator.add,
@@ -27,247 +62,473 @@ _ALLOWED_OPERATORS = {
     ast.UAdd: operator.pos,
 }
 
+# Fuzzy match bands. These decide what gets PROPOSED, never what gets approved.
+_CONFIDENT_MATCH = 85.0
+_PLAUSIBLE_MATCH = 60.0
+_AMBIGUITY_GAP = 5.0
+
+_AGGREGATION_NOTE = (
+    "Requires manual reconciliation — aggregation is not computed by this tool."
+)
+
 
 class _UnresolvableReference(Exception):
-    pass
+    """A reference that cannot become a number: text, a date, or a missing chain."""
+
+
+# ---------------------------------------------------------------------------
+# entry point
+# ---------------------------------------------------------------------------
 
 
 def run_reconciliation(
     parsed_file: ParsedFile,
-    file_context: FileContext,
-    reference_figures: ReferenceFigures | None = None,
-    internal_threshold: float = 0.01,
-    external_threshold: float = 0.01,
-) -> tuple[list[ReconciliationLine], list[str]]:
-    pass1_lines = reconcile_excel_vs_python(parsed_file, file_context, internal_threshold)
+    authoritative_outputs: list[str],
+    reference_figures: Optional[ReferenceFigures] = None,
+    pct_threshold: float = DEFAULT_PCT_THRESHOLD,
+    absolute_threshold: float = DEFAULT_ABSOLUTE_THRESHOLD,
+    default_pct_threshold: float = DEFAULT_PCT_THRESHOLD,
+    default_absolute_threshold: float = DEFAULT_ABSOLUTE_THRESHOLD,
+    warnings: Optional[list[str]] = None,
+) -> ReconciliationResult:
+    """Run both passes and return everything in one object.
 
-    if reference_figures is None:
-        return pass1_lines, []
-
-    pass2_lines, unmatched = reconcile_python_vs_accounts(
-        pass1_lines, reference_figures, external_threshold
+    `authoritative_outputs` comes from the human at Gate 2. This agent never
+    infers which cells matter — an earlier design guessed the output tab by
+    keyword-matching the file description, which is not a basis for deciding
+    what a validation report is about.
+    """
+    warnings = warnings if warnings is not None else []
+    thresholds_are_default = (
+        pct_threshold == default_pct_threshold and absolute_threshold == default_absolute_threshold
     )
-    return pass1_lines + pass2_lines, unmatched
+
+    internal_lines = reconcile_excel_vs_python(
+        parsed_file=parsed_file,
+        authoritative_outputs=authoritative_outputs,
+        pct_threshold=pct_threshold,
+        absolute_threshold=absolute_threshold,
+        thresholds_are_default=thresholds_are_default,
+        warnings=warnings,
+    )
+
+    mappings: list[AccountMapping] = []
+    external_lines: list[ReconciliationLine] = []
+    unmatched_reference_items: list[str] = []
+    unmapped_python_outputs: list[str] = []
+
+    if reference_figures is not None:
+        (
+            external_lines,
+            mappings,
+            unmatched_reference_items,
+            unmapped_python_outputs,
+        ) = reconcile_python_vs_accounts(
+            internal_lines=internal_lines,
+            authoritative_outputs=authoritative_outputs,
+            reference_figures=reference_figures,
+            pct_threshold=pct_threshold,
+            absolute_threshold=absolute_threshold,
+            thresholds_are_default=thresholds_are_default,
+        )
+
+    return ReconciliationResult(
+        lines=internal_lines + external_lines,
+        mappings=mappings,
+        unmatched_reference_items=unmatched_reference_items,
+        unmapped_python_outputs=unmapped_python_outputs,
+        # Preview only. Gate 3 recomputes every one of these.
+        verdicts_are_final=False,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Pass 1 — the workbook against a Python reconstruction of itself
+# ---------------------------------------------------------------------------
 
 
 def reconcile_excel_vs_python(
     parsed_file: ParsedFile,
-    file_context: FileContext,
-    internal_threshold: float = 0.01,
+    authoritative_outputs: list[str],
+    pct_threshold: float,
+    absolute_threshold: float,
+    thresholds_are_default: bool,
+    warnings: list[str],
 ) -> list[ReconciliationLine]:
-    output_tab = _identify_output_tab(parsed_file, file_context)
-    lines: list[ReconciliationLine] = []
+    lines = []
+    for output_ref in authoritative_outputs:
+        chain, coverage, unsupported, root_value = _build_derivation(
+            output_ref, parsed_file, warnings
+        )
+        completeness = "complete" if coverage >= 100.0 else "partial"
 
-    for key, value in parsed_file.cells.items():
-        tab, cell_ref = key.split("!", 1)
-        if tab != output_tab or not (isinstance(value, str) and value.startswith("=")):
-            continue
+        record = parsed_file.cells.get(output_ref)
+        source_value = _as_number(record.cached_value) if record else None
+        if record is not None and record.is_stale:
+            warnings.append(
+                f"{output_ref}: the workbook's own value is stale (never recalculated, or "
+                f"the workbook is set to manual calculation) — the comparison is against a "
+                f"value Excel itself has not refreshed"
+            )
 
-        excel_value = parsed_file.cached_values.get(key)
-        if not _is_number(excel_value):
-            continue  # Excel never cached a value for this formula -- nothing to compare against
+        # A partial reconstruction has no target value. Reporting the fraction
+        # that did resolve would invite comparing it to the whole.
+        target_value = root_value if completeness == "complete" else None
+        delta, delta_pct = _delta(source_value, target_value)
 
-        python_value = _reconstruct_formula(value, tab, parsed_file.cached_values)
-        if python_value is None:
-            continue  # unresolvable reference or unsupported (non +-*/) function -- skip for MVP
-
-        label = _derive_label(tab, cell_ref, parsed_file.cells)
         lines.append(
-            _build_line(
+            ReconciliationLine(
                 check_type="excel_vs_python",
-                label=label,
-                source_value=float(excel_value),
-                target_value=float(python_value),
-                threshold=internal_threshold,
-                source_cell=key,
+                label=_derive_label(output_ref, parsed_file.cells),
+                source_value=source_value,
+                target_value=target_value,
+                delta=delta,
+                delta_pct=delta_pct,
+                verdict=compute_verdict(
+                    delta, delta_pct, pct_threshold, absolute_threshold, completeness
+                ),
+                pct_threshold=pct_threshold,
+                absolute_threshold=absolute_threshold,
+                threshold_is_default=thresholds_are_default,
+                completeness=completeness,
+                reconstruction_coverage_pct=coverage,
+                unsupported_elements=unsupported,
+                derivation=chain,
+                mapping_id=None,
             )
         )
-
     return lines
 
 
+# ---------------------------------------------------------------------------
+# Pass 2 — the Python values against the accounts
+# ---------------------------------------------------------------------------
+
+
 def reconcile_python_vs_accounts(
-    pass1_lines: list[ReconciliationLine],
+    internal_lines: list[ReconciliationLine],
+    authoritative_outputs: list[str],
     reference_figures: ReferenceFigures,
-    external_threshold: float = 0.01,
-) -> tuple[list[ReconciliationLine], list[str]]:
-    candidates = [line for line in pass1_lines if line.check_type == "excel_vs_python"]
+    pct_threshold: float,
+    absolute_threshold: float,
+    thresholds_are_default: bool,
+) -> tuple[list[ReconciliationLine], list[AccountMapping], list[str], list[str]]:
+    """Propose mappings and preliminary comparisons. Approve nothing.
 
+    Returns (lines, mappings, unmatched_reference_items, unmapped_python_outputs).
+    The last two are computed from opposite directions and are not the same
+    question asked twice: one asks whether every ledger line found a home, the
+    other whether every designated output did.
+    """
     lines: list[ReconciliationLine] = []
-    unmatched: list[str] = []
+    mappings: list[AccountMapping] = []
+    unmatched_reference_items: list[str] = []
+    mapped_outputs: set[str] = set()
 
-    for ref_label, accounts_value in reference_figures.line_items.items():
-        if not candidates:
-            unmatched.append(ref_label)
-            continue
+    by_output = {line.label: line for line in internal_lines}
+    output_by_ref = dict(zip(authoritative_outputs, internal_lines))
 
+    for index, reference_line in enumerate(reference_figures.lines, start=1):
         scored = sorted(
-            ((_label_similarity(ref_label, c.label), c) for c in candidates),
-            key=lambda pair: pair[0],
+            (
+                (_label_similarity(reference_line.label, line.label), ref, line)
+                for ref, line in output_by_ref.items()
+                # A designated output can support only one proposed accounting
+                # mapping.  Without this guard, duplicate ledger labels reuse
+                # the same output and silently disappear from the unmatched
+                # population instead of remaining visible for human review.
+                if ref not in mapped_outputs
+            ),
+            key=lambda item: item[0],
             reverse=True,
         )
-        best_score, best_candidate = scored[0]
 
-        if best_score < _AMBIGUOUS_THRESHOLD:
-            unmatched.append(ref_label)
+        if not scored or scored[0][0] < _PLAUSIBLE_MATCH:
+            # No plausible counterpart. No mapping is invented for it.
+            unmatched_reference_items.append(reference_line.line_id)
             continue
 
-        is_ambiguous = best_score < _CONFIDENT_THRESHOLD
-        if not is_ambiguous and len(scored) > 1 and best_score - scored[1][0] <= _CLOSE_CANDIDATE_MARGIN:
-            is_ambiguous = True
+        best_score, best_ref, best_line = scored[0]
+        contenders = [item for item in scored if best_score - item[0] <= _AMBIGUITY_GAP]
+        mapping_id = f"MAP-{index:04d}"
 
-        match_note = None
-        if is_ambiguous:
-            match_note = (
-                f"Ambiguous match ({best_score:.0f}% similarity) between reference label "
-                f"'{ref_label}' and computed label '{best_candidate.label}' -- a human should "
-                f"confirm this pairing itself, not just the numeric delta."
+        if len(contenders) > 1:
+            # Genuinely can't tell which output this ledger line belongs to.
+            # Recorded as unsupported aggregation rather than resolved by
+            # picking the first one and hoping.
+            mapping = AccountMapping(
+                mapping_id=mapping_id,
+                python_output_cell_ref=best_ref,
+                reference_line_id=reference_line.line_id,
+                mapping_type="one_to_many",
+                suggested_by="fuzzy_match",
+                suggested_confidence=round(best_score, 2),
+                approval_note=(
+                    f"{_AGGREGATION_NOTE} Candidates scored within {_AMBIGUITY_GAP} points: "
+                    + ", ".join(f"{ref} ({score:.1f})" for score, ref, _ in contenders)
+                ),
+                is_approved=False,
             )
+            mappings.append(mapping)
+            for _, ref, _ in contenders:
+                mapped_outputs.add(ref)
+            # No comparison line: aggregation is explicitly not computed.
+            continue
+
+        is_ambiguous = best_score < _CONFIDENT_MATCH
+        mapping = AccountMapping(
+            mapping_id=mapping_id,
+            python_output_cell_ref=best_ref,
+            reference_line_id=reference_line.line_id,
+            mapping_type="one_to_one",
+            suggested_by="fuzzy_match",
+            suggested_confidence=round(best_score, 2),
+            approval_note=(
+                f"Match itself needs confirmation: '{reference_line.label}' scored "
+                f"{best_score:.1f} against '{best_line.label}', below the "
+                f"{_CONFIDENT_MATCH:.0f} confidence band."
+                if is_ambiguous
+                else None
+            ),
+            # Never True here. Only a human at Gate 3 sets this.
+            is_approved=False,
+        )
+        mappings.append(mapping)
+        mapped_outputs.add(best_ref)
+
+        source_value = best_line.target_value
+        target_value = reference_line.amount
+        delta, delta_pct = _delta(source_value, target_value)
+        # Incompleteness propagates forward from Pass 1 regardless of what the
+        # numbers look like or whether the mapping is ever approved.
+        completeness = best_line.completeness
 
         lines.append(
-            _build_line(
+            ReconciliationLine(
                 check_type="python_vs_accounts",
-                label=best_candidate.label,
-                source_value=best_candidate.target_value,
-                target_value=float(accounts_value),
-                threshold=external_threshold,
-                source_cell=best_candidate.source_cell,
-                force_warn=is_ambiguous,
-                match_note=match_note,
+                label=f"{reference_line.label} ({reference_line.line_id})",
+                source_value=source_value,
+                target_value=target_value,
+                delta=delta,
+                delta_pct=delta_pct,
+                verdict=compute_verdict(
+                    delta,
+                    delta_pct,
+                    pct_threshold,
+                    absolute_threshold,
+                    completeness,
+                    is_ambiguous_match=is_ambiguous,
+                ),
+                pct_threshold=pct_threshold,
+                absolute_threshold=absolute_threshold,
+                threshold_is_default=thresholds_are_default,
+                completeness=completeness,
+                reconstruction_coverage_pct=best_line.reconstruction_coverage_pct,
+                unsupported_elements=best_line.unsupported_elements,
+                derivation=best_line.derivation,
+                mapping_id=mapping_id,
             )
         )
 
-    return lines, unmatched
+    unmapped_python_outputs = [ref for ref in authoritative_outputs if ref not in mapped_outputs]
+    return lines, mappings, unmatched_reference_items, unmapped_python_outputs
 
 
-def _build_line(
-    check_type: str,
-    label: str,
-    source_value: float,
-    target_value: float,
-    threshold: float,
-    source_cell: str | None,
-    force_warn: bool = False,
-    match_note: str | None = None,
-) -> ReconciliationLine:
-    delta_pct = _delta_pct(source_value, target_value)
-    delta = abs(source_value - target_value)
-    verdict = _classify_verdict(delta_pct, threshold, force_warn)
-
-    return ReconciliationLine(
-        check_type=check_type,
-        label=label,
-        source_value=source_value,
-        target_value=target_value,
-        delta=delta,
-        delta_pct=delta_pct,
-        verdict=verdict,
-        materiality_threshold=threshold,
-        source_cell=source_cell,
-        match_note=match_note,
-    )
+# ---------------------------------------------------------------------------
+# derivation chains
+# ---------------------------------------------------------------------------
 
 
-def apply_thresholds(
-    lines: list[ReconciliationLine], internal_threshold: float, external_threshold: float
-) -> list[ReconciliationLine]:
-    """Reclassify each line's verdict against a human-supplied materiality threshold.
+def _build_derivation(
+    root: str, parsed_file: ParsedFile, warnings: list[str]
+) -> tuple[list[DerivationStep], float, list[str], Optional[float]]:
+    """Walk the cell graph out from an output and reconstruct it in Python.
 
-    Recomputes only `verdict` and `materiality_threshold` from each line's already-computed
-    `delta`/`delta_pct` -- it does not touch label, source_cell, or match_note, and an
-    ambiguous match (match_note set) stays forced to "warn" regardless of the new threshold,
-    same as when the line was first produced.
+    Returns (chain, coverage_pct, unsupported_elements, root_value).
+
+    `is_supported` describes a node's OWN formula. A node whose formula is
+    perfectly supported but whose dependency failed still resolves to None — it
+    just isn't itself the reason.
     """
-    reclassified = []
-    for line in lines:
-        threshold = internal_threshold if line.check_type == "excel_vs_python" else external_threshold
-        verdict = _classify_verdict(line.delta_pct, threshold, force_warn=line.match_note is not None)
-        reclassified.append(
-            line.model_copy(update={"verdict": verdict, "materiality_threshold": threshold})
+    graph = parsed_file.cell_dependency_graph
+    reachable = _reachable_from(root, graph)
+    in_cycle = _cycle_nodes(reachable, graph)
+
+    steps: dict[str, DerivationStep] = {}
+    unsupported_elements: list[str] = []
+
+    def resolve(ref: str) -> DerivationStep:
+        if ref in steps:
+            return steps[ref]
+
+        record = parsed_file.cells.get(ref)
+        depends_on = list(graph.get(ref, []))
+        # Placed before recursion so a cycle cannot re-enter this node.
+        step = DerivationStep(
+            cell_ref=ref, formula=None, depends_on=depends_on, resolved_value=None, is_supported=True
         )
-    return reclassified
+        steps[ref] = step
+
+        if ref in in_cycle:
+            step.is_supported = False
+            unsupported_elements.append(f"{ref} is part of a circular reference (unsupported)")
+            return step
+
+        if record is None:
+            # A referenced cell that holds nothing. Excel reads it as zero.
+            warnings.append(f"{ref}: referenced but empty — treated as 0, per Excel's convention")
+            step.resolved_value = 0.0
+            return step
+
+        step.formula = record.formula
+
+        if record.formula is None:
+            value = _as_number(record.cached_value)
+            if value is None and record.cached_value is not None:
+                step.is_supported = False
+                unsupported_elements.append(
+                    f"{ref} holds a non-numeric value ({record.cached_value!r}) used in arithmetic "
+                    f"(unsupported)"
+                )
+                return step
+            if value is None:
+                warnings.append(f"{ref}: blank cell — treated as 0, per Excel's convention")
+            step.resolved_value = value if value is not None else 0.0
+            return step
+
+        reason = _unsupported_reason(record.formula)
+        if reason is not None:
+            step.is_supported = False
+            unsupported_elements.append(f"{ref} uses {reason}: {record.formula}")
+            return step
+
+        resolved_dependencies = {dep: resolve(dep) for dep in depends_on}
+        if any(child.resolved_value is None for child in resolved_dependencies.values()):
+            # Own formula is fine; something underneath it isn't.
+            return step
+
+        values = {dep: child.resolved_value for dep, child in resolved_dependencies.items()}
+        step.resolved_value = _evaluate(record.formula, ref, values, warnings)
+        return step
+
+    root_step = resolve(root)
+    chain = list(steps.values())
+    supported = sum(1 for step in chain if step.is_supported)
+    coverage = 100.0 if not chain else round(supported / len(chain) * 100, 6)
+
+    # A chain of entirely supported nodes that still didn't produce a number is
+    # not complete either — say so rather than reporting 100% and a None.
+    if root_step.resolved_value is None and coverage >= 100.0:
+        coverage = 0.0 if len(chain) == 1 else round((len(chain) - 1) / len(chain) * 100, 6)
+        unsupported_elements.append(
+            f"{root} could not be reconstructed even though every element is supported"
+        )
+
+    return chain, coverage, unsupported_elements, root_step.resolved_value
 
 
-def _delta_pct(source_value: float, target_value: float) -> float:
-    delta = abs(source_value - target_value)
-    if source_value == 0:
-        return 0.0 if delta == 0 else float("inf")
-    return delta / abs(source_value)
+def _reachable_from(root: str, graph: dict) -> set[str]:
+    seen, stack = set(), [root]
+    while stack:
+        node = stack.pop()
+        if node in seen:
+            continue
+        seen.add(node)
+        stack.extend(graph.get(node, []))
+    return seen
 
 
-def _classify_verdict(delta_pct: float, threshold: float, force_warn: bool) -> str:
-    if force_warn:
-        return "warn"
-    if delta_pct < threshold / 10:
-        return "pass"
-    if delta_pct < threshold:
-        return "warn"
-    return "block"
+def _cycle_nodes(reachable: set[str], graph: dict) -> set[str]:
+    """Every node that can reach itself. Not the same as "has a dependency"."""
+    import networkx as nx
+
+    subgraph = nx.DiGraph()
+    subgraph.add_nodes_from(reachable)
+    for node in reachable:
+        for dependency in graph.get(node, []):
+            if dependency in reachable:
+                subgraph.add_edge(node, dependency)
+    return {node for cycle in nx.simple_cycles(subgraph) for node in cycle}
 
 
-def _is_number(value: object) -> bool:
-    return isinstance(value, (int, float)) and not isinstance(value, bool)
+# ---------------------------------------------------------------------------
+# the supported formula catalogue
+# ---------------------------------------------------------------------------
 
 
-def _identify_output_tab(parsed_file: ParsedFile, file_context: FileContext) -> str:
-    description_lower = file_context.description.lower()
+def _unsupported_reason(formula: str) -> Optional[str]:
+    """Why this formula is outside the catalogue, or None if it is inside it."""
+    if formula.startswith("{="):
+        return "an array formula (unsupported)"
+    if "[" in formula and ".xls" in formula:
+        return "a reference to another workbook (unsupported)"
+    if _STRING_LITERAL_PATTERN.search(formula):
+        return "a text literal in arithmetic (unsupported)"
 
-    for tab in parsed_file.tab_names:
-        if tab.lower() in description_lower:
-            return tab
-
-    description_words = set(re.findall(r"[a-z0-9]+", description_lower))
-    best_tab, best_overlap = None, 0
-    for tab in parsed_file.tab_names:
-        tab_words = set(re.findall(r"[a-z0-9]+", tab.lower()))
-        overlap = len(tab_words & description_words)
-        if overlap > best_overlap:
-            best_tab, best_overlap = tab, overlap
-
-    # No keyword signal at all: fall back to the last tab (common convention for
-    # summary/output tabs). A wrong guess here is self-correcting -- a human
-    # reviews every produced line at Gate 2/3 regardless.
-    return best_tab or parsed_file.tab_names[-1]
+    functions = {name.upper() for name in _FUNCTION_PATTERN.findall(formula)}
+    outside = sorted(functions - _SUPPORTED_FUNCTIONS)
+    if outside:
+        return f"{', '.join(outside)} (unsupported)"
+    return None
 
 
-def _derive_label(tab: str, cell_ref: str, cells: dict) -> str:
-    col_letters, row = coordinate_from_string(cell_ref)
-    col_index = column_index_from_string(col_letters)
-
-    if col_index > 1:
-        left_key = f"{tab}!{get_column_letter(col_index - 1)}{row}"
-        left_value = cells.get(left_key)
-        if isinstance(left_value, str) and not left_value.startswith("="):
-            label = left_value.strip().rstrip(":").strip()
-            if label:
-                return label
-
-    return f"{tab}!{cell_ref}"
-
-
-def _reconstruct_formula(formula: str, own_tab: str, cached_values: dict) -> float | None:
+def _evaluate(formula: str, own_ref: str, values: dict, warnings: list[str]) -> Optional[float]:
+    """Compute a supported formula from its already-resolved dependencies."""
+    own_tab = own_ref.split("!", 1)[0]
     expr = formula[1:] if formula.startswith("=") else formula
 
-    def _replace(match: re.Match) -> str:
-        quoted_tab, unquoted_tab, col, row = match.groups()
-        tab = quoted_tab or unquoted_tab or own_tab
-        value = cached_values.get(f"{tab}!{col.upper()}{row}")
-        if not _is_number(value):
-            raise _UnresolvableReference()
+    def _sum_replacement(match: re.Match) -> str:
+        total = 0.0
+        for argument in match.group(1).split(","):
+            for key in _references_in(argument.strip(), own_tab):
+                value = values.get(key)
+                if value is None:
+                    warnings.append(
+                        f"{own_ref}: {key} is blank inside a SUM — treated as 0, per Excel's "
+                        f"convention"
+                    )
+                    value = 0.0
+                total += value
+        return repr(total)
+
+    expr = _SUM_PATTERN.sub(_sum_replacement, expr)
+
+    def _reference_replacement(match: re.Match) -> str:
+        quoted, plain, start, end = match.groups()
+        if end:
+            raise _UnresolvableReference("a bare range outside SUM")
+        tab = quoted or plain or own_tab
+        value = values.get(f"{tab}!{_normalize(start)}")
+        if value is None:
+            raise _UnresolvableReference(f"{tab}!{start}")
         return repr(float(value))
 
     try:
-        substituted = _CELL_REF_TOKEN.sub(_replace, expr)
+        substituted = _CELL_REF_PATTERN.sub(_reference_replacement, expr)
     except _UnresolvableReference:
         return None
 
     if re.search(r"[A-Za-z]", substituted):
-        return None  # a function name or unresolved reference remains -- unsupported for MVP
+        return None
 
     return _safe_eval_arithmetic(substituted)
 
 
-def _safe_eval_arithmetic(expr: str) -> float | None:
+def _references_in(argument: str, own_tab: str) -> list[str]:
+    """Fully-qualified cell keys for one SUM argument, ranges expanded."""
+    keys: list[str] = []
+    for quoted, plain, start, end in _CELL_REF_PATTERN.findall(argument):
+        tab = quoted or plain or own_tab
+        if not end:
+            keys.append(f"{tab}!{_normalize(start)}")
+            continue
+        expanded = _expand_range(_normalize(start), _normalize(end)) or []
+        keys.extend(f"{tab}!{cell}" for cell in expanded)
+    return keys
+
+
+def _safe_eval_arithmetic(expr: str) -> Optional[float]:
+    """Evaluate arithmetic only — no names, no calls, no attribute access."""
     try:
         tree = ast.parse(expr, mode="eval")
     except SyntaxError:
@@ -290,11 +551,73 @@ def _safe_eval_arithmetic(expr: str) -> float | None:
         return None
 
 
+# ---------------------------------------------------------------------------
+# delta, labels, similarity
+# ---------------------------------------------------------------------------
+
+
+def calculate_delta(
+    source_value: Optional[float], target_value: Optional[float]
+) -> tuple[Optional[float], Optional[float]]:
+    """Symmetric and zero-safe.
+
+    Symmetric: the denominator is the larger magnitude, so swapping the two
+    arguments cannot change the percentage. Dividing by the source alone would
+    make the same pair of numbers disagree by different amounts depending on
+    which side of the comparison each happened to land.
+    """
+    if source_value is None or target_value is None:
+        return None, None
+    delta = abs(source_value - target_value)
+    denominator = max(abs(source_value), abs(target_value))
+    delta_pct = 0.0 if denominator < 1e-9 else delta / denominator
+    return delta, delta_pct
+
+
+# Backwards-compatible alias for the Step 7 tests and any saved local imports.
+_delta = calculate_delta
+
+
+def _as_number(value: object) -> Optional[float]:
+    if isinstance(value, bool) or value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    return None
+
+
+def _derive_label(output_ref: str, cells: dict[str, CellRecord]) -> str:
+    """A human-readable name for an output, taken from the cell to its left.
+
+    Falls back to the cell reference. A wrong label is visible to the reviewer;
+    it never affects a number.
+    """
+    tab, cell_ref = output_ref.split("!", 1)
+    try:
+        column_letters, row = coordinate_from_string(cell_ref)
+    except (ValueError, TypeError):
+        return output_ref
+
+    column_index = column_index_from_string(column_letters)
+    if column_index > 1:
+        left = cells.get(f"{tab}!{get_column_letter(column_index - 1)}{row}")
+        if left is not None and isinstance(left.cached_value, str) and left.formula is None:
+            label = left.cached_value.strip().rstrip(":").strip()
+            if label:
+                return label
+    return output_ref
+
+
 def _label_similarity(reference_label: str, candidate_label: str) -> float:
-    # Plain character-similarity alone fails on acronyms (e.g. "NPR Total" vs
-    # "Net premium reserves" scores ~30%), so it's blended with an
-    # initials-vs-word check to catch that common real-world pattern too.
-    return max(fuzz.WRatio(reference_label, candidate_label), _acronym_score(reference_label, candidate_label))
+    """Character similarity, blended with an acronym check.
+
+    Plain similarity fails badly on acronyms — "NPR Total" against "Net premium
+    reserves" scores about 30% — and acronyms are ordinary in ledger extracts.
+    """
+    return max(
+        fuzz.WRatio(reference_label, candidate_label),
+        _acronym_score(reference_label, candidate_label),
+    )
 
 
 def _acronym_score(label_a: str, label_b: str) -> float:
