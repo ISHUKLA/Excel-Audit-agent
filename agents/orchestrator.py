@@ -21,6 +21,7 @@ from agents.anomaly_detector import detect_anomalies
 from agents.documentation import document_tabs
 from agents.parser import parse_workbook
 from agents.reconciliation import calculate_delta, run_reconciliation
+from core.accounting import evaluate_control_total, signed_reference_amount
 from core.audit_log import AuditLog, NOT_YET_PARSED
 from core.gates import (
     GateBlockedError,
@@ -35,6 +36,7 @@ from core.models import (
     AccountMapping,
     AnomalyFinding,
     AuditReport,
+    ControlTotalCheck,
     FileContext,
     MappingReviewDecision,
     ParsedFile,
@@ -133,6 +135,7 @@ class Orchestrator:
             audit_log=self._audit_log,
             context=pre_parse_context,
         )
+        control_total_check = evaluate_control_total(reference_figures)
 
         parsed_file = parse_workbook(file_path)
         context = {
@@ -148,6 +151,7 @@ class Orchestrator:
             "findings": [],
             "authoritative_outputs": [],
             "context_match_verdict": context_match_verdict,
+            "control_total_check": control_total_check,
             "context": context,
             "materiality_defaults": defaults,
             "stage": "post_parse",
@@ -249,6 +253,7 @@ class Orchestrator:
             default_pct_threshold=defaults["default_pct_threshold"],
             default_absolute_threshold=defaults["default_absolute_threshold"],
             context_match_verdict=state["context_match_verdict"],
+            control_total_verdict=state["control_total_check"].status,
         )
 
     def submit_gate3_decisions(
@@ -297,6 +302,7 @@ class Orchestrator:
             external_threshold_deviation_reason=external_threshold_deviation_reason,
             acknowledge_incomplete=acknowledge_incomplete,
             context_match_verdict=state["context_match_verdict"],
+            control_total_verdict=state["control_total_check"].status,
             actor=actor,
             audit_log=self._audit_log,
             context=state["context"],
@@ -411,6 +417,9 @@ class Orchestrator:
 
     def get_context_match_verdict(self, report_id: str) -> str:
         return self._state_for(report_id)["context_match_verdict"]
+
+    def get_control_total_check(self, report_id: str) -> ControlTotalCheck:
+        return self._state_for(report_id)["control_total_check"]
 
     def get_stage(self, report_id: str) -> str:
         return self._state_for(report_id)["stage"]
@@ -547,13 +556,14 @@ class Orchestrator:
                 raise PipelineStateError(
                     f"human-direct mapping ID already exists: {new_mapping.mapping_id}"
                 )
-            delta, delta_pct = calculate_delta(original_line.source_value, replacement.amount)
+            replacement_target = signed_reference_amount(replacement)
+            delta, delta_pct = calculate_delta(original_line.source_value, replacement_target)
             added_mappings.append(new_mapping)
             added_lines.append(
                 original_line.model_copy(
                     update={
                         "label": f"{replacement.label} ({replacement.line_id})",
-                        "target_value": replacement.amount,
+                        "target_value": replacement_target,
                         "delta": delta,
                         "delta_pct": delta_pct,
                         "mapping_id": new_mapping.mapping_id,
@@ -685,6 +695,7 @@ def _assemble_report(
         unmatched_reference_items=result.unmatched_reference_items,
         unmapped_python_outputs=result.unmapped_python_outputs,
         context_match_verdict=state["context_match_verdict"],
+        control_total_check=state["control_total_check"],
         traceability_index=traceability_index,
         documentation=documentation,
         llm_data_manifest=manifests,
@@ -801,6 +812,9 @@ def _restore_state(raw: dict) -> dict:
     state["file_context"] = FileContext.model_validate(raw["file_context"])
     if raw.get("reference_figures") is not None:
         state["reference_figures"] = ReferenceFigures.model_validate(raw["reference_figures"])
+    state["control_total_check"] = ControlTotalCheck.model_validate(
+        raw.get("control_total_check", {"status": "not_checked"})
+    )
     state["parsed_file"] = ParsedFile.model_validate(raw["parsed_file"])
     state["findings"] = [AnomalyFinding.model_validate(item) for item in raw.get("findings", [])]
     if raw.get("reconciliation_result") is not None:

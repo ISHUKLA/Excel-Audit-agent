@@ -25,6 +25,13 @@ def test_upload_screen_renders_the_required_context_and_reference_controls():
     labels = {widget.label for widget in app.text_input}
     assert {"Entity", "Period", "Currency", "Basis (optional)"} <= labels
     assert [button.label for button in app.button] == ["Start audit"]
+    confirmation = next(
+        checkbox
+        for checkbox in app.checkbox
+        if checkbox.label.startswith("I confirm that the workbook")
+    )
+    assert confirmation.value is False
+    assert app.button[0].disabled is True
     assert app.selectbox[0].options == ["Actuary", "CRO", "CFO", "Auditor"]
 
 

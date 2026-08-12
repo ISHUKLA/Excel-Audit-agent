@@ -40,6 +40,10 @@ def _canonical_json(state: dict) -> str:
         ) from exc
 
 
+class StateIntegrityError(RuntimeError):
+    """Raised when recovered state no longer matches its committed hashes."""
+
+
 def _sha256(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
@@ -153,6 +157,35 @@ class StateStore:
             conn.close()
         if row is None:
             return None
+        recomputed_hash = _sha256(row["state_json"])
+        if recomputed_hash != row["state_hash"]:
+            raise StateIntegrityError(
+                f"refusing recovered state for report {row['report_id']!r} at "
+                f"{row['gate_name']!r}: snapshot content hash does not match"
+            )
+
+        matching_commitment = False
+        for event in self.audit_log.get_rows(row["report_id"]):
+            if event["event_type"] != "state_snapshot":
+                continue
+            if _sha256(event["payload_json"]) != event["payload_hash"]:
+                continue
+            try:
+                payload = json.loads(event["payload_json"])
+            except json.JSONDecodeError:
+                continue
+            if (
+                payload.get("gate_name") == row["gate_name"]
+                and payload.get("state_hash") == row["state_hash"]
+            ):
+                matching_commitment = True
+                break
+        if not matching_commitment:
+            raise StateIntegrityError(
+                f"refusing recovered state for report {row['report_id']!r} at "
+                f"{row['gate_name']!r}: no intact audit-log commitment matches the snapshot"
+            )
+
         return StateSnapshot(
             report_id=row["report_id"],
             gate_name=row["gate_name"],

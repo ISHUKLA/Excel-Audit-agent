@@ -257,6 +257,28 @@ def test_gate_1_matching_context_produces_match(audit_log):
     assert verdict == "match"
 
 
+def test_gate_1_logs_the_mathematical_control_total_check(audit_log):
+    import json
+
+    context_gate(
+        a_file_context(),
+        reference_figures(control_total=-1250.0),
+        True,
+        "RPT-001",
+        APPROVER,
+        audit_log,
+        CONTEXT,
+    )
+
+    payload = json.loads(audit_log.get_rows("RPT-001")[0]["payload_json"])
+    assert payload["control_total_check"] == {
+        "declared_total": -1250.0,
+        "difference": 0.0,
+        "signed_line_total": -1250.0,
+        "status": "match",
+    }
+
+
 def test_gate_1_period_mismatch_produces_mismatch(audit_log):
     """A Q4 workbook reconciled against a Q3 trial balance."""
     _, verdict = context_gate(
@@ -736,6 +758,19 @@ def test_a_context_mismatch_does_not_corrupt_the_internal_verdict(audit_log):
     payload = json.loads(audit_log.get_rows("RPT-001")[-1]["payload_json"])
     assert payload["internal_verdict"] == "pass"
     assert payload["external_verdict"] == "block"
+
+
+def test_a_control_total_mismatch_blocks_external_reconciliation(audit_log):
+    result = a_result(
+        lines=[
+            a_line(),
+            a_line(check_type="python_vs_accounts", mapping_id="MAP-001"),
+        ],
+        mappings=[a_mapping()],
+    )
+
+    with pytest.raises(GateBlockedError, match="external_verdict=block"):
+        run_gate_3(audit_log, result, control_total_verdict="mismatch")
 
 
 # ---------------------------------------------------------------------------

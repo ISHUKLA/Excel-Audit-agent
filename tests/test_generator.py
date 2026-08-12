@@ -11,6 +11,7 @@ from core.models import (
     AnomalyFinding,
     AuditReport,
     CellRecord,
+    ControlTotalCheck,
     DerivationStep,
     FileContext,
     LLMDataManifestEntry,
@@ -22,7 +23,7 @@ from core.models import (
     TraceabilityEntry,
     WorkbookMeta,
 )
-from report.generator import generate_report_pdf, render_report_html
+from report.generator import _mapping_rows, generate_report_pdf, render_report_html
 
 GENERATED_AT = datetime(2026, 8, 11, 9, 30, tzinfo=timezone.utc)
 APPROVED_AT = datetime(2026, 8, 11, 10, 15, tzinfo=timezone.utc)
@@ -97,7 +98,7 @@ def _references() -> ReferenceFigures:
                 period="2025-Q4",
                 currency="EUR",
                 ledger_source="SAP FI Q4 close",
-                debit_credit="credit",
+                debit_credit="debit",
                 amount=1255.0,
                 evidence_ref="trial-balance.csv row 2",
             ),
@@ -109,7 +110,7 @@ def _references() -> ReferenceFigures:
                 period="2025-Q4",
                 currency="EUR",
                 ledger_source="SAP FI Q4 close",
-                debit_credit="credit",
+                debit_credit="debit",
                 amount=495.0,
                 evidence_ref="trial-balance.csv row 3",
             ),
@@ -220,6 +221,12 @@ def _report(**overrides) -> AuditReport:
         unmatched_reference_items=["GL-099"],
         unmapped_python_outputs=["Reserves!C9"],
         context_match_verdict="match",
+        control_total_check=ControlTotalCheck(
+            status="match",
+            declared_total=1750.0,
+            signed_line_total=1750.0,
+            difference=0.0,
+        ),
         traceability_index=[
             TraceabilityEntry(
                 report_figure_label="Approved reserve mapping",
@@ -378,6 +385,18 @@ def test_approved_and_proposed_mappings_are_separate_and_mismatch_is_prominent()
     assert 'id="context-mismatch-banner"' in mismatch_html
     assert "cannot be relied upon" in mismatch_html
     assert 'id="context-mismatch-banner"' not in html
+
+
+def test_unapproved_mapping_fallback_still_displays_the_oriented_accounts_value():
+    references = _references().model_copy(deep=True)
+    references.lines[0].debit_credit = "credit"
+    report = _report(
+        reference_figures=references,
+        reconciliation=[_line()],
+        mappings=[_mapping("MAP-CREDIT", "GL-001", False)],
+    )
+
+    assert _mapping_rows(report)[0]["accounts_value"] == -1255.0
 
 
 def test_header_contract_and_findings_wording_match_the_models():

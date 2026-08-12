@@ -128,7 +128,7 @@ def _reference_figures(period: str = "2025-Q4") -> ReferenceFigures:
         "period": period,
         "currency": "EUR",
         "ledger_source": "Q4 trial balance extract",
-        "debit_credit": "credit",
+        "debit_credit": "debit",
     }
     return ReferenceFigures(
         source_label="Q4 trial balance extract",

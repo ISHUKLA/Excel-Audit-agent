@@ -123,6 +123,14 @@ def test_a_zero_delta_passes_under_any_threshold():
     assert compute_verdict(0.0, 0.0, 0.0001, 1.0, "complete") == "pass"
 
 
+def test_an_exact_match_passes_when_both_thresholds_are_zero():
+    assert compute_verdict(0.0, 0.0, 0.0, 0.0, "complete") == "pass"
+
+
+def test_a_nonzero_difference_blocks_when_both_thresholds_are_zero():
+    assert compute_verdict(0.01, 0.0001, 0.0, 0.0, "complete") == "block"
+
+
 @pytest.mark.parametrize("delta_pct", [0.0, 0.0009, 0.001, 0.009, 0.01, 0.5])
 def test_every_verdict_is_one_of_the_four_states(delta_pct):
     assert verdict(1.0, delta_pct) in {"pass", "warn", "block", "incomplete"}

@@ -7,6 +7,7 @@ from typing import Any
 import weasyprint
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoescape
 
+from core.accounting import signed_reference_amount
 from core.models import AuditReport
 
 _TEMPLATE_DIR = Path(__file__).parent / "templates"
@@ -46,11 +47,6 @@ def render_report_html(report: AuditReport, audit_rows: list[dict]) -> str:
         manual_mapping_rows=[row for row in mapping_rows if row["mapping_type"] != "one_to_one"],
         stale_cells=stale_cells,
         incomplete_pct=_incomplete_percentage(internal_lines),
-        reference_line_total=(
-            sum(line.amount for line in report.reference_figures.lines)
-            if report.reference_figures
-            else None
-        ),
         audit_rows=prepared_audit_rows,
         acknowledge_incomplete=acknowledge_incomplete,
         anthropic_retention_url=ANTHROPIC_RETENTION_URL,
@@ -109,7 +105,7 @@ def _mapping_rows(report: AuditReport) -> list[dict[str, Any]]:
                 "account_number": reference.account_number if reference else None,
                 "python_value": line.source_value if line else None,
                 "accounts_value": line.target_value if line else (
-                    reference.amount if reference else None
+                    signed_reference_amount(reference) if reference else None
                 ),
                 "delta": line.delta if line else None,
                 "delta_pct": line.delta_pct if line else None,

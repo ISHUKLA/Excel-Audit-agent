@@ -29,6 +29,7 @@ from rapidfuzz import fuzz
 # than re-declared so the graph the parser built and the substitutions made here
 # can never drift apart.
 from agents.parser import _CELL_REF_PATTERN, _expand_range, _normalize
+from core.accounting import signed_reference_amount
 from core.models import (
     AccountMapping,
     CellRecord,
@@ -297,7 +298,7 @@ def reconcile_python_vs_accounts(
         mapped_outputs.add(best_ref)
 
         source_value = best_line.target_value
-        target_value = reference_line.amount
+        target_value = signed_reference_amount(reference_line)
         delta, delta_pct = _delta(source_value, target_value)
         # Incompleteness propagates forward from Pass 1 regardless of what the
         # numbers look like or whether the mapping is ever approved.
