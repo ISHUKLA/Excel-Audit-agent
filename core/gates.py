@@ -14,6 +14,7 @@ import json
 from datetime import datetime, timezone
 from typing import Optional
 
+from core.accounting import evaluate_control_total
 from core.audit_log import AuditLog
 from core.models import (
     AnomalyFinding,
@@ -67,6 +68,7 @@ def context_gate(
         )
 
     context_match_verdict, basis_warning = _compare_context(file_context, reference_figures)
+    control_total_check = evaluate_control_total(reference_figures)
 
     audit_log.log_event(
         report_id=report_id,
@@ -78,6 +80,7 @@ def context_gate(
             "description": file_context.description,
             "context_match_verdict": context_match_verdict,
             "basis_warning": basis_warning,
+            "control_total_check": control_total_check.model_dump(mode="json"),
         },
         actor=actor,
         context=context,
@@ -207,6 +210,7 @@ def reconciliation_gate(
     actor: str,
     audit_log: AuditLog,
     context: dict,
+    control_total_verdict: str = "not_checked",
 ) -> tuple[str, str, ReconciliationResult]:
     """Recompute every verdict against the approved thresholds, then aggregate.
 
@@ -248,6 +252,7 @@ def reconciliation_gate(
         default_pct_threshold=default_pct_threshold,
         default_absolute_threshold=default_absolute_threshold,
         context_match_verdict=context_match_verdict,
+        control_total_verdict=control_total_verdict,
     )
     result.verdicts_are_final = True
 
@@ -260,6 +265,7 @@ def reconciliation_gate(
             "internal_verdict": internal_verdict,
             "external_verdict": external_verdict,
             "context_match_verdict": context_match_verdict,
+            "control_total_verdict": control_total_verdict,
             "acknowledge_incomplete": acknowledge_incomplete,
             "unmatched_reference_items": result.unmatched_reference_items,
             "unmapped_python_outputs": result.unmapped_python_outputs,
@@ -295,6 +301,7 @@ def reconciliation_gate(
             "external_threshold_deviation_reason": external_threshold_deviation_reason,
             "acknowledge_incomplete": acknowledge_incomplete,
             "context_match_verdict": context_match_verdict,
+            "control_total_verdict": control_total_verdict,
         },
     )
 
@@ -324,6 +331,7 @@ def preview_reconciliation(
     default_pct_threshold: float,
     default_absolute_threshold: float,
     context_match_verdict: str,
+    control_total_verdict: str = "not_checked",
 ) -> tuple[str, str, ReconciliationResult]:
     """Return a side-effect-free Gate 3 preview for a rendering layer."""
     preview = result.model_copy(deep=True)
@@ -336,6 +344,7 @@ def preview_reconciliation(
         default_pct_threshold=default_pct_threshold,
         default_absolute_threshold=default_absolute_threshold,
         context_match_verdict=context_match_verdict,
+        control_total_verdict=control_total_verdict,
     )
     preview.verdicts_are_final = False
     return internal, external, preview
@@ -351,6 +360,7 @@ def _evaluate_reconciliation(
     default_pct_threshold: float,
     default_absolute_threshold: float,
     context_match_verdict: str,
+    control_total_verdict: str,
 ) -> tuple[str, str]:
     """Recompute both passes independently and aggregate without logging."""
     mappings_by_id = {mapping.mapping_id: mapping for mapping in result.mappings}
@@ -397,6 +407,8 @@ def _evaluate_reconciliation(
         if external_verdict in ("pass", "warn", "not_performed"):
             external_verdict = "incomplete"
     if context_match_verdict == "mismatch":
+        external_verdict = "block"
+    if control_total_verdict == "mismatch":
         external_verdict = "block"
     return internal_verdict, external_verdict
 

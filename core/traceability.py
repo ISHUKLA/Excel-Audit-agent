@@ -14,6 +14,7 @@ mapping exists but nobody has approved it" is.
 
 from typing import Optional
 
+from core.accounting import signed_reference_amount
 from core.models import (
     AccountingProvenance,
     AccountMapping,
@@ -53,7 +54,9 @@ def build_traceability_index(
                 report_figure_label=(
                     f"{reference_line.label} ({line_id})" if reference_line else line_id
                 ),
-                report_value=reference_line.amount if reference_line else None,
+                report_value=(
+                    signed_reference_amount(reference_line) if reference_line else None
+                ),
                 derivation=[],
                 accounting_provenance=None,
                 # The ledger side of the same gap Step 7 recorded in

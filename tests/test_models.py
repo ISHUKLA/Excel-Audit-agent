@@ -15,6 +15,7 @@ from core.models import (
     AuditLogRow,
     AuditReport,
     CellRecord,
+    ControlTotalCheck,
     DerivationStep,
     FileContext,
     LLMDataManifestEntry,
@@ -287,6 +288,12 @@ def test_every_model_instantiates_with_dummy_data():
             captured_at=NOW,
             state_json='{"findings": []}',
             state_hash="d" * 64,
+        ),
+        ControlTotalCheck(
+            status="match",
+            declared_total=1250.0,
+            signed_line_total=1250.0,
+            difference=0.0,
         ),
         an_audit_report(),
     ]

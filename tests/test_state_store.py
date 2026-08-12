@@ -8,7 +8,7 @@ import sqlite3
 import pytest
 
 from core.audit_log import AuditContextError, AuditLog
-from core.state_store import StateSerializationError, StateStore
+from core.state_store import StateIntegrityError, StateSerializationError, StateStore
 
 CONTEXT = {"workbook_hash": "a" * 64, "code_version": "0.1.0"}
 
@@ -141,17 +141,25 @@ def test_rewriting_a_snapshot_contradicts_the_hash_chained_in_the_log(store):
             ('{"findings":[]}',),
         )
 
-    tampered = store.load_latest_snapshot("RPT-001")
-    recomputed = hashlib.sha256(tampered.state_json.encode()).hexdigest()
+    with pytest.raises(StateIntegrityError, match="snapshot content hash does not match"):
+        store.load_latest_snapshot("RPT-001")
 
     event = [r for r in store.audit_log.get_rows("RPT-001") if r["event_type"] == "state_snapshot"][0]
-    chained_hash = json.loads(event["payload_json"])["state_hash"]
-
-    assert recomputed != chained_hash
-    assert chained_hash == snapshot.state_hash
+    assert json.loads(event["payload_json"])["state_hash"] == snapshot.state_hash
     # The log itself is untouched — the tampering shows up as a mismatch
     # against it, not as a broken chain.
     assert store.audit_log.verify_chain() == (True, [])
+
+
+def test_snapshot_with_no_matching_log_commitment_is_refused(store):
+    store.save_snapshot("RPT-001", "gate_1_context", STATE, CONTEXT)
+    with sqlite3.connect(store.db_path) as conn:
+        conn.execute(
+            "UPDATE snapshots SET gate_name = 'altered_gate' WHERE report_id = 'RPT-001'"
+        )
+
+    with pytest.raises(StateIntegrityError, match="no intact audit-log commitment"):
+        store.load_latest_snapshot("RPT-001")
 
 
 def test_context_is_required_for_a_snapshot_too(store):

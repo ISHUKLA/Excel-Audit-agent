@@ -43,6 +43,11 @@ def compute_verdict(
         return "incomplete"
     if delta is None or delta_pct is None:
         return "incomplete"
+    # Zero is inside even a zero-width tolerance: exact equality is a pass.
+    # Keep the independent ambiguity cap because matching the wrong figures is
+    # not made reliable by their values happening to agree.
+    if delta == 0 and delta_pct == 0:
+        return "warn" if is_ambiguous_match else "pass"
 
     pct_verdict = (
         "pass"

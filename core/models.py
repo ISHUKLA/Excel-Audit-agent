@@ -46,7 +46,7 @@ class ReferenceFigureLine(BaseModel):
     currency: str
     ledger_source: str
     debit_credit: Literal["debit", "credit"]
-    amount: float = Field(ge=0)
+    amount: float = Field(ge=0, allow_inf_nan=False)
     version: Optional[str] = None
     evidence_ref: Optional[str] = None
 
@@ -65,7 +65,8 @@ class ReferenceFigures(BaseModel):
     period: str
     currency: str
     basis: Optional[str] = None
-    control_total: Optional[float] = None
+    # Signed net total: debits are positive and credits are negative.
+    control_total: Optional[float] = Field(default=None, allow_inf_nan=False)
     control_total_confirmed_by_human: bool = False
     lines: list[ReferenceFigureLine]
     uploaded_at: datetime
@@ -382,6 +383,19 @@ class StateSnapshot(BaseModel):
     state_hash: str
 
 
+class ControlTotalCheck(BaseModel):
+    """Mathematical tie-out of signed reference lines to the declared total.
+
+    ``not_checked`` means no control total was supplied. Debit lines contribute
+    positively and credit lines negatively to ``signed_line_total``.
+    """
+
+    status: Literal["match", "mismatch", "not_checked"] = "not_checked"
+    declared_total: Optional[float] = None
+    signed_line_total: Optional[float] = None
+    difference: Optional[float] = None
+
+
 class AuditReport(BaseModel):
     """The final assembled report.
 
@@ -415,6 +429,8 @@ class AuditReport(BaseModel):
     # "not_checked" only when reference_figures is None. "mismatch" caps
     # external_verdict at "block" however well the numbers happen to line up.
     context_match_verdict: Literal["match", "mismatch", "not_checked"]
+    # A mismatch is a hard block on the external reconciliation at Gate 3.
+    control_total_check: ControlTotalCheck = Field(default_factory=ControlTotalCheck)
     traceability_index: list[TraceabilityEntry]
     documentation: list[TabDocumentation]
     llm_data_manifest: list[LLMDataManifestEntry]

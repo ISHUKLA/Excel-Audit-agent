@@ -82,7 +82,7 @@ def gl_line(line_id, label, amount, **overrides):
         period="2025-Q4",
         currency="EUR",
         ledger_source="SAP FI",
-        debit_credit="credit",
+        debit_credit="debit",
         amount=amount,
     )
     return ReferenceFigureLine(**{**defaults, **overrides})
@@ -105,6 +105,22 @@ def test_verdicts_are_never_final_coming_out_of_agent_3():
     """Every verdict here is a preview against thresholds nobody has approved."""
     result = run_reconciliation(simple_sum_workbook(), ["Provisions!C5"])
     assert result.verdicts_are_final is False
+
+
+def test_accounts_comparison_applies_debit_and_credit_orientation():
+    debit = run_reconciliation(
+        simple_sum_workbook(total_cached=100.0),
+        ["Provisions!C5"],
+        reference([gl_line("D", "Technical provisions", 100.0, debit_credit="debit")]),
+    ).lines[-1]
+    credit = run_reconciliation(
+        simple_sum_workbook(total_cached=-100.0, formula="=-SUM(C1:C4)"),
+        ["Provisions!C5"],
+        reference([gl_line("C", "Technical provisions", 100.0, debit_credit="credit")]),
+    ).lines[-1]
+
+    assert debit.target_value == 100.0 and debit.delta == 0.0
+    assert credit.target_value == -100.0 and credit.delta == 0.0
 
 
 # ---------------------------------------------------------------------------

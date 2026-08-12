@@ -4,6 +4,15 @@ One line per meaningful change. This is the project's lightweight change-control
 record — it exists so that a reviewer can reconstruct what changed and when
 without reading the git log.
 
+## 2026-08-12 — P0 credibility controls
+
+- Established one accounting sign convention in `core/accounting.py`: reference amounts remain non-negative magnitudes, with debit positive and credit negative. Both fuzzy proposals and human-edited mappings now compare against the correctly oriented amount.
+- Added an exact decimal control-total tie-out. Gate 1 records the declared total, signed line total, difference, and status; Gate 3 forces the external verdict to `block` on mismatch, and the report displays the mathematical evidence and sign convention.
+- Replaced the nominal upload transition with a real Gate 1 screen: the entered workbook, reviewer, accounting, and reference context is summarized before parsing, and the Start action is disabled until an explicit confirmation checkbox is selected.
+- Fixed zero-width materiality bands so an exact match passes at zero percentage and absolute thresholds while any non-zero difference still blocks.
+- Made every snapshot load fail closed: state content is re-hashed and must also match an intact `state_snapshot` commitment in the audit log. `Orchestrator.resume()` therefore refuses altered or orphaned recovered state.
+- Added focused clean, messy, UI, gate, orchestration, report, and recovery regressions for all five controls. Verification: 301 tests pass.
+
 ## 2026-08-11 — Step 13: local-first deployment hardening
 
 - Made local execution the documented default and moved the deployment posture ahead of installation instructions. Docker is described as the same trust boundary only when its evidence volume remains local; hosted deployment is explicitly not recommended until real application authentication exists.

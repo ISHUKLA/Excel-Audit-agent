@@ -341,7 +341,7 @@ def test_an_unmatched_reference_line_appears_in_the_index():
     assert len(entries) == 1
     assert entries[0].trace_status == "unmapped"
     assert "GL-001" in entries[0].report_figure_label
-    assert entries[0].report_value == 1000.0
+    assert entries[0].report_value == -1000.0
     assert entries[0].derivation == []
 
 

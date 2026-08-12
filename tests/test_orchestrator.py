@@ -6,6 +6,7 @@ all four gates with spies to prove orchestration supplies their evidence context
 """
 
 import json
+import sqlite3
 from datetime import datetime, timezone
 
 import pytest
@@ -33,7 +34,7 @@ from core.models import (
     TabDocumentation,
     WorkbookMeta,
 )
-from core.state_store import StateStore
+from core.state_store import StateIntegrityError, StateStore
 
 ACTOR = "Isaac Shukla"
 CONTEXT_HASH = "b" * 64
@@ -65,7 +66,7 @@ def _reference_figures(**overrides) -> ReferenceFigures:
         period=overrides.get("period", "2025-Q4"),
         currency="EUR",
         ledger_source="SAP FI Q4 close",
-        debit_credit="credit",
+        debit_credit="debit",
         amount=100.0,
         evidence_ref="trial-balance.csv row 2",
     )
@@ -415,6 +416,31 @@ def test_post_gate2_snapshot_recovers_findings_and_outputs_after_process_loss(
     assert recovered["parsed_file"].cells["Provisions!C5"].formula == "=B1"
 
 
+def test_resume_refuses_a_snapshot_altered_after_it_was_saved(monkeypatch, tmp_path):
+    _patch_agents(monkeypatch, _result())
+    orchestrator, audit_log, state_store = _orchestrator(tmp_path)
+    report_id, _, _ = orchestrator.run(
+        "unused.xlsx",
+        _file_context(),
+        context_confirmed=True,
+        actor=ACTOR,
+    )
+    with sqlite3.connect(state_store.db_path) as connection:
+        connection.execute(
+            "UPDATE snapshots SET state_json = '{}' WHERE snapshot_id = "
+            "(SELECT MAX(snapshot_id) FROM snapshots WHERE report_id = ?)",
+            (report_id,),
+        )
+
+    fresh = Orchestrator(
+        audit_log=audit_log,
+        state_store=state_store,
+        code_version="test-code-version",
+    )
+    with pytest.raises(StateIntegrityError, match="refusing recovered state"):
+        fresh.resume(report_id)
+
+
 def test_partial_reconstruction_flows_into_report_as_incomplete(monkeypatch, tmp_path):
     partial = _line(
         target_value=None,
@@ -637,7 +663,7 @@ def test_edited_mapping_preserves_the_proposal_and_adds_a_human_direct_mapping(
         period="2025-Q4",
         currency="EUR",
         ledger_source="SAP FI Q4 close",
-        debit_credit="credit",
+        debit_credit="debit",
         amount=100.0,
         evidence_ref="trial-balance.csv row 3",
     )

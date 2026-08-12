@@ -142,14 +142,20 @@ against a local registry of expected names. It is not a signature, an attestatio
   </div>
 </div>
 {% if report.reference_figures.control_total is not none %}
+{% if report.control_total_check.status == "mismatch" %}
+<div class="danger" id="control-total-mismatch-banner">The signed reference lines do not tie to the declared control total. External reconciliation is blocked.</div>
+{% endif %}
 <table>
-  <thead><tr><th>Control total</th><th>Sum of extract lines</th><th>Confirmed by human</th></tr></thead>
+  <thead><tr><th>Declared signed net control total</th><th>Signed line total</th><th>Difference</th><th>Mathematical check</th><th>Confirmed by human</th></tr></thead>
   <tbody><tr>
-    <td>{{ report.reference_figures.control_total|number }}</td>
-    <td>{{ reference_line_total|number }}</td>
+    <td>{{ report.control_total_check.declared_total|number }}</td>
+    <td>{{ report.control_total_check.signed_line_total|number }}</td>
+    <td>{{ report.control_total_check.difference|number }}</td>
+    <td>{{ report.control_total_check.status|upper }}</td>
     <td>{{ "Yes" if report.reference_figures.control_total_confirmed_by_human else "No" }}</td>
   </tr></tbody>
 </table>
+<p class="muted">Sign convention: debit is positive; credit is negative.</p>
 {% if not report.reference_figures.control_total_confirmed_by_human %}
 <div class="warning">This extract's tie-out to its control total has not been confirmed.</div>
 {% endif %}

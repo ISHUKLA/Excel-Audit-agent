@@ -64,7 +64,7 @@ The container writes `/data/audit.db`; the audit log and all state snapshots sha
 
 The tool is built around four points where a named person, not the AI, has to make a decision before the pipeline continues. None of them can be skipped or merged. Each is enforced in [core/gates.py](core/gates.py), which raises `GateBlockedError` rather than passing silently.
 
-1. **Context confirmation.** Before anything is parsed, you confirm that the file description you typed is accurate — and, if you supplied external accounts figures, that those are correct too. This is the tool checking it understood the assignment before doing any work.
+1. **Context confirmation.** Before anything is parsed, the UI displays a summary of the workbook, reviewer, accounting context, and any reference-figure context. Parsing remains disabled until you explicitly check that this displayed context is accurate. If a reference control total is supplied, its mathematical tie-out is also recorded at this gate.
 
 2. **Findings review.** Every anomaly the tool flags is shown to you individually: a hardcoded number buried in a formula, a suspicious skip in a `SUM` range, a circular reference between tabs, an inconsistent cross-tab value. You confirm it's a real issue, override it with a reason, or dismiss it as a false positive with a reason. All three are valid dispositions — a dismissed finding is reviewed, not approved. The pipeline will not proceed until every finding has a disposition attached.
 
@@ -72,7 +72,7 @@ The tool is built around four points where a named person, not the AI, has to ma
    - **Internal consistency** — its own Python reconstruction against the spreadsheet's cached values.
    - **Accounts reconciliation** — the spreadsheet's numbers against the accounts figures you supplied, for the CFO. If you supplied none, this reports as *not performed*, not as a blank section.
 
-   You set the materiality threshold for each (the UI suggests 1%, but the number is yours to choose — the tool never picks it for you). A blocking discrepancy in either comparison stops the process until it's resolved.
+   You set the materiality threshold for each (the UI suggests 1%, but the number is yours to choose — the tool never picks it for you). An exact match passes even when both approved thresholds are zero. A blocking discrepancy in either comparison stops the process until it's resolved, and a reference extract that does not mathematically tie to its declared control total cannot proceed through the accounts reconciliation.
 
 4. **Named approval record.** Once everything above is settled, a named person records their name and role, which is stored with a timestamp. Only then is the PDF generated. This is an identity confirmation and nothing more — it is not a professional signature or attestation, and the report does not claim otherwise.
 
@@ -82,7 +82,8 @@ The tool is built around four points where a named person, not the AI, has to ma
 |-------|--------|--------------|
 | Agent 1 — Parser | [agents/parser.py](agents/parser.py) | Reads the workbook with `openpyxl`, capturing each cell's formula *and* its cached value together. Records named ranges, external links, VBA presence, and a cross-tab dependency graph. Flags duplicate and near-duplicate tab names. |
 | Agent 2 — Anomaly detector | [agents/anomaly_detector.py](agents/anomaly_detector.py) | Rule-based, no LLM. Detects hardcoded literals in formulas, cross-tab inconsistencies, rows excluded from `SUM` ranges, and circular references. |
-| Agent 3 — Reconciliation | [agents/reconciliation.py](agents/reconciliation.py) | Two independent passes: Excel vs. Python, and Python vs. accounts. Where a label match is uncertain, the line is tagged low-confidence rather than being silently treated as a match. |
+| Accounting convention | [core/accounting.py](core/accounting.py) | Applies the single signed-net convention used by external reconciliation and control totals: debit positive, credit negative. |
+| Agent 3 — Reconciliation | [agents/reconciliation.py](agents/reconciliation.py) | Two independent passes: Excel vs. Python, and Python vs. accounts. External target values use debit/credit orientation. Where a label match is uncertain, the line is tagged low-confidence rather than being silently treated as a match. |
 | Traceability index | [core/traceability.py](core/traceability.py) | Maps each reported figure back to its source tab, cell, and formula. A figure with no traceable source appears as an explicit *not traceable* entry, not a missing row. |
 | Agent 4 — Documentation | [agents/documentation.py](agents/documentation.py) | The only module that calls the Anthropic API. Drafts a plain-language summary of each tab's method, assumptions, and data sources. |
 | Orchestrator | [agents/orchestrator.py](agents/orchestrator.py) | Sequences the agents across the four gates and keeps the two reconciliation verdicts separate. |
@@ -104,7 +105,11 @@ The log contains no verbatim LLM responses. It records that a call happened and 
 
 ### `audit.db` is as sensitive as the workbook
 
-Pipeline state is snapshotted to the same database at every gate transition, so that a run survives a restart with its evidence intact rather than just a note that decisions were once made. That means **once a workbook has been processed, its contents live durably in `audit.db`, not only in the original .xlsx.**
+Pipeline state is snapshotted to the same database at every gate transition, so that a run survives a restart with its evidence intact rather than just a note that decisions were once made. Before any snapshot is loaded for recovery, the application recalculates its content hash and requires a matching intact snapshot commitment in the audit log; altered or orphaned state is refused. That means **once a workbook has been processed, its contents live durably in `audit.db`, not only in the original .xlsx.**
+
+### Accounting sign and control-total convention
+
+Reference-line amounts are entered as non-negative magnitudes. `debit_credit` supplies the sign: debits contribute positively and credits negatively. A supplied control total must therefore be the signed net total under that same convention. The tie-out uses decimal arithmetic and exact equality; it is a population-integrity control, not a materiality test. A mismatch is preserved as evidence and blocks external reconciliation at Gate 3.
 
 This is deliberate — it is what evidence retention requires — but it has a consequence worth stating plainly: `audit.db` needs the same handling as the source workbook. Same access controls, same disposal policy, same care about where it gets copied. No code in this project can solve that for you.
 
@@ -117,7 +122,7 @@ pytest tests/test_parser.py -v
 
 There is one test module per source module plus an end-to-end test. Each agent has tests for a clean workbook *and* for messy input — blank tabs, broken formulas, inconsistent labels — because real files are messy by default. The audit log is tested for append-only behaviour explicitly, not assumed safe because no code path calls `UPDATE` today. Streamlit's application harness covers the upload shell, premature-export guard, named-approval-record screen, final report screen, and provider-failure copy; browser QA exercises the live flow through Gate 3.
 
-Step 12's acceptance test uses a real LibreOffice-recalculated workbook and the real staged pipeline. It covers duplicate accounting labels, mapping approval, bidirectional completeness, partial reconstruction, context mismatch, threshold recomputation, traceability on both sides, mocked documentation with data minimization, PDF output, restart recovery, and raw-SQL tamper detection. The full suite currently has 289 passing tests.
+Step 12's acceptance test uses a real LibreOffice-recalculated workbook and the real staged pipeline. It covers duplicate accounting labels, mapping approval, bidirectional completeness, partial reconstruction, context mismatch, threshold recomputation, traceability on both sides, mocked documentation with data minimization, PDF output, restart recovery, and raw-SQL tamper detection. The full suite currently has 301 passing tests.
 
 **What the suite does not cover:** it uses synthetic fixtures rather than a real production workbook, and the Anthropic call in Agent 4 is mocked, so prompt quality and successful live API behaviour remain untested. Step 10's representative PDF has been visually inspected, but large production reports can still exercise pagination combinations absent from the fixture.
 

@@ -161,11 +161,11 @@ def screen_1_upload() -> None:
 
             control_col1, control_col2 = st.columns(2)
             control_total = control_col1.number_input(
-                "Control total",
-                min_value=0.0,
+                "Signed net control total",
                 value=None,
                 step=100.0,
                 key="ref_control_total",
+                help="Debit lines are positive and credit lines are negative.",
             )
             control_confirmed = control_col2.checkbox(
                 "I confirm this extract ties to the control total above",
@@ -216,7 +216,41 @@ def screen_1_upload() -> None:
             control_total = None
             control_confirmed = False
 
-    if not st.button("Start audit", type="primary"):
+    st.subheader("Gate 1 — Confirm context before parsing")
+    context_summary = [
+        ("Workbook", "Filename", uploaded_file.name if uploaded_file else "Not uploaded"),
+        ("Workbook", "Description", description.strip() or "Not supplied"),
+        ("Review", "Reviewer", reviewer_name.strip() or "Not supplied"),
+        ("Review", "Role", role.upper() if role in {"cro", "cfo"} else role.title()),
+        ("Workbook", "Entity", entity.strip() or "Not supplied"),
+        ("Workbook", "Period", period.strip() or "Not supplied"),
+        ("Workbook", "Currency", currency.strip().upper() or "Not supplied"),
+        ("Workbook", "Basis", basis.strip() or "Not supplied"),
+        ("Reference", "Included", "Yes" if include_reference else "No"),
+    ]
+    if include_reference:
+        context_summary.extend(
+            [
+                ("Reference", "Source", source_label.strip() or "Not supplied"),
+                ("Reference", "Entity", ref_entity.strip() or "Not supplied"),
+                ("Reference", "Period", ref_period.strip() or "Not supplied"),
+                ("Reference", "Currency", ref_currency.strip().upper() or "Not supplied"),
+                ("Reference", "Basis", ref_basis.strip() or "Not supplied"),
+                (
+                    "Reference",
+                    "Signed net control total",
+                    "Not supplied" if control_total is None else f"{control_total:,.2f}",
+                ),
+            ]
+        )
+    st.table(pd.DataFrame(context_summary, columns=["Area", "Field", "Confirmed context"]))
+    gate1_confirmed = st.checkbox(
+        "I confirm that the workbook and reference-figure context shown above is accurate.",
+        value=False,
+        key="gate1_context_confirmed",
+    )
+
+    if not st.button("Start audit", type="primary", disabled=not gate1_confirmed):
         return
 
     if uploaded_file is None:
@@ -269,7 +303,7 @@ def screen_1_upload() -> None:
                 temporary_path,
                 file_context,
                 reference_figures,
-                context_confirmed=True,
+                context_confirmed=gate1_confirmed,
                 actor=reviewer_name.strip(),
             )
     except GateBlockedError as exc:

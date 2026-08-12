@@ -43,9 +43,11 @@ temporarily, not even for a demo.
 - [agents/reconciliation.py](agents/reconciliation.py) — Agent 3. Two independent passes.
 - [agents/documentation.py](agents/documentation.py) — Agent 4. The only LLM caller.
 - [agents/orchestrator.py](agents/orchestrator.py) — sequences the pipeline across gates.
+- [core/accounting.py](core/accounting.py) — signed debit/credit and control-total convention.
 - [core/models.py](core/models.py) — Pydantic models. The contract every other module reads from.
 - [core/gates.py](core/gates.py) — the four gates. Raise `GateBlockedError`, never silently pass.
 - [core/audit_log.py](core/audit_log.py) — hash-chained SQLite log. Append-only.
+- [core/state_store.py](core/state_store.py) — durable snapshots with fail-closed recovery verification.
 - [core/traceability.py](core/traceability.py) — figure → source-cell index.
 - [report/generator.py](report/generator.py) — PDF via Jinja2 + WeasyPrint.
 - [tests/](tests/) — one test module per source module, plus `test_end_to_end.py`.
@@ -237,6 +239,7 @@ Running note, per the Diligence rules. Update it when you change a file.
 | File | Origin | Notes |
 |------|--------|-------|
 | all source and tests | AI-written | Initial commit `78a0bb7`, MVP build |
+| P0 credibility control set (`core/accounting.py`, accounting/gate/state/report/UI paths and focused tests) | AI-written | User-directed debit/credit orientation, control-total block, explicit Gate 1, zero thresholds, and verified recovery, 2026-08-12 |
 | [agents/documentation.py](agents/documentation.py) | AI-written | Commit `21b4dbd`; Step 8 rewrite on 2026-08-11 adds minimized payloads, role guidance, safe audit hashes, and validated fallback |
 | [core/llm_data_policy.py](core/llm_data_policy.py) | AI-written | Step 8 minimization allowlist and non-sensitive transmission manifest, 2026-08-11 |
 | [tests/test_documentation.py](tests/test_documentation.py) | AI-written | Step 8 mocked LLM, privacy, manifest, and four-role coverage, 2026-08-11 |
