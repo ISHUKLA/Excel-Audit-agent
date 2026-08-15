@@ -221,36 +221,21 @@ These apply to every prompt, every session.
 
 ## Current state vs. the standard above
 
-**Read this before starting any step.** The code in this repo was built against
-an earlier revision of the algorithm document. Revision 6 — the source of the
-critical rules above — added requirements the code does not yet meet. The rules
-above describe the target, not the present. Known gaps as of 2026-08-10:
+**All gaps identified as of 2026-08-10 have been verified closed.** The gap
+list below represents the state as of that date; re-verification on 2026-08-15
+confirms all eight items are satisfied in code. The Rules and Build Order
+tables above accurately describe the current implementation.
 
-- **Rule 15 (vocabulary).** [core/models.py](core/models.py) has
-  `signed_by`/`signed_at`/`signed_role`; [core/gates.py](core/gates.py) has
-  `sign_off_gate`. Rule 15 forbids all four. The rename to
-  `report_approval_name`/`report_approval_at`/`approval_record_gate` has not
-  happened.
-- **Rule 18 (reference figures).** `ReferenceFigures.line_items` is still a
-  `dict[str, float]`. Rule 18 requires `lines: list[ReferenceFigureLine]`.
-- **Rules 19–21 (account mapping).** No `AccountMapping` model exists, so
-  mapping proposal, human approval, and the report's approved/unapproved tables
-  are all absent.
-- **Rule 11 (`CellRecord`).** No `CellRecord` model; the parser writes to
-  parallel `cells` / `cached_values` dicts on `ParsedFile`.
-- **Rule 12 (partial reconstruction).** `ReconciliationLine.verdict` is
-  `pass|warn|block` with no `incomplete` state and no `completeness` field.
-- **Rule 17 (LLM minimization).** `core/llm_data_policy.py` does not exist;
-  [agents/documentation.py](agents/documentation.py) builds its payload inline.
-- **Step 1 / 3b scaffold.** `core/state_store.py`, `core/verdict_logic.py`, and
-  `authorized_approvers.json` do not exist.
-- **Rule 20 (bidirectional completeness).** `AuditReport` has
-  `unmatched_reference_items` but no `unmapped_python_outputs` or
-  `context_match_verdict`.
-
-Closing any of these is a change to a prior step's architecture. Per the
-Delegation rules, flag it and get confirmation before proceeding — do not fold
-it into an unrelated step.
+| Rule / Feature | Verified closed | Evidence |
+|---|---|---|
+| Rule 15 (approval vocabulary) | ✓ | `report_approval_name`/`report_approval_at`/`report_approval_role` consistently used across `core/models.py`, `core/gates.py`, `agents/orchestrator.py`, `report/generator.py`; forbidden vocabulary (`signed_by`, `sign_off_gate`, `attested_by`, `attestation_gate`) not present |
+| Rule 18 (ReferenceFigureLine) | ✓ | `core/models.py:33` defines model; `ReferenceFigures.lines: list[ReferenceFigureLine]` at line 60 |
+| Rules 19–21 (AccountMapping) | ✓ | `core/models.py:75` defines `AccountMapping`; proposal/approval flow in `agents/reconciliation.py` and `core/gates.py` |
+| Rule 11 (CellRecord) | ✓ | `core/models.py:123` defines model with dual formula/cached-value capture |
+| Rule 12 (incomplete verdict + completeness) | ✓ | `ReconciliationLine.verdict` includes `"incomplete"` (`core/models.py:254`); `completeness: Literal["complete", "partial"]` field present (line 260) |
+| Rule 17 (llm_data_policy.py) | ✓ | File exists at `core/llm_data_policy.py` |
+| Step 1/3b scaffold | ✓ | `core/state_store.py`, `core/verdict_logic.py`, `config/authorized_approvers.json` all present |
+| Rule 20 (bidirectional completeness) | ✓ | `AuditReport` has both `unmapped_python_outputs` and `context_match_verdict`; enforcement in `core/gates.py` (`_finalize_reconciliation` around line 403) |
 
 ## AI-written vs. human-modified
 
@@ -260,4 +245,4 @@ Running note, per the Diligence rules. Update it when you change a file.
 |------|--------|-------|
 | all source and tests | AI-written | Initial commit `78a0bb7`, MVP build |
 | [agents/documentation.py](agents/documentation.py) | AI-written | Commit `21b4dbd`: extract text blocks by type instead of indexing `content[0]` |
-| CLAUDE.md | AI-written | This file, 2026-08-10 |
+| CLAUDE.md | AI-written | This file, 2026-08-10; "Current state vs. the standard" gap list re-verified as closed, 2026-08-15 |
