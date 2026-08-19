@@ -8,7 +8,12 @@ import sqlite3
 import pytest
 
 from core.audit_log import AuditContextError, AuditLog
-from core.state_store import StateIntegrityError, StateSerializationError, StateStore
+from core.state_store import (
+    ChainIntegrityError,
+    StateIntegrityError,
+    StateSerializationError,
+    StateStore,
+)
 
 CONTEXT = {"workbook_hash": "a" * 64, "code_version": "0.1.0"}
 
@@ -216,3 +221,121 @@ def test_an_injected_audit_log_is_used_rather_than_a_second_one(db_path):
     store.save_snapshot("RPT-001", "gate_1_context", STATE, CONTEXT)
     assert store.audit_log is log
     assert len(log.get_rows("RPT-001")) == 1
+
+
+# --------------------------------------------------------------------------
+# the complete global chain is verified before a snapshot is loaded
+# --------------------------------------------------------------------------
+
+
+def _drop_update_trigger(db_path: str) -> None:
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("DROP TRIGGER log_rows_no_update")
+
+
+def test_an_edited_earlier_log_row_refuses_the_load(store):
+    """The gap this closes. The snapshot is pristine and its own commitment
+    still verifies; the tampering is one row further back, where neither
+    Check A nor Check B is looking."""
+    store.audit_log.log_event("RPT-001", "gate_decision", {"gate": 2}, "Isaac Shukla", CONTEXT)
+    store.save_snapshot("RPT-001", "gate_2_findings_review", STATE, CONTEXT)
+
+    _drop_update_trigger(store.db_path)
+    with sqlite3.connect(store.db_path) as conn:
+        conn.execute("UPDATE log_rows SET payload_json = '{}' WHERE row_id = 1")
+
+    with pytest.raises(ChainIntegrityError, match="does not verify at row"):
+        store.load_latest_snapshot("RPT-001")
+
+
+def test_a_deleted_row_refuses_the_load(store):
+    """Deletion edits no payload at all — it breaks the prev_row_hash linkage,
+    which only a walk of the chain can see."""
+    store.audit_log.log_event("RPT-001", "gate_decision", {"gate": 1}, None, CONTEXT)
+    store.audit_log.log_event("RPT-001", "gate_decision", {"gate": 2}, None, CONTEXT)
+    store.save_snapshot("RPT-001", "gate_2_findings_review", STATE, CONTEXT)
+
+    with sqlite3.connect(store.db_path) as conn:
+        conn.execute("DROP TRIGGER log_rows_no_delete")
+        conn.execute("DELETE FROM log_rows WHERE row_id = 2")
+
+    with pytest.raises(ChainIntegrityError):
+        store.load_latest_snapshot("RPT-001")
+
+
+def test_corruption_in_another_report_refuses_this_one(store):
+    """The chain is global, so a break anywhere destroys the ordering guarantee
+    for every row after it. Refusal is unconditional on ownership."""
+    store.save_snapshot("RPT-001", "gate_1_context", STATE, CONTEXT)
+    store.audit_log.log_event("RPT-002", "gate_decision", {"gate": 1}, None, CONTEXT)
+    store.save_snapshot("RPT-002", "gate_1_context", STATE, CONTEXT)
+
+    _drop_update_trigger(store.db_path)
+    with sqlite3.connect(store.db_path) as conn:
+        conn.execute("UPDATE log_rows SET payload_json = '{}' WHERE report_id = 'RPT-002'")
+
+    with pytest.raises(ChainIntegrityError):
+        store.load_latest_snapshot("RPT-001")
+
+
+def test_load_snapshot_by_gate_is_guarded_too(store):
+    """Both public loaders go through _load(), so neither is a way around it."""
+    store.save_snapshot("RPT-001", "gate_1_context", STATE, CONTEXT)
+    _drop_update_trigger(store.db_path)
+    with sqlite3.connect(store.db_path) as conn:
+        conn.execute("UPDATE log_rows SET payload_json = '{}' WHERE row_id = 1")
+
+    with pytest.raises(ChainIntegrityError):
+        store.load_snapshot("RPT-001", "gate_1_context")
+
+
+def test_a_refused_load_changes_nothing_on_disk(store):
+    """No repair, no quarantine, no truncation — the corrupt row stays exactly
+    as found, because its current state is the evidence."""
+    store.save_snapshot("RPT-001", "gate_1_context", STATE, CONTEXT)
+    _drop_update_trigger(store.db_path)
+    with sqlite3.connect(store.db_path) as conn:
+        conn.execute("UPDATE log_rows SET payload_json = '{}' WHERE row_id = 1")
+        before = conn.execute("SELECT * FROM log_rows ORDER BY row_id").fetchall()
+
+    with pytest.raises(ChainIntegrityError):
+        store.load_latest_snapshot("RPT-001")
+
+    with sqlite3.connect(store.db_path) as conn:
+        after = conn.execute("SELECT * FROM log_rows ORDER BY row_id").fetchall()
+    assert after == before
+
+
+def test_chain_integrity_error_is_a_state_integrity_error(store):
+    """Subclassing keeps existing callers working while keeping the two
+    findings distinguishable — a broken history is not a broken snapshot."""
+    assert issubclass(ChainIntegrityError, StateIntegrityError)
+
+
+def test_an_intact_chain_still_loads_normally(store):
+    """The guard must not refuse anything it has no reason to."""
+    store.audit_log.log_event("RPT-001", "gate_decision", {"gate": 1}, None, CONTEXT)
+    store.save_snapshot("RPT-001", "gate_1_context", STATE, CONTEXT)
+    assert json.loads(store.load_latest_snapshot("RPT-001").state_json) == STATE
+
+
+def test_an_unknown_report_on_an_intact_chain_still_returns_none(store):
+    """Criterion 12 at this level: no snapshot is not the same as bad snapshot."""
+    store.save_snapshot("RPT-001", "gate_1_context", STATE, CONTEXT)
+    assert store.load_latest_snapshot("RPT-NONE") is None
+
+
+def test_an_altered_stored_row_hash_refuses_the_load(store):
+    """Recomputing a row's hash to cover an edit does not help either: the row
+    AFTER it committed to the old value, so the linkage still disagrees. Proved
+    for verify_chain() in test_audit_log.py; this proves recovery refuses on it."""
+    store.audit_log.log_event("RPT-001", "gate_decision", {"gate": 1}, None, CONTEXT)
+    store.audit_log.log_event("RPT-001", "gate_decision", {"gate": 2}, None, CONTEXT)
+    store.save_snapshot("RPT-001", "gate_2_findings_review", STATE, CONTEXT)
+
+    _drop_update_trigger(store.db_path)
+    with sqlite3.connect(store.db_path) as conn:
+        conn.execute("UPDATE log_rows SET row_hash = ? WHERE row_id = 1", ("f" * 64,))
+
+    with pytest.raises(ChainIntegrityError, match="does not verify at row"):
+        store.load_latest_snapshot("RPT-001")

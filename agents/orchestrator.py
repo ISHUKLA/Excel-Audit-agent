@@ -101,6 +101,11 @@ class Orchestrator:
         self._authorized_approvers_path = Path(authorized_approvers_path)
         self._code_version_override = code_version
         self._state: dict[str, dict] = {}
+        # Reports whose chain verification has already been recorded by THIS
+        # process. Recovery is reached implicitly through _state_for(), so
+        # without this a single restarted session would append a verification
+        # row on every staged call and fill the log with evidence about itself.
+        self._chain_verification_recorded: set[str] = set()
 
     def run(
         self,
@@ -386,12 +391,34 @@ class Orchestrator:
         return report
 
     def resume(self, report_id: str) -> dict:
-        """Reload the latest durable state for a report into this process."""
+        """Reload the latest durable state for a report into this process.
+
+        load_latest_snapshot() verifies the COMPLETE global audit chain before
+        it reads anything, and raises ChainIntegrityError if any row disagrees —
+        including a row belonging to another report. Nothing reaches memory in
+        that case, because the failure happens before this line.
+        """
         snapshot = self._state_store.load_latest_snapshot(report_id)
         if snapshot is None:
             raise PipelineStateError(f"no persisted state exists for report_id {report_id!r}")
         state = _restore_state(json.loads(snapshot.state_json))
         self._state[report_id] = state
+
+        # Fail closed: a recovery that cannot be evidenced does not stand. If
+        # recording the verification fails, the restored state is discarded
+        # rather than left in memory unrecorded — an unevidenced recovery is
+        # the shape of gap this control exists to close.
+        if report_id not in self._chain_verification_recorded:
+            try:
+                self._state_store.record_chain_verification(
+                    report_id=report_id,
+                    snapshot=snapshot,
+                    context=state["context"],
+                )
+            except Exception:
+                self._state.pop(report_id, None)
+                raise
+            self._chain_verification_recorded.add(report_id)
         return state
 
     def get_report(self, report_id: str) -> AuditReport:

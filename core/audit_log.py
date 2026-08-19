@@ -187,6 +187,18 @@ class AuditLog:
         finally:
             conn.close()
 
+    def count_rows(self) -> int:
+        """How many rows are in the chain. Read-only; adds nothing and changes nothing.
+
+        Used to record how much of the log a verification actually covered, so
+        "the chain verified" is accompanied by the size of what was walked.
+        """
+        conn = self._connect()
+        try:
+            return conn.execute("SELECT COUNT(*) AS n FROM log_rows").fetchone()["n"]
+        finally:
+            conn.close()
+
     def verify_chain(self) -> tuple[bool, list[str]]:
         """Walk the whole log and report any row whose hashes no longer agree.
 

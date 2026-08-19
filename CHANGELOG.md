@@ -4,6 +4,16 @@ One line per meaningful change. This is the project's lightweight change-control
 record — it exists so that a reviewer can reconstruct what changed and when
 without reading the git log.
 
+## 2026-08-19 — Recommendation 1: verify the complete audit chain before every resume
+
+- Closed a gap where `Orchestrator.resume()` restored pipeline state without checking the audit chain behind it. The two existing snapshot checks — content hash, and a matching `state_snapshot` commitment — both pass while an *earlier* log row has been rewritten, because that row still hashes correctly on its own and the snapshot was never touched. Demonstrated against the previous code: with `verify_chain()` reporting `(False, ['1'])`, `resume()` succeeded and restored state at `post_reconciliation`.
+- `StateStore._load()` now walks the complete global chain before reading the `snapshots` table, so no state can reach memory from a corrupt history. Both public loaders go through it; the implicit recovery route via `Orchestrator._state_for()` is covered by the same guard.
+- Added `ChainIntegrityError`, subclassing `StateIntegrityError`. Distinct because "the history behind this state is broken" and "this one snapshot is broken" are different findings with different remedies; subclassed so existing callers keep working. The message names every failing row ID and states plainly that it does not identify who changed the file, when, or whether deliberately.
+- Refusal is unconditional on ownership: the chain is global, so a corrupt row belonging to another report refuses recovery of this one. One bad row makes every report in that `audit.db` unresumable, with no override. This is a real availability cost, accepted deliberately; backups become an operational necessity. New runs on a broken chain remain allowed.
+- Added a sixth `AuditLogRow.event_type`, `chain_verification`, recorded once per report per process on successful recovery. Never recorded on failure — appending to a chain already known to be broken would commit a new row's `prev_row_hash` to a corrupt predecessor. Recording failure is fail-closed: the restored state is discarded rather than left in memory unevidenced.
+- No schema change, no migration, no change to the four human gates, reconciliation calculations, report content, or LLM handling. Existing audit databases and snapshots remain readable and compatible — though a database already tampered with will now refuse recovery where it previously succeeded.
+- Added 18 regressions across the model, snapshot store, and orchestrator: edited early row, deleted mid-chain row, cross-report corruption, no state after refusal, implicit-route refusal, nothing repaired or appended on refusal, once-per-process recording, chain intact after recording, missing-versus-corrupt distinction, and vocabulary. Verification: 319 tests pass (up from 301), end-to-end acceptance unmodified.
+
 ## 2026-08-12 — P0 credibility controls
 
 - Established one accounting sign convention in `core/accounting.py`: reference amounts remain non-negative magnitudes, with debit positive and credit negative. Both fuzzy proposals and human-edited mappings now compare against the correctly oriented amount.

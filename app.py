@@ -18,6 +18,7 @@ from dotenv import load_dotenv
 from agents.orchestrator import Orchestrator, PipelineStateError
 from core.gates import GateBlockedError
 from core.models import FileContext, MappingReviewDecision, ParsedFile, ReconciliationResult
+from core.state_store import ChainIntegrityError
 from core.ui_inputs import (
     ReferenceFigureInputError,
     build_reference_figures,
@@ -112,6 +113,18 @@ def _verdict_banner(verdict: str, label: str) -> None:
         f"{VERDICT_BG[palette_key]};color:{VERDICT_COLOR[palette_key]};"
         f"font-weight:700'>{label}: {display}</div>",
         unsafe_allow_html=True,
+    )
+
+
+def _chain_integrity_error(exc: ChainIntegrityError) -> None:
+    """Render a refused recovery. Rendering only — the refusal itself is made
+    in core/state_store.py, per the rule that app.py holds no business logic."""
+    st.error(str(exc))
+    st.caption(
+        "The audit log is tamper-evident, not tamper-proof: the hash chain makes "
+        "a change detectable after the fact, but it cannot prevent one, identify "
+        "who made it, or establish when. Nothing has been altered or repaired in "
+        "response to this check."
     )
 
 
@@ -445,6 +458,9 @@ def screen_2_findings_review() -> None:
                 selected_outputs,
                 actor=st.session_state.reviewer_name,
             )
+    except ChainIntegrityError as exc:
+        _chain_integrity_error(exc)
+        return
     except (GateBlockedError, PipelineStateError) as exc:
         st.error(str(exc))
         return
@@ -545,6 +561,9 @@ def screen_3_reconciliation() -> None:
             external_absolute_threshold=external_absolute,
             actor=st.session_state.reviewer_name,
         )
+    except ChainIntegrityError as exc:
+        _chain_integrity_error(exc)
+        return
     except (GateBlockedError, PipelineStateError, ValueError) as exc:
         st.error(str(exc))
         return
@@ -592,6 +611,9 @@ def screen_3_reconciliation() -> None:
                     actor=st.session_state.reviewer_name,
                 )
             )
+        except ChainIntegrityError as exc:
+            _chain_integrity_error(exc)
+            return
         except (GateBlockedError, PipelineStateError, ValueError) as exc:
             st.error(str(exc))
             return
@@ -657,6 +679,9 @@ def screen_3_reconciliation() -> None:
                     acknowledge_incomplete=acknowledge_incomplete,
                 )
             )
+    except ChainIntegrityError as exc:
+        _chain_integrity_error(exc)
+        return
     except (GateBlockedError, PipelineStateError, ValueError) as exc:
         st.error(str(exc))
         return
@@ -748,6 +773,9 @@ def screen_4_approval_record() -> None:
             final_report = _orchestrator().submit_approval_record(
                 st.session_state.report_id, approval_name.strip(), approval_role.strip()
             )
+    except ChainIntegrityError as exc:
+        _chain_integrity_error(exc)
+        return
     except (GateBlockedError, PipelineStateError, ValueError) as exc:
         st.error(str(exc))
         return
