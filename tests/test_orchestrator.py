@@ -15,6 +15,7 @@ import agents.orchestrator as orchestrator_module
 from agents.orchestrator import (
     RECONCILIATION_PREVIEW_LABEL,
     Orchestrator,
+    PipelineStateError,
 )
 from core.audit_log import AuditLog, NOT_YET_PARSED
 from core.gates import GateBlockedError
@@ -34,7 +35,7 @@ from core.models import (
     TabDocumentation,
     WorkbookMeta,
 )
-from core.state_store import StateIntegrityError, StateStore
+from core.state_store import ChainIntegrityError, StateIntegrityError, StateStore
 
 ACTOR = "Isaac Shukla"
 CONTEXT_HASH = "b" * 64
@@ -749,3 +750,189 @@ def test_report_preparation_can_retry_without_replaying_gate_3(monkeypatch, tmp_
         if json.loads(row["payload_json"]).get("gate") == 3
     ]
     assert len(gate3_after) == 1
+
+
+# --------------------------------------------------------------------------
+# Recommendation 1 — the complete global chain is verified before every resume
+# --------------------------------------------------------------------------
+
+
+def _tamper_with_row(db_path: str, row_id: int) -> None:
+    """Rewrite one log row's payload after removing the append-only trigger.
+
+    This is the CRO threat model: someone with file access edits a recorded
+    human decision. The snapshots table is deliberately left untouched, so the
+    only thing that can catch it is a walk of the whole chain.
+    """
+    with sqlite3.connect(db_path) as connection:
+        connection.execute("DROP TRIGGER log_rows_no_update")
+        connection.execute(
+            "UPDATE log_rows SET payload_json = ? WHERE row_id = ?",
+            ('{"action":"dismissed","context":{"code_version":"tampered"}}', row_id),
+        )
+
+
+def test_resume_refuses_when_an_earlier_log_row_was_tampered(monkeypatch, tmp_path):
+    """The gap this control closes: the snapshot itself is pristine, and its
+    commitment in the log still verifies on its own, but an earlier decision in
+    the chain was rewritten. Checking only the snapshot cannot see that."""
+    _patch_agents(monkeypatch, _result())
+    orchestrator, audit_log, state_store = _orchestrator(tmp_path)
+    report_id, preview = _start_preview(orchestrator)
+
+    # Row 1 is the Gate 1 context decision — recorded long before the snapshot
+    # that resume() will load, and untouched by Check A or Check B.
+    _tamper_with_row(audit_log.db_path, 1)
+
+    fresh = Orchestrator(
+        audit_log=audit_log,
+        state_store=state_store,
+        code_version="test-code-version",
+    )
+    with pytest.raises(ChainIntegrityError, match="1"):
+        fresh.resume(report_id)
+
+
+
+def test_refused_resume_leaves_no_state_in_memory(monkeypatch, tmp_path):
+    """Criterion 5. A refusal that still populated _state would leave the
+    pipeline running on history it just declared unreliable."""
+    _patch_agents(monkeypatch, _result())
+    orchestrator, audit_log, state_store = _orchestrator(tmp_path)
+    report_id, _ = _start_preview(orchestrator)
+    _tamper_with_row(audit_log.db_path, 1)
+
+    fresh = Orchestrator(
+        audit_log=audit_log,
+        state_store=state_store,
+        code_version="test-code-version",
+    )
+    with pytest.raises(ChainIntegrityError):
+        fresh.resume(report_id)
+    assert fresh._state == {}
+
+    # And the implicit route refuses too, rather than serving partial state.
+    with pytest.raises(ChainIntegrityError):
+        fresh.get_report(report_id)
+
+
+def test_refusal_holds_when_recovery_is_reached_implicitly(monkeypatch, tmp_path):
+    """Criterion 13. resume() is not the only door: _state_for() calls it
+    whenever a staged method finds no process-local state."""
+    _patch_agents(monkeypatch, _result())
+    orchestrator, audit_log, state_store = _orchestrator(tmp_path)
+    report_id, _ = _start_preview(orchestrator)
+    _tamper_with_row(audit_log.db_path, 1)
+
+    fresh = Orchestrator(
+        audit_log=audit_log,
+        state_store=state_store,
+        code_version="test-code-version",
+    )
+    with pytest.raises(ChainIntegrityError, match="does not verify"):
+        fresh.get_reconciliation_preview(report_id)
+
+
+def test_a_refused_resume_appends_nothing_and_repairs_nothing(monkeypatch, tmp_path):
+    """Criteria 7 and 8. Corrupt evidence stays exactly as found — its current
+    state IS the evidence of what happened to it."""
+    _patch_agents(monkeypatch, _result())
+    orchestrator, audit_log, state_store = _orchestrator(tmp_path)
+    report_id, _ = _start_preview(orchestrator)
+    _tamper_with_row(audit_log.db_path, 1)
+
+    with sqlite3.connect(audit_log.db_path) as connection:
+        before_log = connection.execute("SELECT * FROM log_rows ORDER BY row_id").fetchall()
+        before_snaps = connection.execute("SELECT * FROM snapshots ORDER BY snapshot_id").fetchall()
+
+    fresh = Orchestrator(
+        audit_log=audit_log,
+        state_store=state_store,
+        code_version="test-code-version",
+    )
+    with pytest.raises(ChainIntegrityError):
+        fresh.resume(report_id)
+
+    with sqlite3.connect(audit_log.db_path) as connection:
+        after_log = connection.execute("SELECT * FROM log_rows ORDER BY row_id").fetchall()
+        after_snaps = connection.execute("SELECT * FROM snapshots ORDER BY snapshot_id").fetchall()
+    assert after_log == before_log
+    assert after_snaps == before_snaps
+    # Still broken at the same row: nothing was healed.
+    assert audit_log.verify_chain() == (False, ["1"])
+
+
+def test_successful_resume_records_one_chain_verification_per_process(monkeypatch, tmp_path):
+    """Criterion 14, Option B. Recorded once per report per process — not once
+    per staged call, or an implicit recovery route would flood the log."""
+    _patch_agents(monkeypatch, _result())
+    orchestrator, audit_log, state_store = _orchestrator(tmp_path)
+    report_id, _ = _start_preview(orchestrator)
+
+    def verification_rows():
+        return [
+            row
+            for row in audit_log.get_rows(report_id)
+            if row["event_type"] == "chain_verification"
+        ]
+
+    assert verification_rows() == []
+
+    fresh = Orchestrator(
+        audit_log=audit_log,
+        state_store=state_store,
+        code_version="test-code-version",
+    )
+    fresh.resume(report_id)
+    assert len(verification_rows()) == 1
+
+    payload = json.loads(verification_rows()[0]["payload_json"])
+    assert payload["outcome"] == "verified"
+    assert payload["gate_name"] == "post_reconciliation"
+    assert payload["verified_rows"] >= 1
+
+    # Repeated recovery in the same process appends nothing further.
+    fresh.resume(report_id)
+    fresh.get_reconciliation_preview(report_id)
+    assert len(verification_rows()) == 1
+
+    # Recording a row must not itself break the chain it attests to.
+    assert audit_log.verify_chain() == (True, [])
+
+
+def test_the_verification_row_does_not_claim_more_than_it_can(monkeypatch, tmp_path):
+    """Criterion 15. Rules 13/14/15: tamper-evident, never tamper-proof, and
+    never 'validated' — a passing check means no disagreement was detected."""
+    _patch_agents(monkeypatch, _result())
+    orchestrator, audit_log, state_store = _orchestrator(tmp_path)
+    report_id, _ = _start_preview(orchestrator)
+    _tamper_with_row(audit_log.db_path, 1)
+
+    fresh = Orchestrator(
+        audit_log=audit_log,
+        state_store=state_store,
+        code_version="test-code-version",
+    )
+    with pytest.raises(ChainIntegrityError) as caught:
+        fresh.resume(report_id)
+
+    message = str(caught.value).lower()
+    assert "tamper-evident" in message
+    for overstatement in ("tamper-proof", "immutable", "validated", "audit-ready"):
+        assert overstatement not in message
+
+
+def test_a_missing_snapshot_is_not_reported_as_corruption(monkeypatch, tmp_path):
+    """Criterion 12. Absence of evidence and corruption of evidence are
+    different findings and must not collapse into one signal."""
+    _patch_agents(monkeypatch, _result())
+    orchestrator, audit_log, state_store = _orchestrator(tmp_path)
+    _start_preview(orchestrator)
+
+    fresh = Orchestrator(
+        audit_log=audit_log,
+        state_store=state_store,
+        code_version="test-code-version",
+    )
+    with pytest.raises(PipelineStateError, match="no persisted state exists"):
+        fresh.resume("RPT-NEVER-EXISTED")

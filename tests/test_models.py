@@ -696,3 +696,50 @@ def test_audit_report_rejects_a_missing_disclaimer():
         AuditReport(
             **{k: v for k, v in an_audit_report().model_dump().items() if k != "disclaimer"}
         )
+
+
+def test_chain_verification_is_an_accepted_event_type():
+    """Recommendation 1 adds a sixth event. log_event() builds an AuditLogRow
+    on every write, so an unlisted value would fail validation and the write
+    would raise — the model has to know about it first."""
+    assert AuditLogRow(
+        row_id=1,
+        report_id="RPT-001",
+        event_type="chain_verification",
+        payload_hash="b" * 64,
+        prev_row_hash=ZERO_HASH,
+        row_hash="c" * 64,
+        timestamp=NOW,
+    ).event_type == "chain_verification"
+
+
+def test_widening_event_type_did_not_widen_it_to_anything():
+    """All five original values still hold, and an unknown one still rejects."""
+    for accepted in (
+        "gate_decision",
+        "state_snapshot",
+        "llm_call",
+        "report_approved",
+        "mapping_decision",
+        "chain_verification",
+    ):
+        assert AuditLogRow(
+            row_id=1,
+            report_id="RPT-001",
+            event_type=accepted,
+            payload_hash="b" * 64,
+            prev_row_hash=ZERO_HASH,
+            row_hash="c" * 64,
+            timestamp=NOW,
+        ).event_type == accepted
+
+    with pytest.raises(ValidationError):
+        AuditLogRow(
+            row_id=1,
+            report_id="RPT-001",
+            event_type="chain_repaired",
+            payload_hash="b" * 64,
+            prev_row_hash=ZERO_HASH,
+            row_hash="c" * 64,
+            timestamp=NOW,
+        )

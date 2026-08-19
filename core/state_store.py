@@ -6,6 +6,15 @@ that, this table would just be a bigger, more bypassable version of the problem
 the log exists to solve — a place where state could be quietly rewritten with
 nothing to detect it.
 
+Loading a snapshot verifies the COMPLETE global chain first, not merely the
+snapshot and the single log row committing to it. Those two checks pass happily
+while an earlier decision — a finding disposition, a threshold — has been
+rewritten: the edited row still hashes correctly on its own, and the snapshot
+was never touched. Only a walk from genesis sees the disagreement. Because the
+chain is global rather than per-report, a corrupt row belonging to a different
+report refuses recovery here too; that is a real availability cost, and the
+remedy is a restored backup, never a repair.
+
 DISCLOSURE: once a workbook has been through the pipeline, its contents live
 durably in `audit.db`, not only in the original .xlsx. That is deliberate — it is
 what evidence retention means — but it makes `audit.db` as sensitive as the
@@ -42,6 +51,26 @@ def _canonical_json(state: dict) -> str:
 
 class StateIntegrityError(RuntimeError):
     """Raised when recovered state no longer matches its committed hashes."""
+
+
+class ChainIntegrityError(StateIntegrityError):
+    """Raised when the complete global audit chain does not verify.
+
+    Distinct from its parent on purpose. `StateIntegrityError` means *this one
+    snapshot* disagrees with its own committed hashes; this means *the history
+    behind it* no longer holds together. Different findings, different remedies,
+    so they must not collapse into one signal — but it subclasses, so anything
+    already catching StateIntegrityError keeps catching this too.
+
+    Refusal is unconditional on ownership: the chain is global (see
+    AuditLog._last_row_hash), so a break anywhere destroys the ordering
+    guarantee for every row after it, across report boundaries. A corrupt row
+    belonging to another report therefore refuses recovery of this one.
+
+    Tamper-EVIDENT, not tamper-proof. This detects disagreement; it does not
+    prevent anyone with write access to the file from causing it, does not
+    identify who did, and does not establish when.
+    """
 
 
 def _sha256(text: str) -> str:
@@ -129,6 +158,38 @@ class StateStore:
             state_hash=state_hash,
         )
 
+    def record_chain_verification(
+        self,
+        report_id: str,
+        snapshot: StateSnapshot,
+        context: dict,
+        actor: Optional[str] = None,
+    ) -> None:
+        """Record that the chain verified immediately before a recovery.
+
+        Called AFTER the snapshot loads, not from inside _load(), because
+        AuditLog._require_context() needs a workbook_hash and the only copy of
+        it lives inside the snapshot that has not been read yet. So the ordering
+        is forced: verify chain -> load snapshot -> restore -> record. The claim
+        this row makes is "the chain verified immediately before this state was
+        recovered", not that the two happened at the same instant.
+
+        There is deliberately no failure counterpart. A broken chain is reported
+        by raising, never by appending — see ChainIntegrityError.
+        """
+        self.audit_log.log_event(
+            report_id=report_id,
+            event_type="chain_verification",
+            payload={
+                "gate_name": snapshot.gate_name,
+                "state_hash": snapshot.state_hash,
+                "outcome": "verified",
+                "verified_rows": self.audit_log.count_rows(),
+            },
+            actor=actor,
+            context=context,
+        )
+
     def load_latest_snapshot(self, report_id: str) -> Optional[StateSnapshot]:
         """The most recent snapshot for a report — the resume point after a restart."""
         return self._load(
@@ -150,6 +211,24 @@ class StateStore:
         )
 
     def _load(self, sql: str, params: tuple) -> Optional[StateSnapshot]:
+        # The complete chain is verified BEFORE the snapshots table is read, so
+        # there is no window in which corrupt history has already produced state.
+        # Verifying only the snapshot — its own hash, and the one log row that
+        # commits to it — cannot see an edit made to an EARLIER decision: that
+        # row still hashes correctly on its own, and the snapshot is untouched.
+        # Only a walk from genesis catches it.
+        chain_ok, broken_row_ids = self.audit_log.verify_chain()
+        if not chain_ok:
+            raise ChainIntegrityError(
+                "refusing to recover pipeline state: the tamper-evident audit "
+                f"chain does not verify at row(s) {', '.join(broken_row_ids)}. "
+                "The recorded history behind this state no longer agrees with "
+                "itself, so it cannot be relied on. This does not identify who "
+                "changed it, when, or whether the change was deliberate. "
+                "Restore audit.db from a backup and preserve the current file "
+                "as it stands — it is evidence. Nothing has been repaired."
+            )
+
         conn = self._connect()
         try:
             row = conn.execute(sql, params).fetchone()

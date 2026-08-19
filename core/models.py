@@ -347,6 +347,14 @@ class AuditLogRow(BaseModel):
     named approval record, and signature vocabulary is not used anywhere in
     this codebase. This deviates from the literal text of the build document,
     deliberately — see CHANGELOG.md.
+
+    "chain_verification" records that the complete global hash chain verified
+    immediately before a snapshot was recovered into memory. It is written only
+    on success: appending to a chain already known to be broken would commit a
+    new row's prev_row_hash to a corrupt predecessor, which is writing fresh
+    evidence onto compromised evidence. It attests that no disagreement was
+    detected in this file at that moment — not that the evidence is authentic,
+    and not that the run is validated.
     """
 
     row_id: int
@@ -357,6 +365,7 @@ class AuditLogRow(BaseModel):
         "llm_call",
         "report_approved",
         "mapping_decision",
+        "chain_verification",
     ]
     payload_hash: str
     # The previous row's row_hash, or 64 zeros for the first row in a chain.

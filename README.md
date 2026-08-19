@@ -101,6 +101,12 @@ This makes the log **tamper-evident, not tamper-proof**. Anyone with write acces
 
 The chain is global across the whole file rather than per-report, so removing one report's rows entirely is detectable too. Verify it with `AuditLog.verify_chain()`, which returns `(True, [])` on an intact log or `(False, [row_ids])` naming the rows that no longer agree.
 
+**Recovery verifies the whole chain first.** Before any saved snapshot is loaded back into the pipeline — after a restart, or whenever a session resumes a report — the complete chain is walked from the beginning. If any row disagrees, recovery is refused, no state is restored, and the error names the failing rows. Verifying only the snapshot would not be enough: a snapshot stays valid on its own while an earlier decision behind it has been rewritten.
+
+Because the chain is global, this refusal is not limited to the report you are resuming. **One corrupt row makes every report in that `audit.db` unresumable**, and there is no override. The remedy is to restore `audit.db` from a backup and keep the current file as it stands, because it is evidence — nothing is ever repaired automatically. This makes backups an operational necessity rather than merely good practice.
+
+A successful verification is itself recorded in the log, once per report per session. A failed one is not: appending to a chain already known to be broken would write new evidence on top of compromised evidence.
+
 The log contains no verbatim LLM responses. It records that a call happened and what its outcome was.
 
 ### `audit.db` is as sensitive as the workbook
@@ -131,6 +137,7 @@ Step 12's acceptance test uses a real LibreOffice-recalculated workbook and the 
 - **No independent reviewer is enforced.** The same person can complete all four gates; the report discloses that no independent review occurred.
 - **No application-level authentication exists.** The authorized-approvers file is a local name registry, not authentication or identity verification.
 - **The audit log is tamper-evident, not tamper-proof.** Someone with file access can modify or delete `audit.db`; verification makes after-the-fact changes detectable but cannot prevent them.
+- **Chain verification does not defend against wholesale forgery.** Someone who rebuilds every row from the beginning produces a chain that verifies. Detecting that needs an anchor held outside the file, which this MVP does not have.
 - **Data minimization before LLM calls is informal, not certified.** The local policy withholds long free text and external-link values and records a manifest, but it is not a certified privacy, security, or regulatory control.
 
 ## Known gaps
