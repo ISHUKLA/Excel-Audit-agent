@@ -4,6 +4,13 @@ One line per meaningful change. This is the project's lightweight change-control
 record — it exists so that a reviewer can reconstruct what changed and when
 without reading the git log.
 
+## 2026-08-21 — Recommendation 2 corrective patch: Gate 1 UI supplies confirmed hash
+
+- Merged Recommendation 2 did not pass `confirmed_workbook_hash` when constructing `FileContext` in the UI path, so Pydantic validation would fail before the Orchestrator received it.
+- `app.py` now supplies `confirmed_workbook_hash=workbook_hash` to the `FileContext` constructor, ensuring the identity calculated from uploaded bytes flows through to the audit log.
+- Added regression test `test_gate1_passes_the_confirmed_workbook_hash_to_file_context` to verify the field is supplied and to fail if it is removed.
+- No change to orchestrator verification, Gate 1 rendering, or control enforcement.
+
 ## 2026-08-19 — Recommendation 2: bind Gate 1 to the uploaded workbook hash
 
 - Gate 1 previously confirmed a *filename*. Two different workbooks can share a name, so a reviewer could confirm one file and the pipeline could parse another with nothing to detect it. Gate 1 also recorded `not_yet_parsed` as its workbook hash, because nothing had been hashed before the gate ran.

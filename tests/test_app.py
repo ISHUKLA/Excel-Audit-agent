@@ -161,3 +161,20 @@ def test_app_surfaces_a_workbook_identity_mismatch_without_deciding_it():
     assert "no Gate 1 decision was recorded" in source
     # The comparison itself must not live here.
     assert "verify_bytes_match(" not in source
+
+
+def test_gate1_passes_the_confirmed_workbook_hash_to_file_context():
+    """The FileContext received by Orchestrator.run() must carry the hash
+    calculated from the uploaded bytes, or Pydantic validation fails before
+    the run even starts. This test verifies the construction supplies it."""
+    source = APP_PATH.read_text()
+    # The construction must include the confirmed hash calculated from the upload.
+    assert "confirmed_workbook_hash=workbook_hash" in source
+    # And it must be in the FileContext construction (not just a comment or string).
+    assert "FileContext(" in source
+    # Verify the hash is calculated before the construction.
+    fc_line = source.find("file_context = FileContext(")
+    hash_line = source.find("workbook_hash = _workbook_identity_panel")
+    assert hash_line < fc_line, (
+        "workbook_hash must be calculated before FileContext construction"
+    )

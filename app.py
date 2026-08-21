@@ -339,6 +339,7 @@ def screen_1_upload() -> None:
             period=period.strip() or None,
             currency=currency.strip().upper() or None,
             basis=basis.strip() or None,
+            confirmed_workbook_hash=workbook_hash,
             uploaded_at=datetime.now(timezone.utc),
         )
     except (ReferenceFigureInputError, ValueError) as exc:
