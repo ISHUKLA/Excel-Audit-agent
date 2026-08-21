@@ -96,6 +96,7 @@ def _file_context(role="actuary") -> FileContext:
         filename="reserves.xlsx",
         description="Q4 reserve calculation",
         user_role=role,
+        confirmed_workbook_hash="a" * 64,
         uploaded_at=datetime.now(timezone.utc),
     )
 

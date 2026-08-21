@@ -14,7 +14,7 @@ tab referencing another tab twice by two separate, non-circular cell chains is
 ordinary; only the cell-level graph can tell that apart from a real cycle.
 """
 
-import hashlib
+import io
 import re
 import xml.etree.ElementTree as ET
 import zipfile
@@ -26,6 +26,7 @@ from openpyxl.utils import column_index_from_string, get_column_letter
 from openpyxl.worksheet.formula import ArrayFormula
 
 from core.models import CellRecord, ParsedFile, WorkbookMeta
+from core.workbook_identity import sha256_bytes
 
 _TAB_REF_PATTERN = re.compile(r"'([^']+)'!|([A-Za-z_][A-Za-z0-9_.]*)!")
 _NUMBER_LIKE_PATTERN = re.compile(r"^-?[\d,]+\.?\d*%?$")
@@ -49,13 +50,27 @@ _STRING_LITERAL_PATTERN = re.compile(r'"[^"]*"')
 _MAX_RANGE_EXPANSION = 5000
 
 
-def parse_workbook(path: str) -> ParsedFile:
+def parse_workbook(workbook_bytes: bytes) -> ParsedFile:
+    """Parse the exact bytes that were confirmed at Gate 1.
+
+    Takes bytes rather than a path deliberately. A path is a mutable reference:
+    this function reads the workbook five separate times (formula mode, data-only
+    mode, metadata, VBA detection, and the hash), and against a path each of
+    those is an independent window in which the file could change underneath us.
+    The workbook a reviewer confirmed could then differ from the one parsed, with
+    nothing to detect it.
+
+    Bytes cannot change underneath the caller, so the invariant holds by
+    construction: the bytes hashed for Gate 1 are the bytes parsed here. Each
+    reader gets its OWN BytesIO over the same immutable sequence — sharing one
+    buffer would rely on undocumented seek behaviour in openpyxl.
+    """
     warnings: list[str] = []
 
-    workbook_meta = _read_workbook_meta(path)
+    workbook_meta = _read_workbook_meta(workbook_bytes)
 
-    wb_formulas = openpyxl.load_workbook(path, data_only=False)
-    wb_values = openpyxl.load_workbook(path, data_only=True)
+    wb_formulas = openpyxl.load_workbook(io.BytesIO(workbook_bytes), data_only=False)
+    wb_values = openpyxl.load_workbook(io.BytesIO(workbook_bytes), data_only=True)
 
     raw_tab_names = list(wb_formulas.sheetnames)
     tab_names, dedupe_warnings = _dedupe_tab_keys(raw_tab_names)
@@ -139,7 +154,7 @@ def parse_workbook(path: str) -> ParsedFile:
         cells=cells,
         named_ranges=named_ranges,
         external_links=external_links,
-        has_vba=_detect_vba(path),
+        has_vba=_detect_vba(workbook_bytes),
         workbook_meta=workbook_meta,
         tab_dependency_graph=nx.to_dict_of_lists(tab_graph),
         cell_dependency_graph=nx.to_dict_of_lists(cell_graph),
@@ -234,15 +249,16 @@ def _stringify(value: object) -> str | None:
 # ---------------------------------------------------------------------------
 
 
-def _read_workbook_meta(path: str) -> WorkbookMeta:
-    with open(path, "rb") as handle:
-        workbook_hash = hashlib.sha256(handle.read()).hexdigest()
+def _read_workbook_meta(workbook_bytes: bytes) -> WorkbookMeta:
+    # The same canonical hash the UI showed and the human confirmed at Gate 1 —
+    # computed by one helper so the two can never drift apart.
+    workbook_hash = sha256_bytes(workbook_bytes)
 
     calc_mode = "unknown"
     fully_calculated_on_load = None
     app_version = None
 
-    with zipfile.ZipFile(path) as archive:
+    with zipfile.ZipFile(io.BytesIO(workbook_bytes)) as archive:
         names = archive.namelist()
 
         if "xl/workbook.xml" in names:
@@ -399,6 +415,6 @@ def _looks_like_number(value: str) -> bool:
     return bool(_NUMBER_LIKE_PATTERN.match(stripped))
 
 
-def _detect_vba(path: str) -> bool:
-    with zipfile.ZipFile(path) as archive:
+def _detect_vba(workbook_bytes: bytes) -> bool:
+    with zipfile.ZipFile(io.BytesIO(workbook_bytes)) as archive:
         return "xl/vbaProject.bin" in archive.namelist()

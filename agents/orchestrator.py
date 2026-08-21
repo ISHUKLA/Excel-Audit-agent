@@ -23,6 +23,12 @@ from agents.parser import parse_workbook
 from agents.reconciliation import calculate_delta, run_reconciliation
 from core.accounting import evaluate_control_total, signed_reference_amount
 from core.audit_log import AuditLog, NOT_YET_PARSED
+from core.workbook_identity import (
+    WorkbookIdentityError,
+    sha256_bytes,
+    validate_hash_format,
+    verify_bytes_match,
+)
 from core.gates import (
     GateBlockedError,
     approval_record_gate,
@@ -109,14 +115,23 @@ class Orchestrator:
 
     def run(
         self,
-        file_path: str,
+        workbook_bytes: bytes,
         file_context: FileContext,
         reference_figures: Optional[ReferenceFigures] = None,
         *,
+        expected_workbook_hash: str,
         context_confirmed: bool,
         actor: str,
     ) -> tuple[str, ParsedFile, list[AnomalyFinding]]:
         """Start a run and pause with the evidence needed for Gate 2.
+
+        Takes the workbook's BYTES and the hash a human confirmed at Gate 1, not
+        a path. A path is a mutable reference: it cannot carry the guarantee that
+        the workbook confirmed is the workbook parsed.
+
+        ``expected_workbook_hash`` is keyword-only with NO default, so a caller
+        who omits it gets a TypeError rather than an unverified run. There is no
+        flag to skip verification; adding one would make the control advisory.
 
         Returning an AuditReport here would bypass three mandatory human pauses.
         The report exists only after ``submit_gate3_decisions`` and is returned
@@ -127,8 +142,23 @@ class Orchestrator:
         code_version = self._code_version_override or _detect_code_version()
         defaults = _load_materiality_defaults(self._materiality_config_path)
 
-        pre_parse_context = {
-            "workbook_hash": NOT_YET_PARSED,
+        # Identity is established BEFORE Gate 1 runs. If this raises, context_gate
+        # is never called, so no context_confirmed decision is ever recorded for a
+        # workbook whose identity was never established. Ordering is the control.
+        workbook_hash = self._verify_workbook_identity(
+            workbook_bytes=workbook_bytes,
+            expected_workbook_hash=expected_workbook_hash,
+            file_context=file_context,
+            report_id=report_id,
+            actor=actor,
+            code_version=code_version,
+        )
+
+        # Gate 1 now records the real workbook hash. NOT_YET_PARSED was honest
+        # when nothing had been hashed yet; it is no longer true, because the
+        # bytes are hashed before the gate rather than during parsing.
+        gate_context = {
+            "workbook_hash": workbook_hash,
             "code_version": code_version,
         }
         _, context_match_verdict = context_gate(
@@ -138,13 +168,25 @@ class Orchestrator:
             report_id=report_id,
             actor=actor,
             audit_log=self._audit_log,
-            context=pre_parse_context,
+            context=gate_context,
         )
         control_total_check = evaluate_control_total(reference_figures)
 
-        parsed_file = parse_workbook(file_path)
+        parsed_file = parse_workbook(workbook_bytes)
+
+        # Defence in depth. The parser hashes the same bytes with the same helper,
+        # so this cannot fail without a defect somewhere between them. If it ever
+        # does, the run stops rather than silently re-basing every later event on
+        # an identity nobody confirmed.
+        if parsed_file.workbook_meta.workbook_hash != workbook_hash:
+            raise WorkbookIdentityError(
+                "internal consistency failure: the parsed workbook hash "
+                f"({parsed_file.workbook_meta.workbook_hash}) does not match the "
+                f"confirmed hash ({workbook_hash}). Nothing further has been recorded."
+            )
+
         context = {
-            "workbook_hash": parsed_file.workbook_meta.workbook_hash,
+            "workbook_hash": workbook_hash,
             "code_version": code_version,
         }
         state = {
@@ -170,6 +212,56 @@ class Orchestrator:
         self._snapshot(report_id, "post_anomaly_detection", actor)
 
         return report_id, parsed_file, findings
+
+
+    def _verify_workbook_identity(
+        self,
+        *,
+        workbook_bytes: bytes,
+        expected_workbook_hash: str,
+        file_context: FileContext,
+        report_id: str,
+        actor: str,
+        code_version: str,
+    ) -> str:
+        """Confirm these bytes are the workbook the human confirmed at Gate 1.
+
+        Returns the verified hash. On mismatch, records the attempt and raises —
+        no gate decision, no parse, no snapshot, no state.
+
+        The mismatch row's context carries the CONFIRMED hash, not the observed
+        one. Writing the observed hash there would assert an identity for a
+        workbook nobody approved; the observed value belongs in the payload as
+        evidence of what was rejected.
+        """
+        try:
+            return verify_bytes_match(workbook_bytes, expected_workbook_hash)
+        except WorkbookIdentityError as mismatch:
+            # The expected hash may itself be malformed (that is one way to get
+            # here). Only a well-formed digest is safe to record as context; a
+            # junk value falls back to the sentinel rather than being written in
+            # as though it were an identity.
+            try:
+                confirmed = validate_hash_format(expected_workbook_hash)
+            except WorkbookIdentityError:
+                confirmed = NOT_YET_PARSED
+            try:
+                observed = sha256_bytes(workbook_bytes)
+            except WorkbookIdentityError:
+                observed = "unreadable"
+            self._audit_log.log_event(
+                report_id=report_id,
+                event_type="workbook_identity_mismatch",
+                payload={
+                    "confirmed_workbook_hash": confirmed,
+                    "observed_workbook_hash": observed,
+                    "filename": file_context.filename,
+                    "outcome": "blocked",
+                },
+                actor=actor,
+                context={"workbook_hash": confirmed, "code_version": code_version},
+            )
+            raise mismatch
 
     def submit_gate2_decisions(
         self,

@@ -49,6 +49,7 @@ def a_file_context(**overrides):
         period="2025-Q4",
         currency="EUR",
         basis="IFRS 17",
+        confirmed_workbook_hash="a" * 64,
         uploaded_at=NOW,
     )
     return FileContext(**{**defaults, **overrides})
@@ -738,6 +739,92 @@ def test_widening_event_type_did_not_widen_it_to_anything():
             row_id=1,
             report_id="RPT-001",
             event_type="chain_repaired",
+            payload_hash="b" * 64,
+            prev_row_hash=ZERO_HASH,
+            row_hash="c" * 64,
+            timestamp=NOW,
+        )
+
+
+# --------------------------------------------------------------------------
+# Recommendation 2 — Gate 1 is bound to a specific workbook, not a filename
+# --------------------------------------------------------------------------
+
+VALID_HASH = "a" * 64
+
+
+def _file_context_kwargs(**overrides):
+    values = dict(
+        filename="provisions.xlsx",
+        description="Q4 provision calculation",
+        user_role="actuary",
+        confirmed_workbook_hash=VALID_HASH,
+        uploaded_at=NOW,
+    )
+    values.update(overrides)
+    return values
+
+
+def test_file_context_carries_the_confirmed_workbook_hash():
+    assert FileContext(**_file_context_kwargs()).confirmed_workbook_hash == VALID_HASH
+
+
+def test_file_context_without_a_confirmed_hash_is_rejected():
+    """A filename is not an identity. Omitting the hash must be impossible,
+    not merely discouraged."""
+    kwargs = _file_context_kwargs()
+    del kwargs["confirmed_workbook_hash"]
+    with pytest.raises(ValidationError):
+        FileContext(**kwargs)
+
+
+@pytest.mark.parametrize(
+    "bad", ["", "abc", "a" * 63, "a" * 65, "A" * 64, "g" * 64, None, 12345]
+)
+def test_file_context_rejects_a_malformed_confirmed_hash(bad):
+    """Blank and None matter most: a falsy value that validated would make the
+    Gate 1 binding optional in practice while still appearing present."""
+    with pytest.raises(ValidationError):
+        FileContext(**_file_context_kwargs(confirmed_workbook_hash=bad))
+
+
+def test_workbook_identity_mismatch_is_an_accepted_event_type():
+    assert AuditLogRow(
+        row_id=1,
+        report_id="RPT-001",
+        event_type="workbook_identity_mismatch",
+        payload_hash="b" * 64,
+        prev_row_hash=ZERO_HASH,
+        row_hash="c" * 64,
+        timestamp=NOW,
+    ).event_type == "workbook_identity_mismatch"
+
+
+def test_event_type_list_did_not_become_open_after_the_second_widening():
+    for accepted in (
+        "gate_decision",
+        "state_snapshot",
+        "llm_call",
+        "report_approved",
+        "mapping_decision",
+        "chain_verification",
+        "workbook_identity_mismatch",
+    ):
+        assert AuditLogRow(
+            row_id=1,
+            report_id="RPT-001",
+            event_type=accepted,
+            payload_hash="b" * 64,
+            prev_row_hash=ZERO_HASH,
+            row_hash="c" * 64,
+            timestamp=NOW,
+        ).event_type == accepted
+
+    with pytest.raises(ValidationError):
+        AuditLogRow(
+            row_id=1,
+            report_id="RPT-001",
+            event_type="workbook_identity_confirmed",
             payload_hash="b" * 64,
             prev_row_hash=ZERO_HASH,
             row_hash="c" * 64,

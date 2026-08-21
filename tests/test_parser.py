@@ -7,6 +7,7 @@ here would pass while proving nothing.
 """
 
 import hashlib
+import pathlib
 import re
 
 import openpyxl
@@ -14,12 +15,24 @@ import pytest
 from openpyxl.workbook.properties import CalcProperties
 
 from agents.parser import parse_workbook
+from core.workbook_identity import sha256_bytes
 from fixture_helpers import (
     libreoffice_available,
     recalculate_workbook,
     set_calc_mode,
     strip_calc_pr,
 )
+
+
+def _bytes(path) -> bytes:
+    """Read a fixture workbook as bytes.
+
+    parse_workbook takes bytes, not a path: the bytes confirmed at Gate 1 must
+    be the exact bytes parsed, and a path cannot carry that guarantee across the
+    parser's five separate reads.
+    """
+    return pathlib.Path(path).read_bytes()
+
 
 needs_libreoffice = pytest.mark.skipif(
     not libreoffice_available(),
@@ -62,7 +75,7 @@ def test_clean_workbook_is_parsed_with_real_cached_values(tmp_path):
     # test pass — if it fails, the fixture is wrong, not the assertion.
     recalculate_workbook(path)
 
-    parsed = parse_workbook(path)
+    parsed = parse_workbook(_bytes(path))
 
     assert parsed.tab_names == ["Inputs", "Provisions"]
 
@@ -84,7 +97,7 @@ def test_cell_dependency_graph_has_individual_cell_edges(tmp_path):
     _clean_workbook(path)
     recalculate_workbook(path)
 
-    graph = parse_workbook(path).cell_dependency_graph
+    graph = parse_workbook(_bytes(path)).cell_dependency_graph
 
     # A range is expanded cell by cell — the graph answers "which cells feed
     # this one", which a range edge could not.
@@ -105,7 +118,7 @@ def test_tab_graph_is_coarse_and_separate_from_the_cell_graph(tmp_path):
     _clean_workbook(path)
     recalculate_workbook(path)
 
-    parsed = parse_workbook(path)
+    parsed = parse_workbook(_bytes(path))
     assert parsed.tab_dependency_graph["Provisions"] == ["Inputs"]
     assert "Provisions" not in parsed.cell_dependency_graph
     assert "Provisions!C5" not in parsed.tab_dependency_graph
@@ -117,7 +130,7 @@ def test_workbook_hash_is_sha256_of_the_file_and_changes_with_it(tmp_path):
     _clean_workbook(path)
     recalculate_workbook(path)
 
-    first = parse_workbook(path).workbook_meta.workbook_hash
+    first = parse_workbook(_bytes(path)).workbook_meta.workbook_hash
     assert re.fullmatch(r"[0-9a-f]{64}", first)
     with open(path, "rb") as handle:
         assert first == hashlib.sha256(handle.read()).hexdigest()
@@ -125,7 +138,7 @@ def test_workbook_hash_is_sha256_of_the_file_and_changes_with_it(tmp_path):
     wb = openpyxl.load_workbook(path)
     wb["Inputs"]["A1"] = 999
     wb.save(path)
-    assert parse_workbook(path).workbook_meta.workbook_hash != first
+    assert parse_workbook(_bytes(path)).workbook_meta.workbook_hash != first
 
 
 @needs_libreoffice
@@ -133,7 +146,7 @@ def test_number_format_is_captured(tmp_path):
     path = str(tmp_path / "clean.xlsx")
     _clean_workbook(path)
     recalculate_workbook(path)
-    assert parse_workbook(path).cells["Provisions!C5"].number_format == "#,##0.00"
+    assert parse_workbook(_bytes(path)).cells["Provisions!C5"].number_format == "#,##0.00"
 
 
 # ---------------------------------------------------------------------------
@@ -172,14 +185,14 @@ def _messy_workbook(path):
 def test_messy_workbook_parses_without_raising(tmp_path):
     path = str(tmp_path / "messy.xlsx")
     _messy_workbook(path)
-    parsed = parse_workbook(path)
+    parsed = parse_workbook(_bytes(path))
     assert parsed.tab_names == ["Provisions", "provisions ", "Blank"]
 
 
 def test_blank_tab_is_recorded_with_zero_cells(tmp_path):
     path = str(tmp_path / "messy.xlsx")
     _messy_workbook(path)
-    parsed = parse_workbook(path)
+    parsed = parse_workbook(_bytes(path))
 
     assert "Blank" in parsed.tab_names
     assert [k for k in parsed.cells if k.startswith("Blank!")] == []
@@ -188,7 +201,7 @@ def test_blank_tab_is_recorded_with_zero_cells(tmp_path):
 def test_cached_error_value_is_classified_not_swallowed(tmp_path):
     path = str(tmp_path / "messy.xlsx")
     _messy_workbook(path)
-    cell = parse_workbook(path).cells["Provisions!B1"]
+    cell = parse_workbook(_bytes(path)).cells["Provisions!B1"]
 
     assert cell.data_type == "error"
     assert cell.is_error is True
@@ -200,7 +213,7 @@ def test_number_stored_as_text_stays_text_and_earns_a_warning(tmp_path):
     would silently repair a defect in the source workbook."""
     path = str(tmp_path / "messy.xlsx")
     _messy_workbook(path)
-    parsed = parse_workbook(path)
+    parsed = parse_workbook(_bytes(path))
 
     cell = parsed.cells["Provisions!B2"]
     assert cell.data_type == "text"
@@ -211,7 +224,7 @@ def test_number_stored_as_text_stays_text_and_earns_a_warning(tmp_path):
 def test_never_recalculated_formula_is_stale(tmp_path):
     path = str(tmp_path / "messy.xlsx")
     _messy_workbook(path)
-    parsed = parse_workbook(path)
+    parsed = parse_workbook(_bytes(path))
 
     cell = parsed.cells["Provisions!B4"]
     assert cell.formula == "=B3*2"
@@ -223,7 +236,7 @@ def test_never_recalculated_formula_is_stale(tmp_path):
 def test_lookalike_tab_names_are_kept_and_warned_about(tmp_path):
     path = str(tmp_path / "messy.xlsx")
     _messy_workbook(path)
-    parsed = parse_workbook(path)
+    parsed = parse_workbook(_bytes(path))
 
     assert "Provisions" in parsed.tab_names
     assert "provisions " in parsed.tab_names
@@ -233,7 +246,7 @@ def test_lookalike_tab_names_are_kept_and_warned_about(tmp_path):
 def test_merged_cells_are_warned_about(tmp_path):
     path = str(tmp_path / "messy.xlsx")
     _messy_workbook(path)
-    assert any("merged cell range" in w for w in parse_workbook(path).warnings)
+    assert any("merged cell range" in w for w in parse_workbook(_bytes(path)).warnings)
 
 
 def test_a_workbook_with_only_blank_tabs_does_not_crash(tmp_path):
@@ -242,7 +255,7 @@ def test_a_workbook_with_only_blank_tabs_does_not_crash(tmp_path):
     wb.active.title = "Nothing"
     wb.save(path)
 
-    parsed = parse_workbook(path)
+    parsed = parse_workbook(_bytes(path))
     assert parsed.tab_names == ["Nothing"]
     assert parsed.cells == {}
     assert parsed.has_vba is False
@@ -262,7 +275,7 @@ def test_manual_calc_mode_makes_every_formula_cell_stale(tmp_path):
     recalculate_workbook(path)
     set_calc_mode(path, "manual")
 
-    parsed = parse_workbook(path)
+    parsed = parse_workbook(_bytes(path))
     assert parsed.workbook_meta.calc_mode == "manual"
 
     formula_cells = [c for c in parsed.cells.values() if c.formula is not None]
@@ -282,7 +295,7 @@ def test_automatic_calc_mode_leaves_calculated_cells_fresh(tmp_path):
     recalculate_workbook(path)
     set_calc_mode(path, "auto")
 
-    parsed = parse_workbook(path)
+    parsed = parse_workbook(_bytes(path))
     assert parsed.workbook_meta.calc_mode == "automatic"
     assert parsed.cells["Provisions!C5"].is_stale is False
 
@@ -291,7 +304,7 @@ def test_missing_calc_pr_is_unknown_never_assumed_automatic(tmp_path):
     path = str(tmp_path / "nocalcpr.xlsx")
     _clean_workbook(path)
     strip_calc_pr(path)
-    assert parse_workbook(path).workbook_meta.calc_mode == "unknown"
+    assert parse_workbook(_bytes(path)).workbook_meta.calc_mode == "unknown"
 
 
 @needs_libreoffice
@@ -300,7 +313,7 @@ def test_full_calc_on_load_is_read_when_present(tmp_path):
     _clean_workbook(path)
     recalculate_workbook(path)
     set_calc_mode(path, "manual", full_calc_on_load=True)
-    assert parse_workbook(path).workbook_meta.fully_calculated_on_load is True
+    assert parse_workbook(_bytes(path)).workbook_meta.fully_calculated_on_load is True
 
 
 # ---------------------------------------------------------------------------
@@ -317,7 +330,7 @@ def test_named_ranges_are_extracted(tmp_path):
     wb.defined_names.add(openpyxl.workbook.defined_name.DefinedName("DiscountRate", attr_text="Provisions!$A$1"))
     wb.save(path)
 
-    named = parse_workbook(path).named_ranges
+    named = parse_workbook(_bytes(path)).named_ranges
     assert any("DiscountRate" in key for key in named)
 
 
@@ -329,13 +342,13 @@ def test_external_links_are_detected(tmp_path):
     ws["A1"] = "='[Other.xlsx]Sheet1'!A1"
     wb.save(path)
 
-    assert parse_workbook(path).external_links != []
+    assert parse_workbook(_bytes(path)).external_links != []
 
 
 def test_no_vba_in_a_plain_xlsx(tmp_path):
     path = str(tmp_path / "plain.xlsx")
     _messy_workbook(path)
-    assert parse_workbook(path).has_vba is False
+    assert parse_workbook(_bytes(path)).has_vba is False
 
 
 def test_calc_properties_set_via_openpyxl_are_read(tmp_path):
@@ -350,4 +363,62 @@ def test_calc_properties_set_via_openpyxl_are_read(tmp_path):
     wb.calculation = CalcProperties(calcId=191029, calcMode="manual")
     wb.save(path)
 
-    assert parse_workbook(path).workbook_meta.calc_mode == "manual"
+    assert parse_workbook(_bytes(path)).workbook_meta.calc_mode == "manual"
+
+
+# --------------------------------------------------------------------------
+# Recommendation 2 — the parser consumes the confirmed bytes, not a path
+# --------------------------------------------------------------------------
+
+
+def test_parsed_hash_equals_the_hash_of_the_bytes_supplied(tmp_path):
+    """The invariant the Gate 1 binding rests on: what the parser reports as
+    the workbook's identity is the hash of exactly the bytes it was handed."""
+    path = str(tmp_path / "identity.xlsx")
+    _clean_workbook(path)
+    data = _bytes(path)
+    assert parse_workbook(data).workbook_meta.workbook_hash == sha256_bytes(data)
+
+
+def test_parser_does_not_read_the_filesystem_after_the_bytes_are_captured(tmp_path):
+    """Deleting the file must not affect the parse. If it did, the parser would
+    still be reading a mutable path somewhere and the invariant would be a
+    claim rather than a fact."""
+    path = str(tmp_path / "identity.xlsx")
+    _clean_workbook(path)
+    data = _bytes(path)
+    pathlib.Path(path).unlink()
+
+    parsed = parse_workbook(data)
+    assert parsed.cells["Provisions!C5"].formula == "=SUM(C1:C4)"
+    assert parsed.workbook_meta.workbook_hash == sha256_bytes(data)
+
+
+def test_two_readers_over_the_same_bytes_agree(tmp_path):
+    """Formula mode and data-only mode each get their own BytesIO over one
+    immutable sequence; both must describe the same workbook."""
+    path = str(tmp_path / "identity.xlsx")
+    _clean_workbook(path)
+    data = _bytes(path)
+    first = parse_workbook(data)
+    second = parse_workbook(data)
+    assert first.workbook_meta.workbook_hash == second.workbook_meta.workbook_hash
+    assert first.cells.keys() == second.cells.keys()
+
+
+def test_changing_one_byte_changes_the_parsed_identity(tmp_path):
+    """Same filename, different contents — the case Gate 1 must be able to
+    distinguish."""
+    path = str(tmp_path / "identity.xlsx")
+    _clean_workbook(path)
+    data = _bytes(path)
+    assert parse_workbook(data).workbook_meta.workbook_hash != sha256_bytes(data + b"\x00")
+
+
+def test_passing_a_path_instead_of_bytes_fails_loudly(tmp_path):
+    """The old signature must not keep working by accident: a silently accepted
+    path would reintroduce exactly the mutable reference this removed."""
+    path = str(tmp_path / "identity.xlsx")
+    _clean_workbook(path)
+    with pytest.raises(Exception):
+        parse_workbook(str(path))

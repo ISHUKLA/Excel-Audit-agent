@@ -4,6 +4,20 @@ One line per meaningful change. This is the project's lightweight change-control
 record — it exists so that a reviewer can reconstruct what changed and when
 without reading the git log.
 
+## 2026-08-19 — Recommendation 2: bind Gate 1 to the uploaded workbook hash
+
+- Gate 1 previously confirmed a *filename*. Two different workbooks can share a name, so a reviewer could confirm one file and the pipeline could parse another with nothing to detect it. Gate 1 also recorded `not_yet_parsed` as its workbook hash, because nothing had been hashed before the gate ran.
+- Added `core/workbook_identity.py` as the single definition of workbook identity: `sha256_bytes()`, `validate_hash_format()`, `verify_bytes_match()`, and `WorkbookIdentityError`. Hashing a path string is refused outright — that is the defect the module exists to prevent.
+- `agents/parser.py` now takes bytes rather than a path. It read the workbook five separate times (formula mode, data-only mode, ZIP metadata, VBA detection, hashing); against a path each was an independent window in which the file could change. Each reader now gets its own `BytesIO` over one immutable sequence, so the bytes hashed for Gate 1 are provably the bytes parsed. Verified empirically before the change: all five paths accept `BytesIO`.
+- `Orchestrator.run()` takes `workbook_bytes` plus a keyword-only `expected_workbook_hash` with no default — omitting it is a `TypeError`, not an unverified run. There is no flag to skip verification. Identity is checked *before* `context_gate` is called, so no `context_confirmed` decision is ever recorded for a workbook whose identity was never established.
+- `FileContext.confirmed_workbook_hash` is required and format-validated: blank, `None`, truncated, uppercase, and non-hex values are all rejected at the model boundary, so a falsy value cannot make the binding silently optional.
+- A mismatch is recorded as a new `workbook_identity_mismatch` event carrying the confirmed hash, the observed hash, the filename, the actor, the code version, the timestamp, and a blocked outcome. Its *context* commits to the confirmed hash, never the observed one — recording the observed hash there would assert an identity for a workbook nobody approved.
+- No temporary file is written at any point. The residual TOCTOU risk disclosed in the original plan is therefore eliminated rather than mitigated.
+- Streamlit shows the short hash prominently with the full 64 characters underneath, and clears the confirmation whenever the uploaded bytes change — including a same-named replacement.
+- No database schema change, no migration, no change to the four human gates, reconciliation calculations, or report content. Existing audit databases and snapshots remain readable; historical Gate 1 rows keep `not_yet_parsed`, which is what was true when they were written.
+- Known limitation recorded: the workbook is held in memory for the duration of a run and no maximum upload size is enforced. A size limit is a separate governed decision.
+- Verification: 377 tests pass (up from 353 after Step 1, 319 before this recommendation), including an acceptance-level test that a one-byte substitution under the same filename is refused with no gate decision and no snapshot.
+
 ## 2026-08-19 — Recommendation 1: verify the complete audit chain before every resume
 
 - Closed a gap where `Orchestrator.resume()` restored pipeline state without checking the audit chain behind it. The two existing snapshot checks — content hash, and a matching `state_snapshot` commitment — both pass while an *earlier* log row has been rewritten, because that row still hashes correctly on its own and the snapshot was never touched. Demonstrated against the previous code: with `verify_chain()` reporting `(False, ['1'])`, `resume()` succeeded and restored state at `post_reconciliation`.

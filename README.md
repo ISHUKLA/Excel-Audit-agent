@@ -66,6 +66,10 @@ The tool is built around four points where a named person, not the AI, has to ma
 
 1. **Context confirmation.** Before anything is parsed, the UI displays a summary of the workbook, reviewer, accounting context, and any reference-figure context. Parsing remains disabled until you explicitly check that this displayed context is accurate. If a reference control total is supplied, its mathematical tie-out is also recorded at this gate.
 
+   **The confirmation is bound to one specific workbook, not to a filename.** The SHA-256 of the uploaded bytes is shown at this gate — a short form for the eye and the full 64 characters underneath, reproducible with `shasum -a 256`. Uploading a different file clears the confirmation, *even if it has the same name*, because it is a different workbook. The Python layer independently re-checks that hash before parsing: a caller cannot skip it, because the confirmed hash is a required argument with no default. If the bytes do not match, the run stops before parsing, before any Gate 1 decision is recorded, and before any snapshot exists; the blocked attempt is recorded in the audit trail with both hashes.
+
+   The bytes confirmed here are the exact bytes the parser reads — they are never written to an intermediate file, so nothing mutable sits between confirmation and parsing. This establishes *which* workbook was reviewed. It does not establish that the workbook is correct, or that the person confirming it understood what they confirmed.
+
 2. **Findings review.** Every anomaly the tool flags is shown to you individually: a hardcoded number buried in a formula, a suspicious skip in a `SUM` range, a circular reference between tabs, an inconsistent cross-tab value. You confirm it's a real issue, override it with a reason, or dismiss it as a false positive with a reason. All three are valid dispositions — a dismissed finding is reviewed, not approved. The pipeline will not proceed until every finding has a disposition attached.
 
 3. **Reconciliation sign-off.** The tool shows you two independent comparisons side by side, and keeps them separate all the way to the report:
@@ -138,6 +142,7 @@ Step 12's acceptance test uses a real LibreOffice-recalculated workbook and the 
 - **No application-level authentication exists.** The authorized-approvers file is a local name registry, not authentication or identity verification.
 - **The audit log is tamper-evident, not tamper-proof.** Someone with file access can modify or delete `audit.db`; verification makes after-the-fact changes detectable but cannot prevent them.
 - **Chain verification does not defend against wholesale forgery.** Someone who rebuilds every row from the beginning produces a chain that verifies. Detecting that needs an anchor held outside the file, which this MVP does not have.
+- **The whole workbook is held in memory while it is reviewed.** Binding Gate 1 to specific bytes means those bytes are resident for the duration of the run, and no maximum upload size is enforced. A very large workbook will consume memory proportional to its size. A size limit is a separate governed decision, not settled here.
 - **Data minimization before LLM calls is informal, not certified.** The local policy withholds long free text and external-link values and records a manifest, but it is not a certified privacy, security, or regulatory control.
 
 ## Known gaps

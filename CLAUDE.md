@@ -244,6 +244,7 @@ Running note, per the Diligence rules. Update it when you change a file.
 | File | Origin | Notes |
 |------|--------|-------|
 | all source and tests | AI-written | Initial commit `78a0bb7`, MVP build |
+| Recommendation 2 — Gate 1 bound to the uploaded workbook hash (`core/workbook_identity.py`, `agents/parser.py`, `agents/orchestrator.py`, `core/models.py`, `app.py`, focused tests) | AI-written | Bytes-based parsing with per-reader `BytesIO`, required confirmed hash, identity verified before Gate 1, `workbook_identity_mismatch` evidence, no temporary file, 2026-08-19 |
 | Recommendation 1 — complete audit-chain verification before resume (`core/state_store.py`, `core/audit_log.py`, `core/models.py`, `agents/orchestrator.py`, `app.py`, focused tests) | AI-written | Global chain verified before any snapshot load; `ChainIntegrityError`; `chain_verification` event recorded once per report per process; fail-closed recording, 2026-08-19 |
 | [agents/documentation.py](agents/documentation.py) | AI-written | Commit `21b4dbd`: extract text blocks by type instead of indexing `content[0]` |
 | CLAUDE.md | AI-written | This file, 2026-08-10; "Current state vs. the standard" gap list re-verified as closed, 2026-08-15 |
