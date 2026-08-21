@@ -118,3 +118,46 @@ def test_report_screen_exposes_download_badges_traceability_and_integrity_check(
     assert len(app.get("download_button")) == 1
     assert any(button.label == "Verify evidence integrity" for button in app.button)
     assert any("full index in the PDF" in caption.value for caption in app.caption)
+
+
+# --------------------------------------------------------------------------
+# Recommendation 2 — the UI shows which workbook is being confirmed
+# --------------------------------------------------------------------------
+
+
+def test_app_shows_both_a_short_and_a_full_workbook_hash():
+    """Decision 4: the short hash is for the eye, the full 64 characters are
+    what a reviewer can actually check against an external record. Showing only
+    the abbreviation would ask them to confirm something uncheckable."""
+    source = APP_PATH.read_text()
+    assert "SHA-256 (short)" in source
+    assert "workbook_hash[:12]" in source
+    assert "st.code(workbook_hash" in source
+    assert "shasum -a 256" in source
+
+
+def test_app_resets_the_confirmation_when_the_workbook_changes():
+    """Requirement 4: a different file, even under the same name, invalidates
+    the previous confirmation."""
+    source = APP_PATH.read_text()
+    assert 'st.session_state.get("confirmed_workbook_hash") != workbook_hash' in source
+    assert "st.session_state.gate1_context_confirmed = False" in source
+
+
+def test_app_passes_bytes_and_the_confirmed_hash_rather_than_a_path():
+    """The invariant: no temporary file sits between confirmation and parsing."""
+    source = APP_PATH.read_text()
+    assert "expected_workbook_hash=workbook_hash" in source
+    assert "uploaded_file.getvalue()" in source
+    assert "tempfile" not in source
+    assert "NamedTemporaryFile" not in source
+
+
+def test_app_surfaces_a_workbook_identity_mismatch_without_deciding_it():
+    """app.py renders the refusal; the refusal itself is made in the
+    orchestrator, per the rule that app.py holds no business logic."""
+    source = APP_PATH.read_text()
+    assert "except WorkbookIdentityError as exc:" in source
+    assert "no Gate 1 decision was recorded" in source
+    # The comparison itself must not live here.
+    assert "verify_bytes_match(" not in source

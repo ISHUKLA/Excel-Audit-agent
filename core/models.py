@@ -8,7 +8,9 @@ those that prevent a whole class of ambiguity from being representable at all
 from datetime import datetime
 from typing import Any, Literal, Optional
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+from core.workbook_identity import validate_hash_format
 
 
 class FileContext(BaseModel):
@@ -18,16 +20,32 @@ class FileContext(BaseModel):
 
     entity/period/currency/basis are human-entered confirmation fields, not
     validated enums — free text is deliberate for the MVP.
+
+    confirmed_workbook_hash binds this context to ONE specific byte sequence.
+    A filename is not an identity: two different workbooks can share a name, and
+    a reviewer who confirms "provisions.xlsx" has confirmed nothing checkable.
+    The field is required and format-validated so that the identity cannot be
+    omitted, left blank, or truncated — see core/workbook_identity.py.
     """
 
     filename: str
     description: str
     user_role: Literal["actuary", "cro", "cfo", "auditor"]
+    # The SHA-256 of the workbook bytes the human confirmed at Gate 1.
+    confirmed_workbook_hash: str
     entity: Optional[str] = None
     period: Optional[str] = None
     currency: Optional[str] = None
     basis: Optional[str] = None
     uploaded_at: datetime
+
+    @field_validator("confirmed_workbook_hash")
+    @classmethod
+    def _hash_must_be_a_sha256_digest(cls, value: str) -> str:
+        """A blank or truncated hash would make the Gate 1 binding optional in
+        practice while still looking present. Rejected at the model boundary so
+        no downstream code has to remember to check."""
+        return validate_hash_format(value, label="confirmed_workbook_hash")
 
 
 class ReferenceFigureLine(BaseModel):
@@ -355,6 +373,13 @@ class AuditLogRow(BaseModel):
     evidence onto compromised evidence. It attests that no disagreement was
     detected in this file at that moment — not that the evidence is authentic,
     and not that the run is validated.
+
+    "workbook_identity_mismatch" records that a workbook was supplied which did
+    not match the one confirmed at Gate 1. Its context carries the CONFIRMED
+    hash — the identity a human actually approved — and the rejected hash sits
+    in the payload. Recording the rejected hash as the context would assert an
+    identity for a workbook nobody confirmed, which is the opposite of what this
+    log is for.
     """
 
     row_id: int
@@ -366,6 +391,7 @@ class AuditLogRow(BaseModel):
         "report_approved",
         "mapping_decision",
         "chain_verification",
+        "workbook_identity_mismatch",
     ]
     payload_hash: str
     # The previous row's row_hash, or 64 zeros for the first row in a chain.

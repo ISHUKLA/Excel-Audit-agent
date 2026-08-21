@@ -7,9 +7,7 @@ the non-UI modules.
 
 import json
 import os
-import tempfile
 from datetime import datetime, timezone
-from pathlib import Path
 
 import pandas as pd
 import streamlit as st
@@ -19,6 +17,7 @@ from agents.orchestrator import Orchestrator, PipelineStateError
 from core.gates import GateBlockedError
 from core.models import FileContext, MappingReviewDecision, ParsedFile, ReconciliationResult
 from core.state_store import ChainIntegrityError
+from core.workbook_identity import WorkbookIdentityError, sha256_bytes
 from core.ui_inputs import (
     ReferenceFigureInputError,
     build_reference_figures,
@@ -126,6 +125,43 @@ def _chain_integrity_error(exc: ChainIntegrityError) -> None:
         "who made it, or establish when. Nothing has been altered or repaired in "
         "response to this check."
     )
+
+
+def _workbook_identity_panel(uploaded_file) -> str | None:
+    """Show which workbook is being confirmed, and reset the confirmation if it
+    changes. Rendering and session bookkeeping only — the binding is enforced in
+    the orchestrator, which never trusts anything decided here.
+
+    A filename is not an identity: two different workbooks can share a name. The
+    short hash is for the eye, the full 64 characters are what can actually be
+    checked against an external record, so both are shown.
+    """
+    if uploaded_file is None:
+        st.session_state.confirmed_workbook_hash = None
+        return None
+
+    workbook_bytes = uploaded_file.getvalue()
+    workbook_hash = sha256_bytes(workbook_bytes)
+
+    # Requirement 4: a new file — even one with the same name — invalidates the
+    # previous confirmation, because it is a different workbook.
+    if st.session_state.get("confirmed_workbook_hash") != workbook_hash:
+        st.session_state.confirmed_workbook_hash = workbook_hash
+        st.session_state.gate1_context_confirmed = False
+
+    st.markdown("**Workbook identity**")
+    identity_columns = st.columns([1, 1, 2])
+    identity_columns[0].metric("File", uploaded_file.name)
+    identity_columns[1].metric("Size", f"{len(workbook_bytes):,} bytes")
+    identity_columns[2].metric("SHA-256 (short)", workbook_hash[:12])
+    st.code(workbook_hash, language=None)
+    st.caption(
+        "The full SHA-256 of the uploaded bytes. Reproduce it with "
+        "`shasum -a 256 <file>`. Confirming below binds this review to these "
+        "exact bytes; uploading a different file, even under the same name, "
+        "clears the confirmation."
+    )
+    return workbook_hash
 
 
 def _empty_reference_table() -> pd.DataFrame:
@@ -257,6 +293,9 @@ def screen_1_upload() -> None:
             ]
         )
     st.table(pd.DataFrame(context_summary, columns=["Area", "Field", "Confirmed context"]))
+
+    workbook_hash = _workbook_identity_panel(uploaded_file)
+
     gate1_confirmed = st.checkbox(
         "I confirm that the workbook and reference-figure context shown above is accurate.",
         value=False,
@@ -306,28 +345,34 @@ def screen_1_upload() -> None:
         st.error(str(exc))
         return
 
-    temporary_path = None
     try:
-        with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as temporary:
-            temporary.write(uploaded_file.getvalue())
-            temporary_path = temporary.name
+        # No temporary file: the bytes confirmed above are the bytes parsed.
+        # Writing them to disk first would reintroduce a mutable reference
+        # between confirmation and parsing.
         with st.spinner("Parsing workbook and detecting findings…"):
             report_id, parsed_file, findings = _orchestrator().run(
-                temporary_path,
+                uploaded_file.getvalue(),
                 file_context,
                 reference_figures,
+                expected_workbook_hash=workbook_hash,
                 context_confirmed=gate1_confirmed,
                 actor=reviewer_name.strip(),
             )
+    except WorkbookIdentityError as exc:
+        st.error(str(exc))
+        st.session_state.gate1_context_confirmed = False
+        st.caption(
+            "Nothing was parsed and no Gate 1 decision was recorded. The blocked "
+            "attempt is in the audit trail. Re-confirm the context for the "
+            "workbook you intend to review."
+        )
+        return
     except GateBlockedError as exc:
         st.error(str(exc))
         return
     except Exception as exc:  # noqa: BLE001 - processing failures must be visible in the UI
         st.error(f"Could not process this file: {exc}")
         return
-    finally:
-        if temporary_path:
-            Path(temporary_path).unlink(missing_ok=True)
 
     st.session_state.report_id = report_id
     st.session_state.parsed_file = parsed_file

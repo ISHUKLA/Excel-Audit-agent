@@ -60,6 +60,7 @@ def a_file_context(**overrides):
         period="2025-Q4",
         currency="EUR",
         basis="IFRS 17",
+        confirmed_workbook_hash="a" * 64,
         uploaded_at=NOW,
     )
     return FileContext(**{**defaults, **overrides})

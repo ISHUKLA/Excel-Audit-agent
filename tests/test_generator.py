@@ -39,6 +39,7 @@ def _file_context() -> FileContext:
         period="2025-Q4",
         currency="EUR",
         basis="IFRS 17",
+        confirmed_workbook_hash="a" * 64,
         uploaded_at=GENERATED_AT,
     )
 

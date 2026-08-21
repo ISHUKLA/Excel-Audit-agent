@@ -36,9 +36,14 @@ from core.models import (
     WorkbookMeta,
 )
 from core.state_store import ChainIntegrityError, StateIntegrityError, StateStore
+from core.workbook_identity import WorkbookIdentityError, sha256_bytes
 
 ACTOR = "Isaac Shukla"
-CONTEXT_HASH = "b" * 64
+# Real bytes and their real hash: the mocked parser reports CONTEXT_HASH, so
+# deriving it from WORKBOOK_BYTES keeps the Gate 1 identity check honest
+# rather than satisfied by a hand-written constant.
+WORKBOOK_BYTES = b"PK\x03\x04 orchestrator fixture workbook"
+CONTEXT_HASH = sha256_bytes(WORKBOOK_BYTES)
 NOW = datetime.now(timezone.utc)
 DEFAULT_PCT = 0.01
 DEFAULT_ABS = 100.0
@@ -53,6 +58,7 @@ def _file_context(**overrides) -> FileContext:
         period="2025-Q4",
         currency="EUR",
         basis="IFRS 17",
+        confirmed_workbook_hash=CONTEXT_HASH,
         uploaded_at=NOW,
     )
     return FileContext(**{**values, **overrides})
@@ -291,9 +297,10 @@ def _orchestrator(tmp_path):
 
 def _start_preview(orchestrator, reference_figures=None):
     report_id, parsed, findings = orchestrator.run(
-        "unused.xlsx",
+        WORKBOOK_BYTES,
         _file_context(),
         reference_figures,
+        expected_workbook_hash=CONTEXT_HASH,
         context_confirmed=True,
         actor=ACTOR,
     )
@@ -368,11 +375,14 @@ def test_full_staged_pipeline_snapshots_every_pause_and_supplies_gate_context(
         "reconciliation_gate",
         "approval_record_gate",
     }
-    assert gate_contexts["context_gate"]["workbook_hash"] == NOT_YET_PARSED
+    # Requirement 7: Gate 1 records the REAL workbook hash. This assertion
+    # previously expected NOT_YET_PARSED, which was honest when nothing had been
+    # hashed before the gate — the bytes are now hashed before Gate 1 runs.
+    assert gate_contexts["context_gate"]["workbook_hash"] == CONTEXT_HASH
+    assert gate_contexts["context_gate"]["workbook_hash"] != NOT_YET_PARSED
     assert all(context["code_version"] for context in gate_contexts.values())
-    assert all(
-        context["workbook_hash"] for name, context in gate_contexts.items() if name != "context_gate"
-    )
+    # Requirement 12: every gate carries the same identity, start to finish.
+    assert {context["workbook_hash"] for context in gate_contexts.values()} == {CONTEXT_HASH}
     assert audit_log.verify_chain() == (True, [])
     assert calls["reconciliation"][0]["pct_threshold"] == DEFAULT_PCT
     assert calls["reconciliation"][0]["absolute_threshold"] == DEFAULT_ABS
@@ -389,8 +399,9 @@ def test_post_gate2_snapshot_recovers_findings_and_outputs_after_process_loss(
     monkeypatch.setattr(orchestrator_module, "run_reconciliation", crash_after_gate2)
     orchestrator, audit_log, state_store = _orchestrator(tmp_path)
     report_id, _, findings = orchestrator.run(
-        "unused.xlsx",
+        WORKBOOK_BYTES,
         _file_context(),
+        expected_workbook_hash=CONTEXT_HASH,
         context_confirmed=True,
         actor=ACTOR,
     )
@@ -421,8 +432,9 @@ def test_resume_refuses_a_snapshot_altered_after_it_was_saved(monkeypatch, tmp_p
     _patch_agents(monkeypatch, _result())
     orchestrator, audit_log, state_store = _orchestrator(tmp_path)
     report_id, _, _ = orchestrator.run(
-        "unused.xlsx",
+        WORKBOOK_BYTES,
         _file_context(),
+        expected_workbook_hash=CONTEXT_HASH,
         context_confirmed=True,
         actor=ACTOR,
     )
@@ -936,3 +948,191 @@ def test_a_missing_snapshot_is_not_reported_as_corruption(monkeypatch, tmp_path)
     )
     with pytest.raises(PipelineStateError, match="no persisted state exists"):
         fresh.resume("RPT-NEVER-EXISTED")
+
+
+# --------------------------------------------------------------------------
+# Recommendation 2 — Gate 1 is bound to one specific workbook
+# --------------------------------------------------------------------------
+
+OTHER_BYTES = b"PK\x03\x04 a different workbook with the same name"
+
+
+def _audit_rows(audit_log, report_id):
+    return audit_log.get_rows(report_id)
+
+
+def test_matching_workbook_runs_normally(monkeypatch, tmp_path):
+    """No false positive: the correct workbook proceeds exactly as before."""
+    _patch_agents(monkeypatch, _result())
+    orchestrator, _, _ = _orchestrator(tmp_path)
+    report_id, parsed, findings = orchestrator.run(
+        WORKBOOK_BYTES,
+        _file_context(),
+        expected_workbook_hash=CONTEXT_HASH,
+        context_confirmed=True,
+        actor=ACTOR,
+    )
+    assert parsed.workbook_meta.workbook_hash == CONTEXT_HASH
+    assert findings
+
+
+def test_same_filename_different_contents_is_refused(monkeypatch, tmp_path):
+    """The core scenario. The filename is identical; the bytes are not."""
+    _patch_agents(monkeypatch, _result())
+    orchestrator, _, _ = _orchestrator(tmp_path)
+    with pytest.raises(WorkbookIdentityError, match="not the one that was confirmed"):
+        orchestrator.run(
+            OTHER_BYTES,
+            _file_context(),
+            expected_workbook_hash=CONTEXT_HASH,
+            context_confirmed=True,
+            actor=ACTOR,
+        )
+
+
+def test_omitting_the_expected_hash_is_a_type_error(monkeypatch, tmp_path):
+    """Requirement 6. A caller cannot simply leave the control out: the
+    argument is keyword-only with no default, so omission fails at call time."""
+    _patch_agents(monkeypatch, _result())
+    orchestrator, _, _ = _orchestrator(tmp_path)
+    with pytest.raises(TypeError):
+        orchestrator.run(
+            WORKBOOK_BYTES,
+            _file_context(),
+            context_confirmed=True,
+            actor=ACTOR,
+        )
+
+
+@pytest.mark.parametrize("bad", ["", "not-a-hash", "a" * 63, "A" * 64, None])
+def test_malformed_expected_hash_is_refused(monkeypatch, tmp_path, bad):
+    """A falsy or malformed value must not make the binding silently optional."""
+    _patch_agents(monkeypatch, _result())
+    orchestrator, _, _ = _orchestrator(tmp_path)
+    with pytest.raises(WorkbookIdentityError):
+        orchestrator.run(
+            WORKBOOK_BYTES,
+            _file_context(),
+            expected_workbook_hash=bad,
+            context_confirmed=True,
+            actor=ACTOR,
+        )
+
+
+def test_direct_run_call_cannot_bypass_verification(monkeypatch, tmp_path):
+    """context_confirmed=True is not enough on its own. A direct Python caller
+    asserting the human confirmed still has to supply WHICH workbook."""
+    _patch_agents(monkeypatch, _result())
+    orchestrator, audit_log, _ = _orchestrator(tmp_path)
+    with pytest.raises(WorkbookIdentityError):
+        orchestrator.run(
+            OTHER_BYTES,
+            _file_context(),
+            expected_workbook_hash=CONTEXT_HASH,
+            context_confirmed=True,
+            actor=ACTOR,
+        )
+    assert orchestrator._state == {}
+
+
+def test_mismatch_prevents_parser_invocation(monkeypatch, tmp_path):
+    """Requirement 9: the refusal happens before parsing, not after."""
+    _patch_agents(monkeypatch, _result())
+
+    def must_not_run(*_args, **_kwargs):
+        raise AssertionError("parse_workbook was called despite a hash mismatch")
+
+    monkeypatch.setattr(orchestrator_module, "parse_workbook", must_not_run)
+    orchestrator, _, _ = _orchestrator(tmp_path)
+    with pytest.raises(WorkbookIdentityError):
+        orchestrator.run(
+            OTHER_BYTES,
+            _file_context(),
+            expected_workbook_hash=CONTEXT_HASH,
+            context_confirmed=True,
+            actor=ACTOR,
+        )
+
+
+def test_mismatch_creates_no_snapshot_and_no_gate_decision(monkeypatch, tmp_path):
+    """Requirements 9 and 10. A mismatch must not leave a context_confirmed
+    decision behind — the human confirmed a different workbook."""
+    _patch_agents(monkeypatch, _result())
+    orchestrator, audit_log, state_store = _orchestrator(tmp_path)
+    with pytest.raises(WorkbookIdentityError):
+        orchestrator.run(
+            OTHER_BYTES,
+            _file_context(),
+            expected_workbook_hash=CONTEXT_HASH,
+            context_confirmed=True,
+            actor=ACTOR,
+        )
+
+    with sqlite3.connect(audit_log.db_path) as connection:
+        snapshots = connection.execute("SELECT COUNT(*) FROM snapshots").fetchone()[0]
+        gate_rows = connection.execute(
+            "SELECT COUNT(*) FROM log_rows WHERE event_type = 'gate_decision'"
+        ).fetchone()[0]
+    assert snapshots == 0
+    assert gate_rows == 0
+
+
+def test_mismatch_is_recorded_with_the_evidence_required(monkeypatch, tmp_path):
+    """The mismatch row carries confirmed hash, observed hash, filename, actor,
+    code version, timestamp and a blocked outcome. Its CONTEXT hash is the
+    confirmed one: recording the observed hash there would assert an identity
+    for a workbook nobody approved."""
+    _patch_agents(monkeypatch, _result())
+    orchestrator, audit_log, _ = _orchestrator(tmp_path)
+    with pytest.raises(WorkbookIdentityError):
+        orchestrator.run(
+            OTHER_BYTES,
+            _file_context(),
+            expected_workbook_hash=CONTEXT_HASH,
+            context_confirmed=True,
+            actor=ACTOR,
+        )
+
+    with sqlite3.connect(audit_log.db_path) as connection:
+        connection.row_factory = sqlite3.Row
+        row = connection.execute(
+            "SELECT * FROM log_rows WHERE event_type = 'workbook_identity_mismatch'"
+        ).fetchone()
+    assert row is not None
+    payload = json.loads(row["payload_json"])
+    assert payload["confirmed_workbook_hash"] == CONTEXT_HASH
+    assert payload["observed_workbook_hash"] == sha256_bytes(OTHER_BYTES)
+    assert payload["filename"] == "provisions.xlsx"
+    assert payload["outcome"] == "blocked"
+    assert row["actor"] == ACTOR
+    assert row["timestamp"]
+    assert payload["context"]["code_version"] == "test-code-version"
+    # The context commits to the approved identity, not the rejected one.
+    assert payload["context"]["workbook_hash"] == CONTEXT_HASH
+    assert payload["context"]["workbook_hash"] != sha256_bytes(OTHER_BYTES)
+
+
+def test_the_mismatch_row_keeps_the_chain_verifiable(monkeypatch, tmp_path):
+    _patch_agents(monkeypatch, _result())
+    orchestrator, audit_log, _ = _orchestrator(tmp_path)
+    with pytest.raises(WorkbookIdentityError):
+        orchestrator.run(
+            OTHER_BYTES,
+            _file_context(),
+            expected_workbook_hash=CONTEXT_HASH,
+            context_confirmed=True,
+            actor=ACTOR,
+        )
+    assert audit_log.verify_chain() == (True, [])
+
+
+def test_later_events_reuse_the_confirmed_hash(monkeypatch, tmp_path):
+    """Requirement 12: one identity, start to finish."""
+    _patch_agents(monkeypatch, _result())
+    orchestrator, audit_log, _ = _orchestrator(tmp_path)
+    report_id, preview = _start_preview(orchestrator)
+    hashes = {
+        json.loads(row["payload_json"])["context"]["workbook_hash"]
+        for row in audit_log.get_rows(report_id)
+    }
+    assert hashes == {CONTEXT_HASH}
