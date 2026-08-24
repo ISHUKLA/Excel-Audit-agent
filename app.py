@@ -683,7 +683,16 @@ def screen_3_reconciliation() -> None:
     st.markdown("### Executive Summary")
     summary_cols = st.columns(5)
     summary_metric(summary_cols[0], "Formulas examined", len(st.session_state.parsed_file.cells) if st.session_state.parsed_file else 0)
-    summary_metric(summary_cols[1], "Reconstruction coverage", f"{result.completeness if result else 'N/A'}")
+
+    # Reconstruction coverage: count complete vs total lines
+    if result and result.lines:
+        complete_count = sum(1 for line in result.lines if line.completeness == "complete" and line.check_type == "excel_vs_python")
+        total_count = sum(1 for line in result.lines if line.check_type == "excel_vs_python")
+        coverage = f"{complete_count}/{total_count}" if total_count > 0 else "0/0"
+    else:
+        coverage = "Not available"
+    summary_metric(summary_cols[1], "Reconstruction coverage", coverage)
+
     findings = st.session_state.findings or []
     blocker_count = sum(1 for f in findings if f.severity == "blocker")
     summary_metric(summary_cols[2], "Blockers", blocker_count if blocker_count > 0 else "None")
