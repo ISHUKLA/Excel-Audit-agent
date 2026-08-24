@@ -262,9 +262,17 @@ def screen_1_upload() -> None:
                 ),
             )
             reference_from_csv = csv_file is not None
+            # Auto-load reference CSV if seeded from demo case
+            if not reference_from_csv and st.session_state.get("demo_reference_path"):
+                reference_from_csv = True
+                csv_file = st.session_state.demo_reference_path
+
             if reference_from_csv:
                 try:
-                    csv_frame = pd.read_csv(csv_file)
+                    if isinstance(csv_file, str):  # File path from demo
+                        csv_frame = pd.read_csv(csv_file)
+                    else:  # Uploaded file
+                        csv_frame = pd.read_csv(csv_file)
                     validate_reference_csv_columns(csv_frame.columns)
                 except (ReferenceFigureInputError, pd.errors.ParserError, pd.errors.EmptyDataError) as exc:
                     st.error(str(exc))
@@ -335,9 +343,19 @@ def screen_1_upload() -> None:
     if not st.button("Start audit", type="primary", disabled=not gate1_confirmed):
         return
 
-    if uploaded_file is None:
-        st.error("Please upload an .xlsx file.")
+    # Use demo bytes if available, otherwise require file upload
+    workbook_bytes = None
+    filename_for_context = "Demo workbook"
+    if st.session_state.get("demo_workbook_bytes"):
+        workbook_bytes = st.session_state.demo_workbook_bytes
+        st.session_state.demo_workbook_bytes = None  # Consume once
+    elif uploaded_file is not None:
+        workbook_bytes = uploaded_file.getvalue()
+        filename_for_context = uploaded_file.name
+    else:
+        st.error("Please upload an .xlsx file or load a demonstration case.")
         return
+
     if not description.strip():
         st.error("Please describe what this file does.")
         return
@@ -362,7 +380,7 @@ def screen_1_upload() -> None:
             else None
         )
         file_context = FileContext(
-            filename=uploaded_file.name,
+            filename=filename_for_context,
             description=description.strip(),
             user_role=role,
             entity=entity.strip() or None,
@@ -382,7 +400,7 @@ def screen_1_upload() -> None:
         # between confirmation and parsing.
         with st.spinner("Parsing workbook and detecting findings…"):
             report_id, parsed_file, findings = _orchestrator().run(
-                uploaded_file.getvalue(),
+                workbook_bytes,
                 file_context,
                 reference_figures,
                 expected_workbook_hash=workbook_hash,
