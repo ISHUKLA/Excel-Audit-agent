@@ -19,6 +19,7 @@ import re
 import xml.etree.ElementTree as ET
 import zipfile
 from datetime import date, datetime
+from typing import Optional, Union
 
 import networkx as nx
 import openpyxl
@@ -167,7 +168,7 @@ def parse_workbook(workbook_bytes: bytes) -> ParsedFile:
 # ---------------------------------------------------------------------------
 
 
-def _formula_text(raw_value: object, key: str, warnings: list[str]) -> str | None:
+def _formula_text(raw_value: object, key: str, warnings: list[str]) -> Optional[str]:
     """The formula string for a cell, or None if it holds a literal."""
     if isinstance(raw_value, ArrayFormula):
         warnings.append(f"{key}: array formula")
@@ -182,7 +183,7 @@ def _formula_text(raw_value: object, key: str, warnings: list[str]) -> str | Non
 
 def _build_cell_record(
     key: str,
-    formula: str | None,
+    formula: Optional[str],
     cached_value: object,
     number_format: str,
     calc_mode: str,
@@ -209,8 +210,8 @@ def _build_cell_record(
 
 
 def _classify(
-    value: object, formula: str | None, key: str, warnings: list[str]
-) -> tuple[str, bool, str | None]:
+    value: object, formula: Optional[str], key: str, warnings: list[str]
+) -> tuple[str, bool, Optional[str]]:
     """Data type from the value actually observed — never coerced or guessed.
 
     A number stored as text stays text, with a warning. Deciding it was "really"
@@ -240,7 +241,7 @@ def _classify(
     return "text", False, None
 
 
-def _stringify(value: object) -> str | None:
+def _stringify(value: object) -> Optional[str]:
     return None if value is None else str(value)
 
 
@@ -289,7 +290,7 @@ def _read_workbook_meta(workbook_bytes: bytes) -> WorkbookMeta:
     )
 
 
-def _first_text(root: ET.Element, local_name: str) -> str | None:
+def _first_text(root: ET.Element, local_name: str) -> Optional[str]:
     for element in root.iter():
         if element.tag.endswith("}" + local_name) or element.tag == local_name:
             return (element.text or "").strip() or None
@@ -338,7 +339,7 @@ def _normalize(ref: str) -> str:
     return ref.replace("$", "").upper()
 
 
-def _expand_range(start: str, end: str) -> list[str] | None:
+def _expand_range(start: str, end: str) -> Optional[list[str]]:
     start_col, start_row = _split_ref(start)
     end_col, end_row = _split_ref(end)
     if None in (start_col, start_row, end_col, end_row):
@@ -356,7 +357,7 @@ def _expand_range(start: str, end: str) -> list[str] | None:
     ]
 
 
-def _split_ref(ref: str) -> tuple[str | None, int | None]:
+def _split_ref(ref: str) -> tuple[Optional[str], Optional[int]]:
     match = re.fullmatch(r"([A-Z]{1,3})([0-9]{1,7})", ref)
     if not match:
         return None, None

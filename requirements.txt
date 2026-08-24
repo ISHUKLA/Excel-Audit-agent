@@ -1,18 +1,22 @@
+# Pinned from a verified-green Python 3.9.6 test run on 2026-08-24.
+# Do not loosen these versions without re-running the full test suite (pytest tests/).
+#
 # sqlite3 backs the audit log (core/audit_log.py). It is part of the Python
 # standard library — no package line below, nothing to install.
 #
 # libreoffice is a SYSTEM dependency needed only to build test fixtures with
-# real cached formula values. See README.md — it is not needed to run app.py.
+# real cached formula values. See README.md — it is not needed to run app.py
+# or to run the test suite (fixtures are pre-baked and committed).
 
-openpyxl
-pandas
-numpy
-networkx
-anthropic
-pydantic
-streamlit
-jinja2
-weasyprint
-python-dotenv
-pytest
-rapidfuzz
+anthropic==0.125.0
+Jinja2==3.1.6
+networkx==3.2.1
+numpy==2.0.2
+openpyxl==3.1.5
+pandas==2.3.3
+pydantic==2.13.4
+pytest==8.4.2
+python-dotenv==1.2.1
+RapidFuzz==3.13.0
+streamlit==1.50.0
+weasyprint==66.0

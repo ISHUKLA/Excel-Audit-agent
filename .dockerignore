@@ -10,5 +10,10 @@ audit.db
 *.db
 .local-data/
 pkcs11.txt
+
+# Retained workbook artifacts (Phase E2)
+# Must not enter image build context; stay on mounted volume.
+.artifact-store/
+
 .git/
 .DS_Store

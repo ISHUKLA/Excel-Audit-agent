@@ -12,6 +12,7 @@ depending on itself. A tab-level check calls that a cycle and is wrong.
 
 import re
 from collections import defaultdict
+from typing import Optional
 
 import networkx as nx
 
@@ -88,7 +89,7 @@ def _detect_hardcoded_literals(parsed_file: ParsedFile) -> list[AnomalyFinding]:
 # ---------------------------------------------------------------------------
 
 
-def _split_definition(definition: str) -> tuple[str, str] | None:
+def _split_definition(definition: str) -> Optional[tuple[str, str]]:
     match = _DEFINITION_PATTERN.match(definition.replace("$", ""))
     if not match:
         return None
@@ -96,7 +97,7 @@ def _split_definition(definition: str) -> tuple[str, str] | None:
     return tab, cell_ref
 
 
-def _resolve_named_range_value(definition: str, cells: dict) -> float | None:
+def _resolve_named_range_value(definition: str, cells: dict) -> Optional[float]:
     split = _split_definition(definition)
     if split is None:
         return None

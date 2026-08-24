@@ -14,11 +14,17 @@ Excel Audit Agent parses an actuarial or financial Excel workbook, independently
 
 ## Requirements
 
-- Python 3.11+
+- **Python 3.10+** (3.11 or later strongly recommended). The codebase uses PEP 604 union type syntax (`float | str` instead of `Union[float, str]`), which requires Python 3.10+.
+  - **macOS:** install via [Homebrew](https://brew.sh) (`brew install python@3.11`), [MacPorts](https://www.macports.org), [pyenv](https://github.com/pyenv/pyenv), or the [official installer](https://www.python.org/downloads/macos/).
+  - **Linux:** install via your distro's package manager (`apt install python3.11` on Debian/Ubuntu, `dnf install python3.11` on Fedora, etc.) or [pyenv](https://github.com/pyenv/pyenv).
+  - **Windows:** use the [official installer](https://www.python.org/downloads/windows/) or [Windows Package Manager](https://learn.microsoft.com/en-us/windows/package-manager/winget/).
 - An Anthropic API key (used by Agent 4 to draft tab documentation — the only LLM call in the pipeline)
 - On Linux/Docker, the Pango and GDK-PixBuf system libraries that WeasyPrint needs for PDF output (the `Dockerfile` installs these)
 
-**Test-only system dependency.** Building test fixtures needs `libreoffice`, because openpyxl can read formulas but cannot calculate them — a fixture workbook written by openpyxl alone has formulas with no cached values, which is exactly what the parser and reconciliation tests need to check against. Install it with `brew install --cask libreoffice` on macOS, or `apt install libreoffice-calc` on Debian/Ubuntu. **You do not need it to run `app.py`** — only to regenerate fixtures.
+**Test-only system dependency.** Regenerating test fixtures (not running the test suite) requires `libreoffice`, because openpyxl can read formulas but cannot calculate them. **You do not need LibreOffice to run `app.py` or to run the test suite** — all fixture workbooks are pre-recalculated and committed to the repo. Only install LibreOffice if you need to modify and regenerate a fixture:
+- **macOS:** `brew install --cask libreoffice`
+- **Debian/Ubuntu:** `apt install libreoffice-calc`
+- See [FIXTURE_MIGRATION.md](FIXTURE_MIGRATION.md) for fixture regeneration instructions.
 
 ## How to run locally
 

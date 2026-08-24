@@ -2,7 +2,7 @@
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 import weasyprint
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoescape
@@ -125,9 +125,9 @@ def _mapping_rows(report: AuditReport) -> list[dict[str, Any]]:
     return rows
 
 
-def _prepare_audit_rows(rows: list[dict]) -> tuple[list[dict[str, Any]], bool | None]:
+def _prepare_audit_rows(rows: list[dict]) -> tuple[list[dict[str, Any]], Optional[bool]]:
     prepared = []
-    acknowledge_incomplete: bool | None = None
+    acknowledge_incomplete: Optional[bool] = None
     for row in rows:
         payload = _payload(row.get("payload_json"))
         if payload.get("gate") == 3 and "acknowledge_incomplete" in payload:
@@ -158,7 +158,7 @@ def _payload(raw: Any) -> dict:
     return parsed if isinstance(parsed, dict) else {}
 
 
-def _incomplete_percentage(lines: list) -> float | None:
+def _incomplete_percentage(lines: list) -> Optional[float]:
     incomplete = [
         line for line in lines if line.verdict == "incomplete" or line.completeness == "partial"
     ]

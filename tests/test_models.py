@@ -12,6 +12,7 @@ from core.models import (
     AccountingProvenance,
     AccountMapping,
     AnomalyFinding,
+    ArtifactReference,
     AuditLogRow,
     AuditReport,
     CellRecord,
@@ -21,6 +22,9 @@ from core.models import (
     LLMDataManifestEntry,
     MappingReviewDecision,
     ParsedFile,
+    RecalculationEngineProfile,
+    RecalculationEvidence,
+    RecalculationPolicy,
     ReconciliationLine,
     ReconciliationResult,
     ReferenceFigureLine,
@@ -195,6 +199,73 @@ def an_audit_report(**overrides):
     return AuditReport(**{**defaults, **overrides})
 
 
+def a_recalculation_engine_profile(**overrides):
+    defaults = dict(
+        profile_id="libreoffice-macos-26.2.5.2-x86_64",
+        engine_family="libreoffice",
+        exact_version="26.2.5.2",
+        operating_system="macos",
+        architecture="x86_64",
+        supported_extensions=[".xlsx"],
+        status="candidate",
+    )
+    return RecalculationEngineProfile(**{**defaults, **overrides})
+
+
+def a_recalculation_policy(**overrides):
+    defaults = dict(
+        policy_id="test-policy",
+        policy_version="1.0.0",
+        profiles=[a_recalculation_engine_profile()],
+    )
+    return RecalculationPolicy(**{**defaults, **overrides})
+
+
+def an_artifact_reference(**overrides):
+    defaults = dict(
+        artifact_kind="confirmed_source",
+        relative_path="workbooks/test.xlsx",
+        sha256="a" * 64,
+        byte_size=1024,
+    )
+    return ArtifactReference(**{**defaults, **overrides})
+
+
+def a_recalculation_evidence(**overrides):
+    source_artifact = ArtifactReference(
+        artifact_kind="confirmed_source",
+        relative_path="source.xlsx",
+        sha256="b" * 64,
+        byte_size=1024,
+    )
+    recalc_artifact = ArtifactReference(
+        artifact_kind="recalculated_output",
+        relative_path="recalculated.xlsx",
+        sha256="c" * 64,
+        byte_size=1024,
+    )
+    defaults = dict(
+        source_workbook_hash="b" * 64,
+        recalculated_workbook_hash="c" * 64,
+        engine_profile_id="test-profile",
+        engine_family="libreoffice",
+        detected_engine_version="26.2.5.2",
+        policy_id="test-policy",
+        policy_hash="d" * 64,
+        started_at=datetime(2026, 1, 1, 10, 0),
+        completed_at=datetime(2026, 1, 1, 10, 5),
+        formula_count_before=100,
+        formula_count_after=100,
+        formula_manifest_hash_before="e" * 64,
+        formula_manifest_hash_after="e" * 64,
+        source_artifact=source_artifact,
+        recalculated_artifact=recalc_artifact,
+        external_data_refresh_status="not_performed",
+        warnings=[],
+    )
+    return RecalculationEvidence(**{**defaults, **overrides})
+
+
 # --------------------------------------------------------------------------
 # every model instantiates
 # --------------------------------------------------------------------------
@@ -297,6 +368,10 @@ def test_every_model_instantiates_with_dummy_data():
             difference=0.0,
         ),
         an_audit_report(),
+        a_recalculation_engine_profile(),
+        a_recalculation_policy(),
+        an_artifact_reference(),
+        a_recalculation_evidence(),
     ]
     instantiated = {type(m).__name__ for m in models}
     defined = {
@@ -830,3 +905,110 @@ def test_event_type_list_did_not_become_open_after_the_second_widening():
             row_hash="c" * 64,
             timestamp=NOW,
         )
+
+
+# --------------------------------------------------------------------------
+# Recommendation 3 — Recalculation evidence and engine policy
+# --------------------------------------------------------------------------
+
+
+def test_recalculation_engine_profile_candidate_validates():
+    profile = RecalculationEngineProfile(
+        profile_id="test",
+        engine_family="libreoffice",
+        exact_version="26.2.5.2",
+        operating_system="macos",
+        architecture="x86_64",
+        supported_extensions=[".xlsx"],
+        status="candidate",
+    )
+    assert profile.status == "candidate"
+
+
+def test_recalculation_engine_profile_approved_requires_approval_metadata():
+    """Approved profiles must have approved_by, approved_at, and qualification_reference."""
+    with pytest.raises(ValidationError, match="require approved_by"):
+        RecalculationEngineProfile(
+            profile_id="test",
+            engine_family="libreoffice",
+            exact_version="26.2.5.2",
+            operating_system="macos",
+            architecture="x86_64",
+            supported_extensions=[".xlsx"],
+            status="approved",
+        )
+
+
+def test_recalculation_policy_validates():
+    profile = RecalculationEngineProfile(
+        profile_id="test",
+        engine_family="libreoffice",
+        exact_version="26.2.5.2",
+        operating_system="macos",
+        architecture="x86_64",
+        supported_extensions=[".xlsx"],
+        status="candidate",
+    )
+    policy = RecalculationPolicy(
+        policy_id="policy",
+        policy_version="1.0.0",
+        profiles=[profile],
+    )
+    assert len(policy.profiles) == 1
+
+
+def test_artifact_reference_validates():
+    ref = ArtifactReference(
+        artifact_kind="confirmed_source",
+        relative_path="workbooks/test.xlsx",
+        sha256="a" * 64,
+        byte_size=1024,
+    )
+    assert ref.artifact_kind == "confirmed_source"
+
+
+def test_artifact_reference_requires_valid_sha256():
+    """Hash validation uses the canonical workbook-identity validator."""
+    with pytest.raises(ValidationError):
+        ArtifactReference(
+            artifact_kind="confirmed_source",
+            relative_path="workbooks/test.xlsx",
+            sha256="A" * 64,
+            byte_size=1024,
+        )
+
+
+def test_recalculation_evidence_validates():
+    """A complete evidence record with matching hashes validates."""
+    source = ArtifactReference(
+        artifact_kind="confirmed_source",
+        relative_path="source.xlsx",
+        sha256="b" * 64,
+        byte_size=1024,
+    )
+    recalc = ArtifactReference(
+        artifact_kind="recalculated_output",
+        relative_path="recalculated.xlsx",
+        sha256="c" * 64,
+        byte_size=1024,
+    )
+    evidence = RecalculationEvidence(
+        source_workbook_hash="b" * 64,
+        recalculated_workbook_hash="c" * 64,
+        engine_profile_id="test",
+        engine_family="libreoffice",
+        detected_engine_version="26.2.5.2",
+        policy_id="policy",
+        policy_hash="d" * 64,
+        started_at=datetime(2026, 1, 1, 10, 0),
+        completed_at=datetime(2026, 1, 1, 10, 5),
+        formula_count_before=100,
+        formula_count_after=100,
+        formula_manifest_hash_before="e" * 64,
+        formula_manifest_hash_after="e" * 64,
+        source_artifact=source,
+        recalculated_artifact=recalc,
+        external_data_refresh_status="not_performed",
+        warnings=[],
+    )
+    assert evidence.external_data_refresh_status == "not_performed"

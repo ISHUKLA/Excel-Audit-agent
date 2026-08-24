@@ -2,6 +2,8 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .venv/
+.venv-test/
+.venv_manual_test/
 venv/
 *.egg-info/
 .claude/
@@ -11,6 +13,15 @@ venv/
 audit.db
 *.db
 .local-data/
+/uploads/
 pkcs11.txt
 
+# Retained workbook artifacts (Phase E2)
+# ArtifactStore location is caller-supplied; standard local convention is below.
+.artifact-store/
+
 .DS_Store
+.venv311/
+
+# Scope inventory scratch
+excluded_from_release/

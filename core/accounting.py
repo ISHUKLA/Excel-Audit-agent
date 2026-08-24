@@ -6,6 +6,7 @@ the same signed-net convention.
 """
 
 from decimal import Decimal
+from typing import Optional
 
 from core.models import ControlTotalCheck, ReferenceFigureLine, ReferenceFigures
 
@@ -17,7 +18,7 @@ def signed_reference_amount(line: ReferenceFigureLine) -> float:
     return 0.0 if signed == 0 else float(signed)
 
 
-def evaluate_control_total(reference_figures: ReferenceFigures | None) -> ControlTotalCheck:
+def evaluate_control_total(reference_figures: Optional[ReferenceFigures]) -> ControlTotalCheck:
     """Tie the signed reference-line population to its declared control total."""
     if reference_figures is None or reference_figures.control_total is None:
         return ControlTotalCheck()

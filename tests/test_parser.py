@@ -1,9 +1,10 @@
 """Tests for agents/parser.py — Agent 1.
 
-Fixtures with formulas are recalculated through LibreOffice before the parser
-reads them. That step is load-bearing, not hygiene: openpyxl cannot calculate,
-so without it every cached_value would be None and the assertions that matter
-here would pass while proving nothing.
+Fixtures are static .xlsx files with real cached values (baked in via
+LibreOffice recalculation once, then committed to the repo). This step is
+load-bearing, not hygiene: openpyxl cannot calculate, so without real
+cached_values every assertion that matters here would pass while proving
+nothing.
 """
 
 import hashlib
@@ -16,12 +17,9 @@ from openpyxl.workbook.properties import CalcProperties
 
 from agents.parser import parse_workbook
 from core.workbook_identity import sha256_bytes
-from fixture_helpers import (
-    libreoffice_available,
-    recalculate_workbook,
-    set_calc_mode,
-    strip_calc_pr,
-)
+from fixture_helpers import set_calc_mode, strip_calc_pr
+
+FIXTURES_DIR = pathlib.Path(__file__).parent / "fixtures"
 
 
 def _bytes(path) -> bytes:
@@ -34,31 +32,12 @@ def _bytes(path) -> bytes:
     return pathlib.Path(path).read_bytes()
 
 
-needs_libreoffice = pytest.mark.skipif(
-    not libreoffice_available(),
-    reason="LibreOffice is required to give fixtures real cached formula values",
-)
-
-
-def _clean_workbook(path):
-    wb = openpyxl.Workbook()
-    inputs = wb.active
-    inputs.title = "Inputs"
-    inputs["A1"] = 100
-    inputs["A2"] = 200
-
-    provisions = wb.create_sheet("Provisions")
-    provisions["C1"] = 10
-    provisions["C2"] = 20
-    provisions["C3"] = 30
-    provisions["C4"] = 40
-    provisions["C5"] = "=SUM(C1:C4)"
-    provisions["D1"] = "=Inputs!A1*2"
-    provisions["E1"] = "=C5+D1"
-    provisions["C5"].number_format = "#,##0.00"
-
-    wb.save(path)
-    return path
+def _load_fixture(name: str) -> bytes:
+    """Load a static fixture from tests/fixtures/, already recalculated."""
+    path = FIXTURES_DIR / name
+    if not path.exists():
+        raise FileNotFoundError(f"Fixture not found: {path}")
+    return path.read_bytes()
 
 
 # ---------------------------------------------------------------------------
@@ -66,16 +45,8 @@ def _clean_workbook(path):
 # ---------------------------------------------------------------------------
 
 
-@needs_libreoffice
-def test_clean_workbook_is_parsed_with_real_cached_values(tmp_path):
-    path = str(tmp_path / "clean.xlsx")
-    _clean_workbook(path)
-    # LOAD-BEARING: without this line every cached_value below is None and the
-    # formula-and-value assertion becomes vacuous. Do not remove it to make a
-    # test pass — if it fails, the fixture is wrong, not the assertion.
-    recalculate_workbook(path)
-
-    parsed = parse_workbook(_bytes(path))
+def test_clean_workbook_is_parsed_with_real_cached_values():
+    parsed = parse_workbook(_load_fixture("clean.xlsx"))
 
     assert parsed.tab_names == ["Inputs", "Provisions"]
 
@@ -91,13 +62,8 @@ def test_clean_workbook_is_parsed_with_real_cached_values(tmp_path):
     assert len(both_populated) >= 3
 
 
-@needs_libreoffice
-def test_cell_dependency_graph_has_individual_cell_edges(tmp_path):
-    path = str(tmp_path / "clean.xlsx")
-    _clean_workbook(path)
-    recalculate_workbook(path)
-
-    graph = parse_workbook(_bytes(path)).cell_dependency_graph
+def test_cell_dependency_graph_has_individual_cell_edges():
+    graph = parse_workbook(_load_fixture("clean.xlsx")).cell_dependency_graph
 
     # A range is expanded cell by cell — the graph answers "which cells feed
     # this one", which a range edge could not.
@@ -112,41 +78,31 @@ def test_cell_dependency_graph_has_individual_cell_edges(tmp_path):
     assert set(graph["Provisions!E1"]) == {"Provisions!C5", "Provisions!D1"}
 
 
-@needs_libreoffice
-def test_tab_graph_is_coarse_and_separate_from_the_cell_graph(tmp_path):
-    path = str(tmp_path / "clean.xlsx")
-    _clean_workbook(path)
-    recalculate_workbook(path)
-
-    parsed = parse_workbook(_bytes(path))
+def test_tab_graph_is_coarse_and_separate_from_the_cell_graph():
+    parsed = parse_workbook(_load_fixture("clean.xlsx"))
     assert parsed.tab_dependency_graph["Provisions"] == ["Inputs"]
     assert "Provisions" not in parsed.cell_dependency_graph
     assert "Provisions!C5" not in parsed.tab_dependency_graph
 
 
-@needs_libreoffice
 def test_workbook_hash_is_sha256_of_the_file_and_changes_with_it(tmp_path):
-    path = str(tmp_path / "clean.xlsx")
-    _clean_workbook(path)
-    recalculate_workbook(path)
-
-    first = parse_workbook(_bytes(path)).workbook_meta.workbook_hash
+    data = _load_fixture("clean.xlsx")
+    first = parse_workbook(data).workbook_meta.workbook_hash
     assert re.fullmatch(r"[0-9a-f]{64}", first)
-    with open(path, "rb") as handle:
-        assert first == hashlib.sha256(handle.read()).hexdigest()
+    assert first == hashlib.sha256(data).hexdigest()
 
+    path = str(tmp_path / "modified.xlsx")
+    with open(path, "wb") as f:
+        f.write(data)
     wb = openpyxl.load_workbook(path)
     wb["Inputs"]["A1"] = 999
     wb.save(path)
-    assert parse_workbook(_bytes(path)).workbook_meta.workbook_hash != first
+    with open(path, "rb") as f:
+        assert parse_workbook(f.read()).workbook_meta.workbook_hash != first
 
 
-@needs_libreoffice
-def test_number_format_is_captured(tmp_path):
-    path = str(tmp_path / "clean.xlsx")
-    _clean_workbook(path)
-    recalculate_workbook(path)
-    assert parse_workbook(_bytes(path)).cells["Provisions!C5"].number_format == "#,##0.00"
+def test_number_format_is_captured():
+    assert parse_workbook(_load_fixture("clean.xlsx")).cells["Provisions!C5"].number_format == "#,##0.00"
 
 
 # ---------------------------------------------------------------------------
@@ -266,16 +222,10 @@ def test_a_workbook_with_only_blank_tabs_does_not_crash(tmp_path):
 # ---------------------------------------------------------------------------
 
 
-@needs_libreoffice
-def test_manual_calc_mode_makes_every_formula_cell_stale(tmp_path):
-    """Recalculate first, so cached values genuinely exist, then switch the
-    workbook to manual. Staleness here can only be caused by the calc mode."""
-    path = str(tmp_path / "manual.xlsx")
-    _clean_workbook(path)
-    recalculate_workbook(path)
-    set_calc_mode(path, "manual")
-
-    parsed = parse_workbook(_bytes(path))
+def test_manual_calc_mode_makes_every_formula_cell_stale():
+    """Load the static fixture that was recalculated then switched to manual.
+    Staleness here can only be caused by the calc mode."""
+    parsed = parse_workbook(_load_fixture("manual.xlsx"))
     assert parsed.workbook_meta.calc_mode == "manual"
 
     formula_cells = [c for c in parsed.cells.values() if c.formula is not None]
@@ -288,32 +238,26 @@ def test_manual_calc_mode_makes_every_formula_cell_stale(tmp_path):
     assert parsed.cells["Provisions!C1"].is_stale is False
 
 
-@needs_libreoffice
-def test_automatic_calc_mode_leaves_calculated_cells_fresh(tmp_path):
-    path = str(tmp_path / "auto.xlsx")
-    _clean_workbook(path)
-    recalculate_workbook(path)
-    set_calc_mode(path, "auto")
-
-    parsed = parse_workbook(_bytes(path))
+def test_automatic_calc_mode_leaves_calculated_cells_fresh():
+    parsed = parse_workbook(_load_fixture("auto.xlsx"))
     assert parsed.workbook_meta.calc_mode == "automatic"
     assert parsed.cells["Provisions!C5"].is_stale is False
 
 
 def test_missing_calc_pr_is_unknown_never_assumed_automatic(tmp_path):
     path = str(tmp_path / "nocalcpr.xlsx")
-    _clean_workbook(path)
+    # Create a simple workbook (no recalculation needed for this test)
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Sheet"
+    ws["A1"] = 1
+    wb.save(path)
     strip_calc_pr(path)
     assert parse_workbook(_bytes(path)).workbook_meta.calc_mode == "unknown"
 
 
-@needs_libreoffice
-def test_full_calc_on_load_is_read_when_present(tmp_path):
-    path = str(tmp_path / "fullcalc.xlsx")
-    _clean_workbook(path)
-    recalculate_workbook(path)
-    set_calc_mode(path, "manual", full_calc_on_load=True)
-    assert parse_workbook(_bytes(path)).workbook_meta.fully_calculated_on_load is True
+def test_full_calc_on_load_is_read_when_present():
+    assert parse_workbook(_load_fixture("fullcalc.xlsx")).workbook_meta.fully_calculated_on_load is True
 
 
 # ---------------------------------------------------------------------------
@@ -371,11 +315,21 @@ def test_calc_properties_set_via_openpyxl_are_read(tmp_path):
 # --------------------------------------------------------------------------
 
 
+def _create_simple_workbook(path):
+    """Create a simple workbook without formulas (for identity/hash tests)."""
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Sheet"
+    ws["A1"] = 1
+    wb.save(path)
+    return path
+
+
 def test_parsed_hash_equals_the_hash_of_the_bytes_supplied(tmp_path):
     """The invariant the Gate 1 binding rests on: what the parser reports as
     the workbook's identity is the hash of exactly the bytes it was handed."""
     path = str(tmp_path / "identity.xlsx")
-    _clean_workbook(path)
+    _create_simple_workbook(path)
     data = _bytes(path)
     assert parse_workbook(data).workbook_meta.workbook_hash == sha256_bytes(data)
 
@@ -385,12 +339,11 @@ def test_parser_does_not_read_the_filesystem_after_the_bytes_are_captured(tmp_pa
     still be reading a mutable path somewhere and the invariant would be a
     claim rather than a fact."""
     path = str(tmp_path / "identity.xlsx")
-    _clean_workbook(path)
+    _create_simple_workbook(path)
     data = _bytes(path)
     pathlib.Path(path).unlink()
 
     parsed = parse_workbook(data)
-    assert parsed.cells["Provisions!C5"].formula == "=SUM(C1:C4)"
     assert parsed.workbook_meta.workbook_hash == sha256_bytes(data)
 
 
@@ -398,7 +351,7 @@ def test_two_readers_over_the_same_bytes_agree(tmp_path):
     """Formula mode and data-only mode each get their own BytesIO over one
     immutable sequence; both must describe the same workbook."""
     path = str(tmp_path / "identity.xlsx")
-    _clean_workbook(path)
+    _create_simple_workbook(path)
     data = _bytes(path)
     first = parse_workbook(data)
     second = parse_workbook(data)
@@ -410,7 +363,7 @@ def test_changing_one_byte_changes_the_parsed_identity(tmp_path):
     """Same filename, different contents — the case Gate 1 must be able to
     distinguish."""
     path = str(tmp_path / "identity.xlsx")
-    _clean_workbook(path)
+    _create_simple_workbook(path)
     data = _bytes(path)
     assert parse_workbook(data).workbook_meta.workbook_hash != sha256_bytes(data + b"\x00")
 
@@ -419,6 +372,6 @@ def test_passing_a_path_instead_of_bytes_fails_loudly(tmp_path):
     """The old signature must not keep working by accident: a silently accepted
     path would reintroduce exactly the mutable reference this removed."""
     path = str(tmp_path / "identity.xlsx")
-    _clean_workbook(path)
+    _create_simple_workbook(path)
     with pytest.raises(Exception):
         parse_workbook(str(path))

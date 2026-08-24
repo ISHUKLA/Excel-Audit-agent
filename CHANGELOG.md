@@ -4,6 +4,38 @@ One line per meaningful change. This is the project's lightweight change-control
 record — it exists so that a reviewer can reconstruct what changed and when
 without reading the git log.
 
+## 2026-08-21 — Recommendation 3, Phase E3: recalculation engine adapter and integration
+
+- Implemented `core/recalculation.py` with engine-neutral adapter interface, LibreOffice headless adapter using subprocess without shell=True, explicit timeout enforcement, and isolated user profile isolation. LibreOffice adapter rejects missing executable outright; never silently substitutes another engine.
+- Implemented comprehensive preflight validation: rejects empty/non-bytes input, malformed ZIP/OOXML, VBA macros, external workbook links, data connections/query tables, and encrypted containers. Passes only standard .xlsx workbooks with no active references or macros.
+- Implemented deterministic formula inventory and manifest hashing: records sheet, cell, and formula; sorts canonically; calculates SHA-256 manifest hash. Output verification requires formula count and manifest hash to remain unchanged, all formula cells to have cached results, and no formula-error values (#DIV/0!, etc.).
+- Implemented `RecalculationService` as a 12-step orchestrator: verify source identity, resolve profile, detect actual engine facts, require approved exact-match profile (blocks candidate and withdrawn), preflight, retain confirmed source, record start time, invoke adapter in isolated temp directory, record completion time, verify recalculated output, retain recalculated output, and return validated evidence.
+- Created `tests/test_recalculation.py` with fake adapters only (no real subprocess or LibreOffice). Coverage: approved/candidate/withdrawn profile enforcement, all dimension mismatches, source-hash mismatches, missing adapters, malformed workbooks, VBA/external-links/data-connections rejection, preflight and formula inventory, formula verification, output verification, artifact-store failures, no fallback behavior, and identical source/output hashes are permissible.
+- Created `tests/test_recalculation_qualification.py` with synthetic workbook setup: creates A1=100, B1=A1*2, cached B1=200; changes A1 to 150 without recalculation to preserve stale cache at 200; verifies precondition state (A1=150, formula present, cached=200, expected result=300). Phase F3 will invoke real adapter and assert cached B1 becomes 300 with formula/manifest preserved.
+- Candidate profile in `config/recalculation_engines.json` remains unapproved; unit tests construct in-memory approved profiles for testing. No bypass flags; no qualification-mode; failed recalculation does not return completed evidence; unverified output is not retained; external-data refresh remains "not_performed."
+- No orchestrator integration yet; no audit-log events; no state snapshots. Recalculation is a standalone service. No tests run in Phase E3; Phase F3 runs unit tests with fake adapters; Phase F3 (real LibreOffice qualification) runs on explicit authorization.
+- Limitations: LibreOffice adapter requires explicit path (no environment search); isolated temp directory is ephemeral (cannot be retained for inspection); Formula.xlsx conversion assumes standard .xlsx output format; external-data refresh state is static (LibreOffice --headless flag disables refresh, not verified independently); formula caching is engine-dependent (LibreOffice may recalculate more or less than expected in edge cases).
+- No tests run, no engine invoked, no artifacts created, no commits or pushes.
+
+## 2026-08-21 — Recommendation 3, Phase E2: protected workbook artifact retention
+
+- Implemented `ArtifactStore` for hash-verifiable, append-only storage of confirmed_source and recalculated_output workbook artifacts in a caller-supplied directory. Artifacts are stored with fixed filenames (confirmed_source.xlsx, recalculated_output.xlsx) in report-ID directories; uploaded filenames never participate in paths.
+- Save writes through temporary files with fsync before publication and re-verifies after rename to ensure atomicity and concurrency safety. Save raises `ArtifactExistsError` if the artifact already exists; no overwrite operation exists. Load re-calculates SHA-256 and size to detect any tampering.
+- Symbolic links are rejected throughout (root directory, all path components, final artifact file). Traversal (..), absolute paths, and malformed report IDs are blocked. Size cap is caller-supplied with no hard-coded default. No delete/update/replace APIs.
+- Added 73 focused tests covering save/load, hash verification, path validation, symlink rejection, concurrency, and the absence of mutating APIs. Tests use pytest temporary directories; no real workbooks in the repository.
+- Updated `.gitignore` and `.dockerignore` to exclude artifact storage from version control and Docker image builds.
+- Documented limitations: artifacts are hash-verifiable but not immutable (filesystem access can modify or delete them); no encryption-at-rest implemented; size cap and storage location are entirely caller-supplied; no orchestrator, engine, or audit-log integration yet.
+- No tests run in Phase E2; Phase F2 is separate. No engine invoked, no artifacts created, no commits or pushes.
+
+## 2026-08-21 — Recommendation 3, Phase E1: recalculation evidence and engine-policy foundation
+
+- Implemented four validated Pydantic models to represent recalculation engines and evidence: `RecalculationEngineProfile` (with status: candidate/approved/withdrawn, requiring approval metadata for approved profiles), `RecalculationPolicy` (with unique profile IDs and non-empty profile list), `ArtifactReference` (for confirmed-source and recalculated-output tracking), and `RecalculationEvidence` (requiring equal before/after formula counts and manifest hashes for successful completion).
+- Created `config/recalculation_engines.json` with a single candidate profile: `libreoffice-macos-26.2.5.2-x86_64`, configured for LibreOffice 26.2.5.2 on macOS x86_64 with .xlsx support. Candidate status and installation notes make clear that presence does not constitute qualification or approval.
+- Added `core/recalculation_policy.py` with `RecalculationPolicyError`, `load_recalculation_policy()` (reads exact configuration bytes, validates through Pydantic, returns policy and policy hash, fails closed without fallback), and `require_approved_engine_profile()` (gating function that blocks candidate/withdrawn/mismatched profiles, requires exact matches on family/version/OS/architecture/extension, raises rather than returning None).
+- No runtime recalculation implemented in Phase E1 — the foundation is established only. Docker and CI/CD do not yet satisfy the control boundary. Historical runs without recalculation evidence cannot resume downstream (enforcement belongs to orchestrator phase).
+- Added 47 focused tests in `tests/test_recalculation_policy.py` and 8 in `tests/test_models.py` covering clean cases (candidate validates, policy loads, evidence validates, hash reproducibility), negative cases (candidate cannot be selected, withdrawn blocks, all dimension mismatches block), and model contracts (approved requires metadata, extensions normalized and deduplicated, timestamps ordered, artifact kinds matched).
+- Verification: tests not yet run (Phase E1 stops before focused testing). No changes to orchestrator, parser, app, Docker, CI, report, or gates. No commits or pushes.
+
 ## 2026-08-21 — Recommendation 2 corrective patch: Gate 1 UI supplies confirmed hash
 
 - Merged Recommendation 2 did not pass `confirmed_workbook_hash` when constructing `FileContext` in the UI path, so Pydantic validation would fail before the Orchestrator received it.

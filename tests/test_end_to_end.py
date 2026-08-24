@@ -28,8 +28,9 @@ from core.models import (
     ReferenceFigures,
 )
 from core.state_store import StateStore
-from fixture_helpers import recalculate_workbook
 from report.generator import generate_report_pdf
+
+FIXTURES_DIR = pathlib.Path(__file__).parent / "fixtures"
 
 ACTOR = "Isaac Shukla"
 NOW = datetime.now(timezone.utc)
@@ -71,27 +72,14 @@ class _FakeClient:
 
 @pytest.fixture(scope="module")
 def workbook_path(tmp_path_factory) -> str:
-    path = tmp_path_factory.mktemp("step12_workbook") / "reserves.xlsx"
-    workbook = openpyxl.Workbook()
+    """Copy the static recalculated reserves.xlsx fixture to a temp location."""
+    fixture_path = FIXTURES_DIR / "reserves.xlsx"
+    if not fixture_path.exists():
+        raise FileNotFoundError(f"Fixture not found: {fixture_path}")
 
-    hypotheses = workbook.active
-    hypotheses.title = "Hypotheses"
-    hypotheses["A1"] = LONG_PRIVATE_NOTE
-    hypotheses["B12"] = 1.75
-    hypotheses["B13"] = "TH00-02"
-
-    provisions = workbook.create_sheet("Provisions")
-    provisions["B5"] = "Provisions total"
-    provisions["C5"] = "=Hypotheses!B12 * 1000"
-    provisions["C6"] = "=C5 * 0.035"
-    provisions["C7"] = "=VLOOKUP(B13,SomeTable,2,FALSE)"
-
-    controls = workbook.create_sheet("Controls")
-    controls["D1"] = "=SUM(Provisions!C5:C7)"
-
-    workbook.save(path)
-    recalculate_workbook(str(path))
-    return str(path)
+    dest = tmp_path_factory.mktemp("step12_workbook") / "reserves.xlsx"
+    dest.write_bytes(fixture_path.read_bytes())
+    return str(dest)
 
 
 @pytest.fixture

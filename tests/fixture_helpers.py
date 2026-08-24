@@ -16,6 +16,7 @@ import shutil
 import subprocess
 import zipfile
 from pathlib import Path
+from typing import Optional
 
 # macOS installs the binary inside the app bundle rather than on PATH.
 _CANDIDATE_BINARIES = (
@@ -27,7 +28,7 @@ _CANDIDATE_BINARIES = (
 )
 
 
-def soffice_path() -> str | None:
+def soffice_path() -> Optional[str]:
     """The LibreOffice binary, or None if it isn't installed."""
     for candidate in _CANDIDATE_BINARIES:
         resolved = shutil.which(candidate) if "/" not in candidate else candidate
@@ -41,7 +42,19 @@ def libreoffice_available() -> bool:
 
 
 def recalculate_workbook(path: str) -> None:
-    """Recalculate an .xlsx in place, so its formula cells get real cached values.
+    """DEPRECATED: This function is NOT called by the test suite.
+
+    It was used once to generate the static fixtures in tests/fixtures/.
+    All test fixtures now have real cached values baked in permanently.
+
+    If a fixture ever needs to change, regenerate it manually with this
+    function on a machine that has LibreOffice installed, then re-commit
+    the resulting .xlsx file to tests/fixtures/ — do not wire this back
+    into the automated test run.
+
+    Original docstring:
+    ----
+    Recalculate an .xlsx in place, so its formula cells get real cached values.
 
     Converts through a scratch directory rather than in place, because
     LibreOffice will not reliably overwrite its own input file. Raises if
@@ -75,7 +88,7 @@ def recalculate_workbook(path: str) -> None:
     shutil.rmtree(scratch, ignore_errors=True)
 
 
-def set_calc_mode(path: str, mode: str, full_calc_on_load: bool | None = None) -> None:
+def set_calc_mode(path: str, mode: str, full_calc_on_load: Optional[bool] = None) -> None:
     """Rewrite a workbook's calcPr calcMode directly in the .xlsx zip.
 
     Used to test the manual-calculation path in isolation: the fixture is

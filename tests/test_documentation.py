@@ -4,6 +4,7 @@ import hashlib
 import json
 from datetime import datetime, timezone
 from types import SimpleNamespace
+from typing import Optional
 
 import pytest
 
@@ -45,7 +46,7 @@ def _cell(
     cell_ref: str,
     value=None,
     *,
-    formula: str | None = None,
+    formula: Optional[str] = None,
     data_type: str = "number",
 ) -> CellRecord:
     return CellRecord(

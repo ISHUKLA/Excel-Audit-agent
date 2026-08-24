@@ -12,7 +12,7 @@ import subprocess
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union
 
 import anthropic
 from pydantic import BaseModel
@@ -85,8 +85,8 @@ class Orchestrator:
         audit_log: Optional[AuditLog] = None,
         state_store: Optional[StateStore] = None,
         documentation_client: Optional[anthropic.Anthropic] = None,
-        materiality_config_path: str | Path = _DEFAULT_MATERIALITY_PATH,
-        authorized_approvers_path: str | Path = _DEFAULT_APPROVERS_PATH,
+        materiality_config_path: Union[str, Path] = _DEFAULT_MATERIALITY_PATH,
+        authorized_approvers_path: Union[str, Path] = _DEFAULT_APPROVERS_PATH,
         code_version: Optional[str] = None,
     ):
         if state_store is not None and audit_log is not None:

@@ -8,6 +8,7 @@ hashes, never workbook cell content or raw LLM responses.
 import hashlib
 import json
 import time
+from typing import Optional, Union
 
 import anthropic
 from pydantic import ValidationError
@@ -65,7 +66,7 @@ def document_tabs(
     audit_log: AuditLog,
     report_id: str,
     audit_context: dict,
-    client: anthropic.Anthropic | None = None,
+    client: Optional[anthropic.Anthropic] = None,
 ) -> tuple[list[TabDocumentation], list[LLMDataManifestEntry]]:
     """Document every tab and return its non-sensitive transmission manifests.
 
@@ -140,7 +141,7 @@ def _system_prompt_for_role(role: str) -> str:
     return f"{_BASE_SYSTEM_PROMPT}{_ROLE_GUIDANCE[role]}"
 
 
-def _parse_response(tab_name: str, raw_response: str) -> tuple[TabDocumentation, str | None]:
+def _parse_response(tab_name: str, raw_response: str) -> tuple[TabDocumentation, Optional[str]]:
     """Validate one response without retaining invalid raw content."""
     try:
         data = json.loads(raw_response)
@@ -166,7 +167,7 @@ def _parse_response(tab_name: str, raw_response: str) -> tuple[TabDocumentation,
     )
 
 
-def _safe_validation_error(exc: TypeError | ValidationError) -> str:
+def _safe_validation_error(exc: Union[TypeError, ValidationError]) -> str:
     """Describe validation failure while omitting rejected input values."""
     if isinstance(exc, ValidationError):
         return json.dumps(exc.errors(include_input=False), sort_keys=True, default=str)
@@ -180,9 +181,9 @@ def _log_llm_call(
     manifest: LLMDataManifestEntry,
     request_json: str,
     *,
-    raw_response: str | None,
+    raw_response: Optional[str],
     outcome: str,
-    error_detail: str | None,
+    error_detail: Optional[str],
 ) -> None:
     """Log a non-evidentiary call summary, never request/response content."""
     event_payload = {

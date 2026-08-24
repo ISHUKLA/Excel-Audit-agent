@@ -8,6 +8,7 @@ the non-UI modules.
 import json
 import os
 from datetime import datetime, timezone
+from typing import Optional
 
 import pandas as pd
 import streamlit as st
@@ -127,7 +128,7 @@ def _chain_integrity_error(exc: ChainIntegrityError) -> None:
     )
 
 
-def _workbook_identity_panel(uploaded_file) -> str | None:
+def _workbook_identity_panel(uploaded_file) -> Optional[str]:
     """Show which workbook is being confirmed, and reset the confirmation if it
     changes. Rendering and session bookkeeping only — the binding is enforced in
     the orchestrator, which never trusts anything decided here.

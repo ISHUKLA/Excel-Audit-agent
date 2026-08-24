@@ -1,0 +1,75 @@
+name: CI — Release v1.0.0 Freeze
+
+on:
+  push:
+    branches:
+      - release/v1.0.0-freeze
+  pull_request:
+    branches:
+      - release/v1.0.0-freeze
+
+jobs:
+  test:
+    name: Test Suite
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Scan for leaked secrets (gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          enable-comments: true
+          enable-upload-artifact: true
+
+      - name: Run test suite
+        run: pytest -v
+
+  docker-build:
+    name: Docker Build & Smoke Test
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t excel-audit-agent:ci .
+
+      - name: Smoke test — container startup
+        run: |
+          # Start the container in the background with a timeout
+          timeout 30 docker run \
+            --name test-container \
+            -p 8501:8501 \
+            --health-cmd="curl -f http://localhost:8501/_stcore/health || exit 1" \
+            --health-interval=2s \
+            --health-timeout=2s \
+            --health-retries=5 \
+            -d excel-audit-agent:ci
+
+          # Wait for health check to pass
+          sleep 3
+          HEALTH=$(docker inspect test-container --format='{{json .State.Health.Status}}')
+
+          # Clean up
+          docker stop test-container || true
+          docker rm test-container || true
+
+          # Fail if not healthy
+          if [ "$HEALTH" != '"healthy"' ]; then
+            echo "Container failed health check. Health status: $HEALTH"
+            exit 1
+          fi
+
+          echo "✓ Container started and health endpoint responded"

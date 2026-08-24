@@ -6,7 +6,7 @@ those that prevent a whole class of ambiguity from being representable at all
 """
 
 from datetime import datetime
-from typing import Any, Literal, Optional
+from typing import Any, Literal, Optional, Union
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -149,7 +149,7 @@ class CellRecord(BaseModel):
 
     cell_ref: str
     formula: Optional[str] = None
-    cached_value: Optional[float | str | bool] = None
+    cached_value: Optional[Union[float, str, bool]] = None
     data_type: Literal["number", "text", "date", "boolean", "error", "blank"]
     number_format: str
     is_error: bool
@@ -490,3 +490,230 @@ class AuditReport(BaseModel):
     report_id: str
     # Fixed text pointing to how this report_id's hash chain can be re-verified.
     audit_log_verification_note: str
+
+
+class RecalculationEngineProfile(BaseModel):
+    """One candidate or approved calculation engine, with exact version and platform.
+
+    A candidate profile has no approval metadata. An approved profile requires
+    approved_by, approved_at, and qualification_reference. A withdrawn profile
+    cannot be selected for runtime.
+    """
+
+    profile_id: str
+    engine_family: Literal["libreoffice", "microsoft_excel"]
+    exact_version: str
+    operating_system: str
+    architecture: str
+    supported_extensions: list[str]
+    status: Literal["candidate", "approved", "withdrawn"]
+    qualification_reference: Optional[str] = None
+    approved_by: Optional[str] = None
+    approved_at: Optional[datetime] = None
+    notes: Optional[str] = None
+
+    @field_validator("profile_id")
+    @classmethod
+    def _profile_id_not_blank(cls, value: str) -> str:
+        if not (value or "").strip():
+            raise ValueError("profile_id cannot be blank")
+        return value
+
+    @field_validator("exact_version")
+    @classmethod
+    def _exact_version_not_blank(cls, value: str) -> str:
+        if not (value or "").strip():
+            raise ValueError("exact_version cannot be blank")
+        return value
+
+    @field_validator("supported_extensions")
+    @classmethod
+    def _extensions_not_empty_and_normalized(cls, value: list[str]) -> list[str]:
+        if not value:
+            raise ValueError("supported_extensions cannot be empty")
+        normalized = []
+        seen = set()
+        for ext in value:
+            if not ext.startswith("."):
+                raise ValueError(f"extension '{ext}' must begin with a dot")
+            lower_ext = ext.lower()
+            if lower_ext in seen:
+                raise ValueError(f"duplicate extension: {lower_ext}")
+            seen.add(lower_ext)
+            normalized.append(lower_ext)
+        return normalized
+
+    @model_validator(mode="after")
+    def _validate_approval_metadata(self):
+        if self.status == "candidate":
+            if self.approved_by is not None or self.approved_at is not None:
+                raise ValueError(
+                    "candidate profiles must not contain approved_by or approved_at"
+                )
+        elif self.status == "approved":
+            if not (self.approved_by or "").strip():
+                raise ValueError("approved profiles require approved_by")
+            if self.approved_at is None:
+                raise ValueError("approved profiles require approved_at")
+            if not (self.qualification_reference or "").strip():
+                raise ValueError("approved profiles require qualification_reference")
+        return self
+
+
+class RecalculationPolicy(BaseModel):
+    """A collection of engine profiles available for recalculation.
+
+    Profile IDs must be unique. The list cannot be empty. No profile is
+    silently selected as a default.
+    """
+
+    policy_id: str
+    policy_version: str
+    profiles: list[RecalculationEngineProfile]
+
+    @field_validator("profiles")
+    @classmethod
+    def _profiles_not_empty_and_unique(cls, value: list[RecalculationEngineProfile]) -> list[RecalculationEngineProfile]:
+        if not value:
+            raise ValueError("profiles list cannot be empty")
+        seen_ids = set()
+        for profile in value:
+            if profile.profile_id in seen_ids:
+                raise ValueError(f"duplicate profile_id: {profile.profile_id}")
+            seen_ids.add(profile.profile_id)
+        return value
+
+
+class ArtifactReference(BaseModel):
+    """A pointer to a workbook artifact with integrity information.
+
+    Both the confirmed source workbook and the recalculated output must be
+    referenced this way, with their hashes verified to match.
+    """
+
+    artifact_kind: Literal["confirmed_source", "recalculated_output"]
+    relative_path: str
+    sha256: str
+    byte_size: int
+
+    @field_validator("sha256")
+    @classmethod
+    def _hash_must_be_a_sha256_digest(cls, value: str) -> str:
+        return validate_hash_format(value, label="artifact sha256")
+
+    @field_validator("byte_size")
+    @classmethod
+    def _byte_size_greater_than_zero(cls, value: int) -> int:
+        if value <= 0:
+            raise ValueError("byte_size must be greater than zero")
+        return value
+
+    @field_validator("relative_path")
+    @classmethod
+    def _path_must_be_relative(cls, value: str) -> str:
+        if value.startswith("/") or value.startswith("\\"):
+            raise ValueError("relative_path must not be absolute")
+        if ".." in value:
+            raise ValueError("relative_path must not contain '..'")
+        return value
+
+
+class RecalculationEvidence(BaseModel):
+    """A successfully completed and verified recalculation, never a failed attempt.
+
+    Every hash is a canonical SHA-256 digest. The successful recalculation
+    requires equal before/after formula counts and equal before/after
+    formula-manifest hashes. Identical source and recalculated hashes are
+    acceptable — hash inequality is not evidence that recalculation occurred.
+
+    External data refresh must remain "not_performed" for the MVP.
+    """
+
+    source_workbook_hash: str
+    recalculated_workbook_hash: str
+    engine_profile_id: str
+    engine_family: Literal["libreoffice", "microsoft_excel"]
+    detected_engine_version: str
+    policy_id: str
+    policy_hash: str
+    started_at: datetime
+    completed_at: datetime
+    formula_count_before: int
+    formula_count_after: int
+    formula_manifest_hash_before: str
+    formula_manifest_hash_after: str
+    source_artifact: ArtifactReference
+    recalculated_artifact: ArtifactReference
+    external_data_refresh_status: Literal["not_performed"]
+    warnings: list[str]
+
+    @field_validator("source_workbook_hash")
+    @classmethod
+    def _source_hash_is_sha256(cls, value: str) -> str:
+        return validate_hash_format(value, label="source_workbook_hash")
+
+    @field_validator("recalculated_workbook_hash")
+    @classmethod
+    def _recalculated_hash_is_sha256(cls, value: str) -> str:
+        return validate_hash_format(value, label="recalculated_workbook_hash")
+
+    @field_validator("policy_hash")
+    @classmethod
+    def _policy_hash_is_sha256(cls, value: str) -> str:
+        return validate_hash_format(value, label="policy_hash")
+
+    @field_validator("formula_manifest_hash_before")
+    @classmethod
+    def _manifest_hash_before_is_sha256(cls, value: str) -> str:
+        return validate_hash_format(value, label="formula_manifest_hash_before")
+
+    @field_validator("formula_manifest_hash_after")
+    @classmethod
+    def _manifest_hash_after_is_sha256(cls, value: str) -> str:
+        return validate_hash_format(value, label="formula_manifest_hash_after")
+
+    @field_validator("detected_engine_version")
+    @classmethod
+    def _detected_version_not_blank(cls, value: str) -> str:
+        if not (value or "").strip():
+            raise ValueError("detected_engine_version cannot be blank")
+        return value
+
+    @field_validator("formula_count_before", "formula_count_after")
+    @classmethod
+    def _formula_counts_non_negative(cls, value: int) -> int:
+        if value < 0:
+            raise ValueError("formula counts must be non-negative")
+        return value
+
+    @model_validator(mode="after")
+    def _validate_timestamps_and_formulas(self):
+        if self.completed_at < self.started_at:
+            raise ValueError("completed_at cannot precede started_at")
+        if self.formula_count_before != self.formula_count_after:
+            raise ValueError(
+                "successful evidence requires equal before/after formula counts"
+            )
+        if self.formula_manifest_hash_before != self.formula_manifest_hash_after:
+            raise ValueError(
+                "successful evidence requires equal before/after formula-manifest hashes"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_artifacts(self):
+        if self.source_artifact.artifact_kind != "confirmed_source":
+            raise ValueError("source_artifact must have artifact_kind=confirmed_source")
+        if self.recalculated_artifact.artifact_kind != "recalculated_output":
+            raise ValueError(
+                "recalculated_artifact must have artifact_kind=recalculated_output"
+            )
+        if self.source_artifact.sha256 != self.source_workbook_hash:
+            raise ValueError(
+                "source_artifact.sha256 must agree with source_workbook_hash"
+            )
+        if self.recalculated_artifact.sha256 != self.recalculated_workbook_hash:
+            raise ValueError(
+                "recalculated_artifact.sha256 must agree with recalculated_workbook_hash"
+            )
+        return self
