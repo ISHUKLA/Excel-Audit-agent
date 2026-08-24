@@ -327,6 +327,55 @@ Backups are an operational necessity, not merely good practice.
 
 ---
 
+## Use of AI in Development
+
+This tool was built with assistance from Claude (Anthropic's language model). This section documents where AI was used, what was human-directed, and what remains human-reviewed.
+
+### What Was AI-Written
+
+**Agents 1–4 and the orchestrator:** All four parsing/anomaly/reconciliation/documentation agents, the orchestrator that sequences them, and the Pydantic models that validate their outputs were written by Claude following human-specified rules.
+
+**Audit log and state store:** The hash-chained audit log (append-only SQLite with tamper-evident verification) and the state snapshot store were AI-written to specification.
+
+**Reconciliation logic:** The two-pass reconciliation (Excel vs. Python, Python vs. accounts), mapping proposal flow, and verdict computation were AI-written and thoroughly tested.
+
+**Test suite:** 384 tests covering clean cases, messy input, boundary conditions, and end-to-end flows were AI-written. All tests pass.
+
+**Streamlit interface and PDF report:** The five-screen UI, gate enforcement, and PDF report generation via Jinja2 + WeasyPrint were AI-written.
+
+**Docker, CI, and deployment:** The Dockerfile, GitHub Actions CI workflow, and deployment configuration were AI-written.
+
+**Phase 3 UI polish:** The Streamlit enhancements (progress indicator, responsibility badges, demo case selector, findings sorting, executive summary, AI transparency panel, reset button) were AI-written.
+
+**Documentation and README:** This README and supporting documentation (CLAUDE.md, SCOPE_INVENTORY.md, FIXTURE_MIGRATION.md) were AI-written.
+
+### What Was Human-Directed
+
+Every element above was written *to a human-specified design*. The human author provided:
+
+- **Rules, not recipes.** Operating principles from [CLAUDE.md](CLAUDE.md) (e.g., "never skip a gate", "no invented data", "tamper-evident not tamper-proof").
+- **Acceptance criteria.** What each test must verify, what each gate must block, what evidence the audit log must preserve.
+- **Architecture decisions.** Four gates, two reconciliation passes, data minimization before LLM calls, append-only audit log.
+- **Boundary decisions.** Which formulas to support, what constitutes a finding, how to handle duplicate labels.
+- **Review and sign-off.** Every module was reviewed before moving to the next; gaps were identified and closed before release.
+
+### What Remains Human-Reviewed
+
+- **AI output in Agent 4 (documentation).** Claude writes plain-language tab summaries in the PDF. These are shown to the reviewer but do not drive any decision; they are explanatory text only. The real evidence is the parsed workbook, detected anomalies, and reconciliation deltas.
+- **Gate decisions.** Every decision at each of the four gates is made by a named human: context confirmation, findings disposition, materiality thresholds, approval record.
+- **Findings and reconciliation.** Agents 1–3 produce deterministic output (parsed data, rules-based anomalies, numeric deltas). Humans decide whether these constitute issues and what to do about them.
+
+### Implications
+
+- **The tool is not autonomous.** It surfaces evidence; humans govern the evidence.
+- **AI is not in the approval path.** No gate is automatically satisfied or bypassed by an AI decision.
+- **Code is traceable.** Every line can be read and understood; the logic is deterministic where it matters (parsing, anomaly detection, reconciliation).
+- **This is disclosed in the tool itself.** The UI shows a responsibility badge on every output section: "Deterministic Python calculation", "AI-generated explanation", or "Human decision required".
+
+See [CLAUDE.md](CLAUDE.md) for the full development methodology, rule set, and build order.
+
+---
+
 ## Roadmap
 
 The current release (v1.0.0) ships the five-gate pipeline, local-first deployment, and an audit log with hash-chain verification. Post-MVP scope includes:
