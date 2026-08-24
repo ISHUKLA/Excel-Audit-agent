@@ -1,0 +1,5 @@
+account_number,label,amount,debit_credit,ledger_source,evidence_reference
+4200,Net claim reserves,1850000,debit,Synthetic trial balance,AI2 demo case 3 row 1
+4201,Net claim reserves,125000,debit,Synthetic trial balance,AI2 demo case 3 row 2 duplicate label
+4300,Unearned premium liability,425000,debit,Synthetic trial balance,AI2 demo case 3 row 3
+4999,Legacy transition adjustment,90000,debit,Synthetic trial balance,AI2 demo case 3 row 4 unmatched

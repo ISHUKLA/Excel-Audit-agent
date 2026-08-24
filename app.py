@@ -25,6 +25,9 @@ from core.ui_inputs import (
     validate_reference_csv_columns,
 )
 from report.generator import generate_report_pdf
+from ui.components import responsibility_badge, verdict_card, summary_metric, finding_card
+from ui.progress import progress_indicator
+from demo_cases import load_case, list_cases
 
 ROLE_OPTIONS = ["actuary", "cro", "cfo", "auditor"]
 SEVERITY_BADGE = {
@@ -171,6 +174,32 @@ def _empty_reference_table() -> pd.DataFrame:
 
 def screen_1_upload() -> None:
     st.header("Screen 1 — Upload")
+
+    # Demo case selector (seeds input only, doesn't skip gates)
+    with st.expander("📚 Load a demonstration case"):
+        demo_cases = list_cases()
+        case_names = [f"Case {c['number']}: {c['name']}" for c in demo_cases]
+        selected_idx = st.selectbox(
+            "Choose a synthetic case to load",
+            range(len(demo_cases)),
+            format_func=lambda i: case_names[i],
+            key="demo_case_selector",
+        )
+        if st.button("Load case"):
+            try:
+                case_data = load_case(demo_cases[selected_idx]["number"])
+                # Seed input fields (don't auto-confirm Gate 1)
+                st.session_state.demo_workbook_bytes = case_data["workbook_bytes"]
+                st.session_state.demo_reference_path = case_data["reference_csv_path"]
+                st.session_state.file_description = case_data["description"]
+                st.session_state.file_entity = case_data["entity"]
+                st.session_state.file_period = case_data["period"]
+                st.session_state.file_currency = case_data["currency"]
+                st.session_state.file_basis = case_data["basis"]
+                st.info(f"✓ Case {demo_cases[selected_idx]['number']} loaded. Proceed through all gates normally.")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Could not load case: {e}")
 
     uploaded_file = st.file_uploader("Upload Excel file", type=["xlsx"], key="workbook_upload")
     description = st.text_area("Describe what this file does", key="file_description")
@@ -403,10 +432,42 @@ def screen_2_findings_review() -> None:
     decided_count = sum(finding.finding_id in decisions for finding in findings)
     st.progress(decided_count / len(findings) if findings else 1.0)
     st.caption(f"{decided_count} of {len(findings)} findings reviewed")
+
+    filtered_findings = findings
     if not findings:
         st.info("No findings were raised for this file. Output designation is still required.")
+    else:
+        # Sorting/filtering options
+        sort_col1, sort_col2 = st.columns(2)
+        sort_by = sort_col1.selectbox(
+            "Sort by",
+            ["severity", "cell", "status"],
+            key="findings_sort",
+            help="Order the findings for review"
+        )
+        filter_severity = sort_col2.multiselect(
+            "Filter by severity",
+            ["blocker", "warning", "info"],
+            default=["blocker", "warning", "info"],
+            key="findings_filter",
+        )
 
-    for finding in findings:
+        # Apply sorting and filtering
+        filtered_findings = [f for f in findings if f.severity in filter_severity]
+        if sort_by == "severity":
+            severity_order = {"blocker": 0, "warning": 1, "info": 2}
+            filtered_findings = sorted(filtered_findings, key=lambda f: severity_order.get(f.severity, 3))
+        elif sort_by == "cell":
+            filtered_findings = sorted(filtered_findings, key=lambda f: (f.tab, f.cell_ref))
+        elif sort_by == "status":
+            def status_order(f):
+                decision = decisions.get(f.finding_id, {}).get("decision")
+                return {"confirmed": 0, "overridden": 1, "dismissed": 2, None: 3}.get(decision, 4)
+            filtered_findings = sorted(filtered_findings, key=status_order)
+
+        st.caption(f"Showing {len(filtered_findings)} of {len(findings)} findings")
+
+    for finding in filtered_findings:
         with st.container(border=True):
             st.markdown(
                 f"**{SEVERITY_BADGE[finding.severity]}** — "
@@ -528,8 +589,36 @@ def screen_2_findings_review() -> None:
     st.rerun()
 
 
+def _ai_transparency_panel() -> None:
+    """Show what was and was not sent to the LLM, and why AI is not used in calculations."""
+    with st.expander("🤖 AI Transparency — What Claude was and was not sent"):
+        st.markdown("""
+**What was sent to Claude:**
+- Tab names and structure (not cell values)
+- Formula patterns (not workbook data)
+- Numeric summary of findings and reconciliation
+
+**What was withheld:**
+- Cell values or cached numbers
+- Reference figure amounts or account labels
+- Personally identifying information
+- Account mappings or business context
+
+**Why:**
+Data minimization reduces exposure while allowing Claude to document the audit process.
+See `core/llm_data_policy.py` for the exact rules.
+
+**Important:** AI generates explanatory text only. All calculations are deterministic Python.
+All approval decisions are made by humans. The tool does not validate methodology.
+        """)
+        responsibility_badge("ai_generated")
+
+
 def screen_3_reconciliation() -> None:
     st.header("Screen 3 — Gate 3: Reconciliation and mapping approval")
+
+    _ai_transparency_panel()
+
     context_verdict = st.session_state.context_match_verdict
     if context_verdict == "mismatch":
         st.error(
@@ -571,6 +660,19 @@ def screen_3_reconciliation() -> None:
     defaults = st.session_state.materiality_defaults
     default_pct_percent = defaults["default_pct_threshold"] * 100
     default_absolute = defaults["default_absolute_threshold"]
+
+    # Executive summary cards
+    st.markdown("### Executive Summary")
+    summary_cols = st.columns(5)
+    summary_metric(summary_cols[0], "Formulas examined", len(st.session_state.parsed_file.cells) if st.session_state.parsed_file else 0)
+    summary_metric(summary_cols[1], "Reconstruction coverage", f"{result.completeness if result else 'N/A'}")
+    findings = st.session_state.findings or []
+    blocker_count = sum(1 for f in findings if f.severity == "blocker")
+    summary_metric(summary_cols[2], "Blockers", blocker_count if blocker_count > 0 else "None")
+    summary_metric(summary_cols[3], "Internal verdict", st.session_state.internal_verdict or "Not available")
+    summary_metric(summary_cols[4], "External verdict", st.session_state.external_verdict or "Not available")
+
+    st.markdown("---")
 
     st.subheader("Internal consistency (Excel vs Python)")
     internal_pct_percent, internal_absolute = _threshold_inputs(
@@ -1218,10 +1320,48 @@ def _pdf_error_message(exc: Exception) -> str:
     )
 
 
+def _landing_section() -> None:
+    """Render the product landing section with disclaimer."""
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        st.title("Excel Audit Agent")
+        st.markdown("**Parse, reconcile, and audit actuarial spreadsheets through four mandatory human gates.**")
+    with col2:
+        st.write("")
+        st.write("")
+        if st.button("⟲ Reset", use_container_width=True, help="Start a fresh report"):
+            if st.session_state.get("report_id"):
+                st.warning("⚠️ Reset will clear the current report. Continue?")
+                if st.checkbox("I understand. Clear the report.", key="confirm_reset"):
+                    _init_state()
+                    st.rerun()
+            else:
+                _init_state()
+                st.rerun()
+
+    st.markdown("---")
+
+    # Disclaimer (always visible, not buried)
+    with st.container(border=True):
+        st.warning(
+            "⚠️ **This tool does not validate actuarial methodology or assumptions.** "
+            "It reconstructs and reconciles stated calculations, surfaces anomalies, and "
+            "routes findings through human review. Only a qualified actuary can certify "
+            "the underlying model. All findings and verdicts require human judgment."
+        )
+
+    st.markdown("---")
+
+
 def main() -> None:
     st.set_page_config(page_title="Excel Audit Agent", layout="wide")
     _load_environment()
     _init_state()
+
+    # Always show landing and progress
+    _landing_section()
+    progress_indicator()
+
     screens = {
         1: screen_1_upload,
         2: screen_2_findings_review,

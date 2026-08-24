@@ -269,4 +269,5 @@ Running note, per the Diligence rules. Update it when you change a file.
 | [tests/test_deployment.py](tests/test_deployment.py) | AI-written | Step 13 image, secret, mounted-path, README-order, and limitation regressions, 2026-08-11 |
 | [tests/test_app.py](tests/test_app.py) | AI-written | Step 11 per-screen shell, export guard, vocabulary, and retry-message coverage, 2026-08-11 |
 | [tests/test_ui_inputs.py](tests/test_ui_inputs.py) | AI-written | Step 11 clean, duplicate, missing-column, and malformed reference-input coverage, 2026-08-11 |
+| `outputs/ai2_2026_demo_pack_20260824/` | AI-written | Three synthetic demonstration workbooks, two matching reference-figure CSVs, and a case guide covering the clean, spreadsheet-control-failure, and accounting-reconciliation-failure journeys, 2026-08-24 |
 | AGENTS.md | AI-written | This file, 2026-08-10 |
