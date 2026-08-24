@@ -397,9 +397,8 @@ The current release (v1.0.0) ships the five-gate pipeline, local-first deploymen
 ## Contact and Attribution
 
 **Author:** Isaac Shukla  
-**Email:** apoorvaranjan@gmail.com  
 
-This tool was built with assistance from Claude (Anthropic). See [CLAUDE.md](CLAUDE.md) for the operating rules and build history.
+This tool was built with assistance from Claude Code (Anthropic). See [CLAUDE.md](CLAUDE.md) for the operating rules and build history.
 
 ---
 
