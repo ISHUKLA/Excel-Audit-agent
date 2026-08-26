@@ -422,5 +422,3 @@ This tool was built with assistance from Claude Code (Anthropic). See [CLAUDE.md
 **Architecture diagram:** Included as Mermaid, renders on GitHub.
 
 ---
-
-Everything else in the README is traceable to code. Shall I create the screenshot/GIF TODO placeholder image, or will you provide that separately?
