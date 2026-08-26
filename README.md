@@ -402,23 +402,3 @@ The current release (v1.0.0) ships the five-gate pipeline, local-first deploymen
 This tool was built with assistance from Claude Code (Anthropic). See [CLAUDE.md](CLAUDE.md) for the operating rules and build history.
 
 ---
-
-## Summary of TODOs and Gaps
-
-**Cannot verify without your input:**
-1. **Screenshot/GIF:** Current README references none. Expecting path: `docs/screenshot.png` or `docs/demo.gif`. Once available, add a markdown image reference in section 3.
-
-**Verified as absent, noted in README:**
-2. **Production benchmark:** No real workbooks tested. Documented as "Synthetic only" in section 12.
-3. **Licence file:** Referenced but not checked. Verify [`LICENCE`](LICENCE) exists and is readable.
-
-**All commands tested and working:**
-- `pip install -r requirements.txt` ✓
-- `streamlit run app.py` ✓
-- `pytest tests/` ✓ (384 tests)
-- Docker build and run ✓
-- CI badge points to live workflow ✓
-
-**Architecture diagram:** Included as Mermaid, renders on GitHub.
-
----
