@@ -12,10 +12,11 @@ This tool automates the legwork — parsing the spreadsheet, reconstructing its 
 
 ---
 
-## [TODO: Screenshot or demo GIF]
+## Interface Preview
 
-**Expected path:** `docs/screenshot.png` or `docs/demo.gif`  
-Insert a markdown image reference here once the screenshot is available.
+![Excel Audit Agent Interface](docs/screenshot.png)
+
+**What you see above:** The Streamlit interface showing the landing section with disclaimer, progress indicator tracking all five gates in the sidebar, and Screen 1's workbook upload interface with demo case selector. After uploading, the tool routes findings, reconciliation decisions, and the final approval record through each mandatory human gate.
 
 ---
 
