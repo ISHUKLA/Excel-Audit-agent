@@ -16,7 +16,13 @@ from dotenv import load_dotenv
 
 from agents.orchestrator import Orchestrator, PipelineStateError
 from core.gates import GateBlockedError
-from core.models import FileContext, MappingReviewDecision, ParsedFile, ReconciliationResult
+from core.models import (
+    AI_DOCUMENTATION_STATUS_LABELS,
+    FileContext,
+    MappingReviewDecision,
+    ParsedFile,
+    ReconciliationResult,
+)
 from core.state_store import ChainIntegrityError
 from core.workbook_identity import WorkbookIdentityError, sha256_bytes
 from core.ui_inputs import (
@@ -438,6 +444,11 @@ def screen_1_upload() -> None:
     st.session_state.pdf_bytes = None
     st.session_state.pdf_generation_error = None
     st.session_state.report_preparation_error = None
+    # The AI documentation choice is per-report, not a session default — clear
+    # any prior report's widget state so nothing carries over pre-selected.
+    for key in ("gate3_ai_documentation_choice", "gate3_ai_documentation_ack",
+                "retry_ai_documentation_choice", "retry_ai_documentation_ack"):
+        st.session_state.pop(key, None)
     st.session_state.screen = 2
     st.rerun()
 
@@ -607,35 +618,77 @@ def screen_2_findings_review() -> None:
     st.rerun()
 
 
-def _ai_transparency_panel() -> None:
-    """Show what was and was not sent to the LLM, and why AI is not used in calculations."""
-    with st.expander("🤖 AI Transparency — What Claude was and was not sent"):
-        st.markdown("""
-**What was sent to Claude:**
-- Tab names and structure (not cell values)
-- Formula patterns (not workbook data)
-- Numeric summary of findings and reconciliation
+_AI_DISCLOSURE_MARKDOWN = """
+**If you choose to use optional Claude documentation, the following is sent to Anthropic** for
+each cell included in a tab's payload:
 
-**What was withheld:**
-- Cell values or cached numbers
-- Reference figure amounts or account labels
-- Personally identifying information
-- Account mappings or business context
+- Tab names
+- Cell references for included cells
+- Exact formula text, **including any embedded string literals**
+- Cached numeric cell values
+- Short text cell values below the current 40-character threshold
+- The cell's data type and stale-state indicator
+- In-tab named-range names
+- The designated authoritative-output cell references
+- Your professional role category, through role-specific prompt guidance
 
-**Why:**
-Data minimization reduces exposure while allowing Claude to document the audit process.
-See `core/llm_data_policy.py` for the exact rules.
+**Short text and formula literals may contain personal, client, account, or commercially
+sensitive information.** The rule that withholds long free text and external-link formulas is a
+length/pattern heuristic — it is not a PII detector and not a certified privacy control.
 
-**Important:** AI generates explanatory text only. All calculations are deterministic Python.
-All approval decisions are made by humans. The tool does not validate methodology.
-        """)
-        responsibility_badge("ai_generated")
+**The following are never sent through this documentation payload:**
+
+- The complete workbook file bytes
+- Reference-figure amounts, reference account numbers, or reference account labels
+- Accounting mappings
+- Materiality thresholds
+- Reviewer name, entity, reporting period, currency, or accounting basis
+- Long non-formula text (40 characters or more)
+- Formulas recognised as external-workbook links, or their paths
+
+All calculations, findings, reconciliation results, and verdicts are deterministic Python and are
+identical whether or not you use this optional step. See `core/llm_data_policy.py` for the exact
+filtering rules.
+"""
+
+_AI_USE_LABELS = {
+    "use": "Use optional Claude documentation",
+    "decline": "Continue without AI documentation",
+}
+
+
+def _ai_choice_ui(key_prefix: str) -> tuple[Optional[bool], bool]:
+    """Render the disclosure and the explicit, unpreselected use/decline choice.
+
+    Returns (use_ai, acknowledged). ``use_ai`` is None until the reviewer picks
+    one of the two options — nothing here can be preselected. Rendering this
+    function calls no Anthropic client; only the caller's own submit button,
+    read on a later rerun, can act on the returned choice.
+    """
+    st.subheader("Optional AI documentation")
+    st.markdown(_AI_DISCLOSURE_MARKDOWN)
+    choice = st.radio(
+        "Choose how to proceed with tab documentation for this report",
+        options=["use", "decline"],
+        index=None,
+        format_func=lambda value: _AI_USE_LABELS[value],
+        key=f"{key_prefix}_choice",
+    )
+    acknowledged = False
+    if choice == "use":
+        acknowledged = st.checkbox(
+            "I understand the data categories described above will be transmitted to "
+            "Anthropic. I confirm that this workbook is synthetic or that I am authorised "
+            "to transmit this content for AI-generated documentation.",
+            value=False,
+            key=f"{key_prefix}_ack",
+        )
+    responsibility_badge("ai_generated")
+    return (None if choice is None else choice == "use"), acknowledged
 
 
 def screen_3_reconciliation() -> None:
     st.header("Screen 3 — Gate 3: Reconciliation and mapping approval")
-
-    _ai_transparency_panel()
 
     context_verdict = st.session_state.context_match_verdict
     if context_verdict == "mismatch":
@@ -654,12 +707,21 @@ def screen_3_reconciliation() -> None:
         )
     if st.session_state.report_preparation_error:
         st.error(st.session_state.report_preparation_error)
-        if st.button("Retry report preparation", type="primary"):
+        st.caption(
+            "If the earlier attempt failed while using Claude documentation, you may switch "
+            "to 'Continue without AI documentation' below and complete the report without a "
+            "second external call."
+        )
+        retry_use_ai, retry_acknowledged = _ai_choice_ui("retry_ai_documentation")
+        retry_ready = retry_use_ai is not None and (retry_use_ai is False or retry_acknowledged)
+        if st.button("Retry report preparation", type="primary", disabled=not retry_ready):
             try:
                 with st.spinner("Retrying documentation and report preparation…"):
                     report = _orchestrator().prepare_report(
                         st.session_state.report_id,
                         actor=st.session_state.reviewer_name,
+                        use_ai_documentation=bool(retry_use_ai),
+                        ai_transmission_acknowledged=retry_acknowledged,
                     )
             except Exception as exc:  # noqa: BLE001 - provider failures stay retryable
                 st.session_state.report_preparation_error = _preparation_error_message(exc)
@@ -828,12 +890,24 @@ def screen_3_reconciliation() -> None:
             key="acknowledge_incomplete",
         )
 
+    st.markdown("---")
+    use_ai_documentation, ai_transmission_acknowledged = _ai_choice_ui("gate3_ai_documentation")
+    ai_choice_missing = use_ai_documentation is None
+    if ai_choice_missing:
+        st.warning("Choose whether to use optional Claude documentation before proceeding.")
+    ai_acknowledgement_missing = (
+        use_ai_documentation is True
+        and not ai_transmission_acknowledged
+    )
+
     disabled = (
         has_blocker
         or bool(unreviewed)
         or internal_reason_missing
         or external_reason_missing
         or (is_incomplete and not acknowledge_incomplete)
+        or ai_choice_missing
+        or ai_acknowledgement_missing
     )
     if not st.button("Confirm reconciliation", disabled=disabled, type="primary"):
         return
@@ -852,6 +926,8 @@ def screen_3_reconciliation() -> None:
                     internal_threshold_deviation_reason=internal_reason or None,
                     external_threshold_deviation_reason=external_reason or None,
                     actor=st.session_state.reviewer_name,
+                    use_ai_documentation=bool(use_ai_documentation),
+                    ai_transmission_acknowledged=ai_transmission_acknowledged,
                     acknowledge_incomplete=acknowledge_incomplete,
                 )
             )
@@ -914,6 +990,7 @@ def screen_4_approval_record() -> None:
     )
 
     st.subheader("Data sent to third-party AI service")
+    st.caption(_ai_status_label(report.ai_documentation_status))
     if report.llm_data_manifest:
         st.dataframe(_manifest_frame(report), hide_index=True, width="stretch")
     else:
@@ -1005,6 +1082,7 @@ def screen_5_report() -> None:
         )
         _verdict_banner(external, "Accounts reconciliation (CFO)")
 
+    st.caption(_ai_status_label(report.ai_documentation_status))
     st.subheader("Traceability index (preview)")
     if report.traceability_index:
         st.dataframe(_traceability_frame(report), hide_index=True, width="stretch")
@@ -1271,6 +1349,10 @@ def _render_bidirectional_gaps(result: ReconciliationResult) -> None:
                 st.write(f"- {item}")
         else:
             st.write("None — every designated output was mapped")
+
+
+def _ai_status_label(status: str) -> str:
+    return AI_DOCUMENTATION_STATUS_LABELS.get(status, status)
 
 
 def _manifest_frame(report) -> pd.DataFrame:

@@ -366,6 +366,53 @@ def test_report_language_uses_only_bounded_approval_and_integrity_terms():
     assert "tamper-evident" in html
 
 
+# --------------------------------------------------------------------------
+# Work Package 1, Phase E — AI documentation status shown accurately
+# --------------------------------------------------------------------------
+
+
+def test_declined_report_states_no_data_was_transmitted():
+    """Item: the PDF must not imply a call was attempted when it was declined."""
+    report = _report(
+        ai_documentation_status="declined",
+        documentation=[],
+        llm_data_manifest=[],
+    )
+
+    html = render_report_html(report, _audit_rows())
+
+    assert "AI documentation declined" in html
+    assert "No data was transmitted to Anthropic for this report" in html
+    assert "declined the optional Claude documentation step" in html
+
+
+def test_generated_report_discloses_every_transmitted_category():
+    """Item 20: the PDF disclosure enumerates the actual transmitted categories,
+    not the pre-Phase-E claim that cell values were withheld."""
+    html = render_report_html(_report(ai_documentation_status="generated"), _audit_rows())
+
+    for category in (
+        "cached numeric cell values",
+        "short text cell values below the current 40-character threshold",
+        "exact formula text, including any embedded string literals",
+        "professional role category",
+        "not a PII detector",
+    ):
+        assert category in html
+
+    assert "reference-figure amounts" in html
+    assert "materiality thresholds" in html
+
+
+def test_validation_failed_status_is_visible_and_distinct_from_declined():
+    html = render_report_html(
+        _report(ai_documentation_status="validation_failed"), _audit_rows()
+    )
+
+    assert "AI documentation validation failed" in html
+    assert "manual documentation review is required" in html
+
+
 def test_approved_and_proposed_mappings_are_separate_and_mismatch_is_prominent():
     html = render_report_html(_report(), _audit_rows())
     approved_start = html.index('id="approved-mappings-table"')

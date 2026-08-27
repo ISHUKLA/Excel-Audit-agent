@@ -734,6 +734,81 @@ def test_audit_report_uses_approval_record_vocabulary_only():
     assert {"report_approval_name", "report_approval_at", "report_approval_role"} <= fields
 
 
+# --------------------------------------------------------------------------
+# Work Package 1, Phase E — explicit per-report AI documentation choice
+# --------------------------------------------------------------------------
+
+
+def test_llm_use_decision_is_an_accepted_event_type():
+    assert AuditLogRow(
+        row_id=1,
+        report_id="RPT-001",
+        event_type="llm_use_decision",
+        payload_hash="b" * 64,
+        prev_row_hash=ZERO_HASH,
+        row_hash="c" * 64,
+        timestamp=NOW,
+    ).event_type == "llm_use_decision"
+
+
+def test_event_type_list_did_not_become_open_after_the_llm_use_decision_widening():
+    for accepted in (
+        "gate_decision",
+        "state_snapshot",
+        "llm_call",
+        "llm_use_decision",
+        "report_approved",
+        "mapping_decision",
+        "chain_verification",
+        "workbook_identity_mismatch",
+    ):
+        assert AuditLogRow(
+            row_id=1,
+            report_id="RPT-001",
+            event_type=accepted,
+            payload_hash="b" * 64,
+            prev_row_hash=ZERO_HASH,
+            row_hash="c" * 64,
+            timestamp=NOW,
+        ).event_type == accepted
+
+    with pytest.raises(ValidationError):
+        AuditLogRow(
+            row_id=1,
+            report_id="RPT-001",
+            event_type="llm_use_confirmed",
+            payload_hash="b" * 64,
+            prev_row_hash=ZERO_HASH,
+            row_hash="c" * 64,
+            timestamp=NOW,
+        )
+
+
+def test_ai_documentation_status_defaults_to_not_recorded_for_backward_compatibility():
+    """Item 25: a report/snapshot assembled before this control existed must
+    remain readable. Omitting the field must not raise, and must not silently
+    read as though AI were used."""
+    report = an_audit_report()
+    assert report.ai_documentation_status == "not_recorded"
+
+
+def test_ai_documentation_status_accepts_every_defined_outcome():
+    for status in ("generated", "declined", "validation_failed", "unavailable", "not_recorded"):
+        assert an_audit_report(ai_documentation_status=status).ai_documentation_status == status
+
+    with pytest.raises(ValidationError):
+        an_audit_report(ai_documentation_status="ai_validated")
+
+
+def test_declined_report_can_carry_empty_documentation_and_manifest():
+    """The no-AI completion path assembles a report with no fabricated content."""
+    report = an_audit_report(
+        ai_documentation_status="declined", documentation=[], llm_data_manifest=[]
+    )
+    assert report.documentation == []
+    assert report.llm_data_manifest == []
+
+
 def test_the_headline_verdict_is_not_called_validation():
     fields = set(AuditReport.model_fields)
     assert "translation_and_reconciliation_verdict" in fields

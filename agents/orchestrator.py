@@ -18,7 +18,7 @@ import anthropic
 from pydantic import BaseModel
 
 from agents.anomaly_detector import detect_anomalies
-from agents.documentation import document_tabs
+from agents.documentation import FALLBACK_METHOD_SUMMARY, document_tabs
 from agents.parser import parse_workbook
 from agents.reconciliation import calculate_delta, run_reconciliation
 from core.accounting import evaluate_control_total, signed_reference_amount
@@ -71,6 +71,12 @@ _PENDING_APPROVAL_DISCLOSURE = (
     "The named approval record has not yet been completed. No independent review "
     "is implied."
 )
+
+# Identifies which version of the AI transmission disclosure a reviewer was
+# shown when they made the use/decline choice. Bump this whenever the
+# disclosure text changes so historic audit rows stay tied to what a reviewer
+# actually saw rather than the current wording.
+AI_DISCLOSURE_VERSION = "ai-disclosure-2026-08-27-v1"
 
 
 class PipelineStateError(RuntimeError):
@@ -366,9 +372,18 @@ class Orchestrator:
         external_threshold_deviation_reason: Optional[str],
         *,
         actor: str,
+        use_ai_documentation: bool,
+        ai_transmission_acknowledged: bool = False,
         acknowledge_incomplete: bool = False,
     ) -> tuple[str, str, ReconciliationResult]:
-        """Apply mapping dispositions, finalize both passes, and assemble a report."""
+        """Apply mapping dispositions, finalize both passes, and assemble a report.
+
+        ``use_ai_documentation`` is required (no default) so this cannot be
+        called without the reviewer having made an explicit per-report choice
+        about whether Claude documentation runs. It is only actioned inside
+        ``prepare_report``, after Gate 3 itself is already durable — so a
+        failed or declined AI step never replays the Gate 3 decision.
+        """
         _require_actor(actor)
         state = self._state_for(report_id)
         _require_stage(state, {"post_reconciliation"})
@@ -414,20 +429,49 @@ class Orchestrator:
         state["stage"] = "post_gate3"
         self._snapshot(report_id, "post_gate3", actor)
 
-        self.prepare_report(report_id, actor=actor)
+        self.prepare_report(
+            report_id,
+            actor=actor,
+            use_ai_documentation=use_ai_documentation,
+            ai_transmission_acknowledged=ai_transmission_acknowledged,
+        )
         return internal_verdict, external_verdict, final_result
 
-    def prepare_report(self, report_id: str, *, actor: str) -> AuditReport:
+    def prepare_report(
+        self,
+        report_id: str,
+        *,
+        actor: str,
+        use_ai_documentation: bool,
+        ai_transmission_acknowledged: bool = False,
+    ) -> AuditReport:
         """Continue from a completed Gate 3 after a downstream service failure.
 
         Gate 3 is already evidentiary and must not be replayed merely because
         documentation or traceability preparation failed. Keeping this as a
         separate resumable transition lets the UI retry those downstream steps
-        against the durable post-Gate-3 snapshot.
+        against the durable post-Gate-3 snapshot — including retrying with a
+        different ``use_ai_documentation`` choice after an earlier attempt
+        failed, without a second Gate 3 decision or a replayed Anthropic call.
+
+        ``use_ai_documentation`` has no default: every call must state the
+        reviewer's explicit choice. When True, ``ai_transmission_acknowledged``
+        must also be True — the synthetic/authorised-data confirmation is only
+        meaningful when it was actually shown and checked for THIS attempt.
+
+        The ``llm_use_decision`` audit event is written before any Anthropic
+        client is touched. If writing it fails, the exception propagates and
+        no call is made — the control fails closed, not open.
         """
         _require_actor(actor)
         state = self._state_for(report_id)
         _require_stage(state, {"post_gate3"})
+        if use_ai_documentation and not ai_transmission_acknowledged:
+            raise ValueError(
+                "AI documentation requires the synthetic/authorized-data "
+                "transmission confirmation before any Anthropic call is made"
+            )
+
         final_result = state["reconciliation_result"]
         traceability_index = build_traceability_index(
             parsed_file=state["parsed_file"],
@@ -435,15 +479,40 @@ class Orchestrator:
             findings=state["findings"],
             reference_figures=state["reference_figures"],
         )
-        documentation, manifests = document_tabs(
-            state["parsed_file"],
-            state["file_context"],
-            state["authoritative_outputs"],
-            audit_log=self._audit_log,
+
+        # Recorded before any possible Anthropic call, whichever path is
+        # chosen. Control metadata only — never the workbook payload or the
+        # disclosure text itself.
+        self._audit_log.log_event(
             report_id=report_id,
-            audit_context=state["context"],
-            client=self._documentation_client,
+            event_type="llm_use_decision",
+            payload={
+                "decision": "use" if use_ai_documentation else "decline",
+                "disclosure_version": AI_DISCLOSURE_VERSION,
+            },
+            actor=actor,
+            context=state["context"],
         )
+
+        if use_ai_documentation:
+            documentation, manifests = document_tabs(
+                state["parsed_file"],
+                state["file_context"],
+                state["authoritative_outputs"],
+                audit_log=self._audit_log,
+                report_id=report_id,
+                audit_context=state["context"],
+                client=self._documentation_client,
+            )
+            ai_documentation_status = (
+                "validation_failed"
+                if any(doc.method_summary == FALLBACK_METHOD_SUMMARY for doc in documentation)
+                else "generated"
+            )
+        else:
+            documentation, manifests = [], []
+            ai_documentation_status = "declined"
+
         report = _assemble_report(
             state=state,
             result=final_result,
@@ -452,6 +521,7 @@ class Orchestrator:
             manifests=manifests,
             internal_verdict=state["internal_verdict"],
             external_verdict=state["external_verdict"],
+            ai_documentation_status=ai_documentation_status,
         )
         state["report"] = report
         state["stage"] = "pre_approval_record"
@@ -795,6 +865,7 @@ def _assemble_report(
     manifests: list,
     internal_verdict: str,
     external_verdict: str,
+    ai_documentation_status: str,
 ) -> AuditReport:
     """Assemble the model from finalized upstream outputs; do not recompute them."""
     overall = _translation_and_reconciliation_verdict(
@@ -818,6 +889,7 @@ def _assemble_report(
         traceability_index=traceability_index,
         documentation=documentation,
         llm_data_manifest=manifests,
+        ai_documentation_status=ai_documentation_status,
         translation_and_reconciliation_verdict=overall,
         internal_verdict=internal_verdict,
         external_verdict=external_verdict,

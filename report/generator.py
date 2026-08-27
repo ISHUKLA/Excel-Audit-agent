@@ -8,7 +8,7 @@ import weasyprint
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoescape
 
 from core.accounting import signed_reference_amount
-from core.models import AuditReport
+from core.models import AI_DOCUMENTATION_STATUS_LABELS, AuditReport
 
 _TEMPLATE_DIR = Path(__file__).parent / "templates"
 
@@ -51,6 +51,9 @@ def render_report_html(report: AuditReport, audit_rows: list[dict]) -> str:
         acknowledge_incomplete=acknowledge_incomplete,
         anthropic_retention_url=ANTHROPIC_RETENTION_URL,
         short_workbook_hash=f"{report.workbook_hash[:12]}…",
+        ai_documentation_status_label=AI_DOCUMENTATION_STATUS_LABELS.get(
+            report.ai_documentation_status, report.ai_documentation_status
+        ),
     )
 
 

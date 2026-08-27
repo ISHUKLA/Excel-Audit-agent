@@ -84,13 +84,21 @@ def test_readme_leads_with_local_first_posture_and_plain_limitations():
     lower_readme = readme.lower()
     headings = [line for line in readme.splitlines() if line.startswith("## ")]
 
-    assert headings[0] == "## Deployment posture"
+    assert "## Deployment Posture" in headings
+    assert "## Five-Minute Demonstration" in headings
+    assert headings.index("## Deployment Posture") < headings.index(
+        "## Five-Minute Demonstration"
+    )
     assert "Default and recommended: run locally" in readme
-    assert "hosted deployment is explicitly not recommended" in readme
+    assert (
+        "Hosted deployment is not recommended without additional access control."
+        in readme
+    )
     assert "reachable by anyone with the URL" in readme
     assert "-p 127.0.0.1:8501:8501" in readme
     assert "named approval record" in lower_readme
-    assert "No independent reviewer is enforced" in readme
-    assert "No application-level authentication exists" in readme
+    assert "No independent reviewer enforced" in readme
+    assert "No application-level authentication." in readme
     assert "tamper-evident, not tamper-proof" in readme
-    assert "Data minimization before LLM calls is informal, not certified" in readme
+    assert "Data minimization is informal" in readme
+    assert "not a certified privacy or regulatory control" in readme

@@ -218,6 +218,8 @@ def _submit_gate3(
         internal_threshold_deviation_reason=None,
         external_threshold_deviation_reason=external_reason,
         actor=ACTOR,
+        use_ai_documentation=True,
+        ai_transmission_acknowledged=True,
         acknowledge_incomplete=True,
     )
 
@@ -322,6 +324,8 @@ def test_full_pipeline_mapping_traceability_reporting_and_evidence_integrity(
             internal_threshold_deviation_reason=None,
             external_threshold_deviation_reason=None,
             actor=ACTOR,
+            use_ai_documentation=True,
+            ai_transmission_acknowledged=True,
             acknowledge_incomplete=True,
         )
 

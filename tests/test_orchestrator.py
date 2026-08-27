@@ -348,6 +348,8 @@ def test_full_staged_pipeline_snapshots_every_pause_and_supplies_gate_context(
         internal_threshold_deviation_reason=None,
         external_threshold_deviation_reason=None,
         actor=ACTOR,
+        use_ai_documentation=True,
+        ai_transmission_acknowledged=True,
     )
     report = orchestrator.submit_approval_record(report_id, ACTOR, "actuary")
 
@@ -479,6 +481,8 @@ def test_partial_reconstruction_flows_into_report_as_incomplete(monkeypatch, tmp
         internal_threshold_deviation_reason=None,
         external_threshold_deviation_reason=None,
         actor=ACTOR,
+        use_ai_documentation=True,
+        ai_transmission_acknowledged=True,
         acknowledge_incomplete=True,
     )
 
@@ -514,6 +518,8 @@ def test_omitted_mapping_approval_cannot_produce_external_pass(monkeypatch, tmp_
             internal_threshold_deviation_reason=None,
             external_threshold_deviation_reason=None,
             actor=ACTOR,
+            use_ai_documentation=True,
+            ai_transmission_acknowledged=True,
         )
 
     assert orchestrator._state[report_id]["reconciliation_result"].verdicts_are_final is False
@@ -544,6 +550,8 @@ def test_context_mismatch_forces_external_block_even_when_numbers_match(monkeypa
             internal_threshold_deviation_reason=None,
             external_threshold_deviation_reason=None,
             actor=ACTOR,
+            use_ai_documentation=True,
+            ai_transmission_acknowledged=True,
         )
 
     gate3_rows = []
@@ -578,6 +586,8 @@ def test_gate3_looser_threshold_replaces_preview_before_report_assembly(monkeypa
         internal_threshold_deviation_reason="CFO-approved Q4 materiality",
         external_threshold_deviation_reason=None,
         actor=ACTOR,
+        use_ai_documentation=True,
+        ai_transmission_acknowledged=True,
     )
 
     assert preview.verdicts_are_final is False
@@ -617,6 +627,8 @@ def test_approved_mapping_records_human_and_report_keeps_unapproved_proposals(
         internal_threshold_deviation_reason=None,
         external_threshold_deviation_reason=None,
         actor=ACTOR,
+        use_ai_documentation=True,
+        ai_transmission_acknowledged=True,
         acknowledge_incomplete=True,
     )
 
@@ -653,6 +665,8 @@ def test_rejected_mapping_is_kept_as_evidence_but_excluded_from_the_verdict(
         internal_threshold_deviation_reason=None,
         external_threshold_deviation_reason=None,
         actor=ACTOR,
+        use_ai_documentation=True,
+        ai_transmission_acknowledged=True,
         acknowledge_incomplete=True,
     )
 
@@ -699,6 +713,8 @@ def test_edited_mapping_preserves_the_proposal_and_adds_a_human_direct_mapping(
         internal_threshold_deviation_reason=None,
         external_threshold_deviation_reason=None,
         actor=ACTOR,
+        use_ai_documentation=True,
+        ai_transmission_acknowledged=True,
         acknowledge_incomplete=True,
     )
 
@@ -742,6 +758,8 @@ def test_report_preparation_can_retry_without_replaying_gate_3(monkeypatch, tmp_
             internal_threshold_deviation_reason=None,
             external_threshold_deviation_reason=None,
             actor=ACTOR,
+            use_ai_documentation=True,
+            ai_transmission_acknowledged=True,
         )
 
     assert orchestrator.get_stage(report_id) == "post_gate3"
@@ -752,7 +770,12 @@ def test_report_preparation_can_retry_without_replaying_gate_3(monkeypatch, tmp_
     ]
     assert len(gate3_before) == 1
 
-    report = orchestrator.prepare_report(report_id, actor=ACTOR)
+    report = orchestrator.prepare_report(
+        report_id,
+        actor=ACTOR,
+        use_ai_documentation=True,
+        ai_transmission_acknowledged=True,
+    )
 
     assert report.internal_verdict == "pass"
     assert orchestrator.get_stage(report_id) == "pre_approval_record"
@@ -1136,3 +1159,206 @@ def test_later_events_reuse_the_confirmed_hash(monkeypatch, tmp_path):
         for row in audit_log.get_rows(report_id)
     }
     assert hashes == {CONTEXT_HASH}
+
+
+# --- Work Package 1, Phase E: explicit AI documentation choice --------------
+
+
+def _submit_gate3_with_ai_choice(orchestrator, report_id, preview, *, use_ai, acknowledged=None):
+    return orchestrator.submit_gate3_decisions(
+        report_id,
+        preview,
+        mapping_decisions=[],
+        internal_pct_threshold=DEFAULT_PCT,
+        internal_absolute_threshold=DEFAULT_ABS,
+        external_pct_threshold=DEFAULT_PCT,
+        external_absolute_threshold=DEFAULT_ABS,
+        internal_threshold_deviation_reason=None,
+        external_threshold_deviation_reason=None,
+        actor=ACTOR,
+        use_ai_documentation=use_ai,
+        ai_transmission_acknowledged=use_ai if acknowledged is None else acknowledged,
+    )
+
+
+def test_declining_ai_documentation_makes_no_document_tabs_call(monkeypatch, tmp_path):
+    """Items 5, 6, 10: decline -> zero calls, report reaches Gate 4 eligibility,
+    and the audit trail records the decision but no llm_call event."""
+    orchestrator, audit_log, _ = _orchestrator(tmp_path)
+    _patch_agents(monkeypatch, _result())
+    document_calls = []
+    monkeypatch.setattr(
+        orchestrator_module,
+        "document_tabs",
+        lambda *args, **kwargs: document_calls.append((args, kwargs)),
+    )
+    report_id, preview = _start_preview(orchestrator)
+
+    _submit_gate3_with_ai_choice(orchestrator, report_id, preview, use_ai=False)
+
+    assert document_calls == []
+    report = orchestrator.get_report(report_id)
+    assert report.ai_documentation_status == "declined"
+    assert report.documentation == []
+    assert report.llm_data_manifest == []
+
+    event_types = [row["event_type"] for row in audit_log.get_rows(report_id)]
+    assert "llm_use_decision" in event_types
+    assert "llm_call" not in event_types
+
+
+def test_using_ai_documentation_without_acknowledgment_raises_and_makes_no_call(
+    monkeypatch, tmp_path
+):
+    """Item C/11-adjacent: the confirmation is required only for the AI path,
+    and rejecting it happens before any Anthropic call or decision log entry."""
+    orchestrator, audit_log, _ = _orchestrator(tmp_path)
+    _patch_agents(monkeypatch, _result())
+    document_calls = []
+    monkeypatch.setattr(
+        orchestrator_module,
+        "document_tabs",
+        lambda *args, **kwargs: document_calls.append((args, kwargs)),
+    )
+    report_id, preview = _start_preview(orchestrator)
+
+    with pytest.raises(ValueError, match="synthetic/authorized"):
+        _submit_gate3_with_ai_choice(orchestrator, report_id, preview, use_ai=True, acknowledged=False)
+
+    assert document_calls == []
+    event_types = [row["event_type"] for row in audit_log.get_rows(report_id)]
+    assert "llm_use_decision" not in event_types
+
+
+def test_declining_requires_no_transmission_acknowledgment(monkeypatch, tmp_path):
+    """The confirmation checkbox is only required for the AI path."""
+    orchestrator, _, _ = _orchestrator(tmp_path)
+    _patch_agents(monkeypatch, _result())
+    report_id, preview = _start_preview(orchestrator)
+
+    internal, external, final_result = _submit_gate3_with_ai_choice(
+        orchestrator, report_id, preview, use_ai=False, acknowledged=False
+    )
+    assert final_result.verdicts_are_final is True
+
+
+def test_a_failed_decision_log_prevents_any_anthropic_call(monkeypatch, tmp_path):
+    """Item 11: if llm_use_decision cannot be recorded, no call is made."""
+    orchestrator, audit_log, _ = _orchestrator(tmp_path)
+    _patch_agents(monkeypatch, _result())
+    document_calls = []
+    monkeypatch.setattr(
+        orchestrator_module,
+        "document_tabs",
+        lambda *args, **kwargs: document_calls.append((args, kwargs)),
+    )
+    report_id, preview = _start_preview(orchestrator)
+
+    original_log_event = audit_log.log_event
+
+    def failing_log_event(*args, **kwargs):
+        event_type = kwargs.get("event_type", args[1] if len(args) > 1 else None)
+        if event_type == "llm_use_decision":
+            raise RuntimeError("simulated audit-log write failure")
+        return original_log_event(*args, **kwargs)
+
+    monkeypatch.setattr(audit_log, "log_event", failing_log_event)
+
+    with pytest.raises(RuntimeError, match="simulated audit-log write failure"):
+        _submit_gate3_with_ai_choice(orchestrator, report_id, preview, use_ai=True)
+
+    assert document_calls == []
+
+
+def test_deterministic_verdicts_are_identical_whether_or_not_ai_documentation_is_used(
+    monkeypatch, tmp_path
+):
+    """Item 8: the use/decline choice never changes a deterministic verdict."""
+
+    def _run_once(use_ai: bool, subdir: str):
+        report_dir = tmp_path / subdir
+        report_dir.mkdir()
+        orchestrator, _, _ = _orchestrator(report_dir)
+        _patch_agents(monkeypatch, _result())
+        report_id, preview = _start_preview(orchestrator)
+        return _submit_gate3_with_ai_choice(orchestrator, report_id, preview, use_ai=use_ai)
+
+    internal_with_ai, external_with_ai, result_with_ai = _run_once(True, "with_ai")
+    internal_without_ai, external_without_ai, result_without_ai = _run_once(False, "without_ai")
+
+    assert (internal_with_ai, external_with_ai) == (internal_without_ai, external_without_ai)
+    assert [line.verdict for line in result_with_ai.lines] == [
+        line.verdict for line in result_without_ai.lines
+    ]
+
+
+def test_declined_ai_documentation_still_reaches_gate_4_and_approval(monkeypatch, tmp_path):
+    """Items 6, 7: the no-AI path completes through Gate 4 and is PDF-eligible."""
+    orchestrator, _, _ = _orchestrator(tmp_path)
+    _patch_agents(monkeypatch, _result())
+    report_id, preview = _start_preview(orchestrator)
+
+    _submit_gate3_with_ai_choice(orchestrator, report_id, preview, use_ai=False)
+    report = orchestrator.submit_approval_record(report_id, ACTOR, "actuary")
+
+    assert report.report_approval_name == ACTOR
+    assert report.ai_documentation_status == "declined"
+
+
+def test_llm_use_decision_precedes_llm_call_when_ai_is_used(monkeypatch, tmp_path):
+    """Item 9: the decision event is written before agents/documentation.py's
+    own llm_call event, using the REAL document_tabs (not the orchestrator-level
+    fake), so the ordering guarantee is exercised end to end."""
+    from types import SimpleNamespace
+
+    from agents.documentation import document_tabs as real_document_tabs
+
+    valid_json = json.dumps(
+        {
+            "method_summary": "Carries the provision output.",
+            "assumptions": [],
+            "data_sources": [],
+            "anomalies_noted": [],
+            "role_notes": "",
+        }
+    )
+
+    class _FakeMessagesAPI:
+        def create(self, **kwargs):
+            return SimpleNamespace(content=[SimpleNamespace(type="text", text=valid_json)])
+
+    class _FakeAnthropicClient:
+        def __init__(self):
+            self.messages = _FakeMessagesAPI()
+
+    audit_log = AuditLog(str(tmp_path / "audit.db"))
+    state_store = StateStore(audit_log.db_path, audit_log=audit_log)
+    orchestrator = Orchestrator(
+        audit_log=audit_log,
+        state_store=state_store,
+        documentation_client=_FakeAnthropicClient(),
+        code_version="test-code-version",
+    )
+    _patch_agents(monkeypatch, _result())
+    monkeypatch.setattr(orchestrator_module, "document_tabs", real_document_tabs)
+    monkeypatch.setattr("agents.documentation.time.sleep", lambda _: None)
+
+    report_id, preview = _start_preview(orchestrator)
+    _submit_gate3_with_ai_choice(orchestrator, report_id, preview, use_ai=True)
+
+    event_types = [row["event_type"] for row in audit_log.get_rows(report_id)]
+    assert event_types.index("llm_use_decision") < event_types.index("llm_call")
+
+    report = orchestrator.get_report(report_id)
+    assert report.ai_documentation_status == "generated"
+
+
+def test_prepare_report_has_no_default_for_use_ai_documentation(monkeypatch, tmp_path):
+    """Every call site must state the reviewer's explicit choice; there is no
+    silent default that could let a call happen unconsidered."""
+    orchestrator, _, _ = _orchestrator(tmp_path)
+    _patch_agents(monkeypatch, _result())
+    report_id, _ = _start_preview(orchestrator)
+
+    with pytest.raises(TypeError):
+        orchestrator.prepare_report(report_id, actor=ACTOR)
