@@ -191,11 +191,38 @@ def _build_cell_record(
 ) -> CellRecord:
     data_type, is_error, error_type = _classify(cached_value, formula, key, warnings)
 
-    # Stale means the cached value cannot be trusted as current — either it was
-    # never computed, or the workbook doesn't recompute automatically.
-    is_stale = formula is not None and (cached_value is None or calc_mode == "manual")
-    if formula is not None and cached_value is None:
-        warnings.append(f"{key}: formula has no cached value (never recalculated)")
+    # Freshness is a literal cell's non-question: nothing about it is
+    # recomputed, so calc mode cannot make it untrustworthy.
+    calculation_freshness = "fresh"
+    if formula is not None:
+        # Priority order matters for the warning text, not for the resulting
+        # classification of any one cause over another: a missing cached value
+        # means this cell was never computed at all, which is a stronger claim
+        # than "the workbook says don't trust cached values" (manual), which is
+        # itself a stronger claim than "we could not determine the workbook's
+        # calc mode" (unknown). Each cause gets its own distinct warning so a
+        # reviewer can tell which situation they are actually looking at.
+        if cached_value is None:
+            calculation_freshness = "stale"
+            warnings.append(f"{key}: formula has no cached value (never recalculated)")
+        elif calc_mode == "manual":
+            calculation_freshness = "stale"
+            warnings.append(
+                f"{key}: workbook calculation mode is manual — the cached value may "
+                "not reflect the current formula"
+            )
+        elif calc_mode == "unknown":
+            calculation_freshness = "unknown"
+            warnings.append(
+                f"{key}: workbook calculation mode could not be determined — the "
+                "cached value's freshness is unknown"
+            )
+
+    # is_stale is kept for every existing caller (the LLM data-minimization
+    # manifest, the report's stale-cell list) with its meaning widened to match
+    # calculation_freshness: "cannot be trusted as current" now also covers
+    # "we don't know", not only "we know it's out of date".
+    is_stale = calculation_freshness != "fresh"
 
     return CellRecord(
         cell_ref=key,
@@ -206,6 +233,7 @@ def _build_cell_record(
         is_error=is_error,
         error_type=error_type,
         is_stale=is_stale,
+        calculation_freshness=calculation_freshness,
     )
 
 

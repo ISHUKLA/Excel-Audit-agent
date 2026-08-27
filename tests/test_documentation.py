@@ -58,6 +58,7 @@ def _cell(
         is_error=data_type == "error",
         error_type=value if data_type == "error" else None,
         is_stale=formula is not None and value is None,
+        calculation_freshness="stale" if (formula is not None and value is None) else "fresh",
     )
 
 

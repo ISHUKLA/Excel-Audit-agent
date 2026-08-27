@@ -55,6 +55,7 @@ def _parsed_file() -> ParsedFile:
                 number_format="#,#00.00",
                 is_error=False,
                 is_stale=False,
+                calculation_freshness="fresh",
             ),
             "Reserves!B2": CellRecord(
                 cell_ref="Reserves!B2",
@@ -64,6 +65,7 @@ def _parsed_file() -> ParsedFile:
                 number_format="#,#00.00",
                 is_error=False,
                 is_stale=False,
+                calculation_freshness="fresh",
             ),
         },
         named_ranges={},
@@ -156,6 +158,7 @@ def _line(**overrides) -> ReconciliationLine:
         unsupported_elements=[],
         derivation=_derivation(),
         mapping_id=None,
+        calculation_evidence_status="fresh",
     )
     return ReconciliationLine(**{**values, **overrides})
 
@@ -187,6 +190,7 @@ def _report(**overrides) -> AuditReport:
         delta_pct=5.0 / 1255.0,
         verdict="warn",
         mapping_id="MAP-001",
+        calculation_evidence_status="fresh",
     )
     proposed_external = _line(
         check_type="python_vs_accounts",
@@ -197,6 +201,7 @@ def _report(**overrides) -> AuditReport:
         delta_pct=0.01,
         verdict="incomplete",
         mapping_id="MAP-002",
+        calculation_evidence_status="fresh",
     )
     defaults = dict(
         file_context=_file_context(),
@@ -484,3 +489,79 @@ def test_pdf_generation_requires_a_complete_named_approval_record():
 
     with pytest.raises(ValueError, match="named approval record"):
         generate_report_pdf(report, _audit_rows())
+
+
+# --------------------------------------------------------------------------
+# Work Package 2 — stale calculation evidence must fail closed
+# --------------------------------------------------------------------------
+
+
+def test_pdf_shows_the_stale_warning_and_affected_cell_references():
+    stale_line = _line(
+        label="Technical provisions",
+        delta=0.0,
+        delta_pct=0.0,
+        verdict="incomplete",
+        calculation_evidence_status="stale",
+        stale_cell_refs=["Reserves!B2", "Assumptions!B7"],
+    )
+    report = _report(
+        reconciliation=[stale_line],
+        translation_and_reconciliation_verdict="incomplete",
+        internal_verdict="incomplete",
+        external_verdict="not_performed",
+        reference_figures=None,
+        mappings=[],
+        unmatched_reference_items=[],
+        unmapped_python_outputs=[],
+    )
+
+    html = render_report_html(report, _audit_rows())
+
+    # The affected output and its specific stale cell references are visible.
+    assert "Technical provisions" in html
+    assert "Reserves!B2" in html
+    assert "Assumptions!B7" in html
+    # Freshness is labelled distinctly from formula coverage.
+    assert "Calculation evidence freshness" in html
+    assert "STALE" in html
+    # The zero delta does not read as a pass anywhere the verdict is shown.
+    assert 'status-incomplete">incomplete' in html or "status status-incomplete" in html
+
+
+def test_pdf_incomplete_percentage_is_not_misreported_as_zero_for_a_stale_line():
+    """A 100%-formula-coverage, stale-evidence line must not make the report
+    claim 0% is incomplete — that figure is coverage-only and must stay
+    silent (None) rather than understate a genuinely incomplete result."""
+    stale_line = _line(
+        verdict="incomplete",
+        completeness="complete",
+        reconstruction_coverage_pct=100.0,
+        calculation_evidence_status="stale",
+        stale_cell_refs=["Reserves!B2"],
+    )
+    report = _report(
+        reconciliation=[stale_line],
+        translation_and_reconciliation_verdict="incomplete",
+        internal_verdict="incomplete",
+        external_verdict="not_performed",
+        reference_figures=None,
+        mappings=[],
+        unmatched_reference_items=[],
+        unmapped_python_outputs=[],
+    )
+
+    html = render_report_html(report, _audit_rows())
+
+    assert "0.0% of this calculation could not be reconstructed" not in html
+    assert "incomplete because their calculation evidence is stale" in html
+
+
+def test_pdf_not_flagged_stale_wording_does_not_claim_verified_freshness():
+    """"Not flagged stale" appears; "verified fresh"/"freshly recalculated"
+    appear only inside the sentence explicitly disclaiming them, never as a
+    standalone claim about an actual cell."""
+    html = render_report_html(_report(), _audit_rows()).lower()
+    assert "not flagged stale" in html
+    assert "not the same claim as \"verified fresh\"" in html
+    assert "not prove" in html

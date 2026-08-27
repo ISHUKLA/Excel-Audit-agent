@@ -1,0 +1,126 @@
+{
+  "generated_at": "2026-08-27T20:10:25Z",
+  "purpose": "One-time, build-time recalculation of synthetic test fixtures and competition demonstration workbooks, so their workbook calc mode can be genuinely and accurately declared 'automatic' (with fullCalcOnLoad set) rather than left as 'unknown'. This is a fixture-generation activity performed on repository-controlled synthetic files; it is not part of the running application and is not invoked by the automated test suite.",
+  "engine_family": "libreoffice",
+  "engine_version": "26.2.5.2 (build cd7284b4cbbfeb507e630c1aac019f4157393acb)",
+  "executable_path": "/usr/local/bin/soffice",
+  "operating_system": "Darwin 25.6.0 (macOS)",
+  "architecture": "x86_64",
+  "all_files_synthetic": true,
+  "workbooks": [
+    {
+      "relative_path": "tests/fixtures/clean.xlsx",
+      "pre_recalculation_sha256": "ba82c9aa8ea6e5bb85359232d7344c7659d136e11a6a98edf101ee575e1f4531",
+      "post_recalculation_sha256": "68e30a758af745d21353582d84c32918ec2602842a2d7dccfed492b240fb2f13",
+      "formula_manifest_sha256_before": "f3029c2ff9e3797b17629901b6030bfb0e96f56ca1c80d8ecf991d7a61affecb",
+      "formula_manifest_sha256_after": "f3029c2ff9e3797b17629901b6030bfb0e96f56ca1c80d8ecf991d7a61affecb",
+      "formula_manifest_note": "formula text unchanged; formula-manifest hash identical.",
+      "calculation_mode_after": "automatic",
+      "formula_count_before": 3,
+      "formula_count_after": 3,
+      "tab_names_unchanged": true,
+      "named_ranges_unchanged": true,
+      "has_vba_unchanged": true,
+      "external_links_unchanged": true,
+      "cached_numeric_values_unchanged": true,
+      "verification_result": "pass"
+    },
+    {
+      "relative_path": "tests/fixtures/reserves.xlsx",
+      "pre_recalculation_sha256": "8e6ee33c1e5b2aa10a1fd11babd364292ae46a4b92518819bff3450ee182fa4e",
+      "post_recalculation_sha256": "bce9e28c9fee33ef2adb84396181679007319150c1fc627abfb4cf20ca5c3f0e",
+      "formula_manifest_sha256_before": "4cb2140a0a1cf3c16512a3a748e452d200ea79886279606f251ac784a830d7a6",
+      "formula_manifest_sha256_after": "4cb2140a0a1cf3c16512a3a748e452d200ea79886279606f251ac784a830d7a6",
+      "formula_manifest_note": "formula text unchanged; formula-manifest hash identical.",
+      "calculation_mode_after": "automatic",
+      "formula_count_before": 4,
+      "formula_count_after": 4,
+      "tab_names_unchanged": true,
+      "named_ranges_unchanged": true,
+      "has_vba_unchanged": true,
+      "external_links_unchanged": true,
+      "cached_numeric_values_unchanged": true,
+      "verification_result": "pass"
+    },
+    {
+      "relative_path": "demo/workbooks/case_1_clean_reserve_calculation.xlsx",
+      "pre_recalculation_sha256": "0f105f0a0a6d7e6d00e792e8c8802e02d04a9e023c43b34e33a2afebe19a5cff",
+      "post_recalculation_sha256": "4bf75d31657b4419afa33f271ab8c316d9613895d4b29d53d02ae5f3f82e7104",
+      "formula_manifest_sha256_before": "ff0ecc9db213bd185cb3cdf61d9a7f1bbc8bd7ea97cabd3a219bb6ceb164ec25",
+      "formula_manifest_sha256_after": "6f5ecc53a3c485150283f2beebf9a0d4538c8cd3bb9a340980b2b9eb9fdf47ef",
+      "formula_manifest_note": "formula-manifest hash changed only due to LibreOffice's writer normalizing cross-sheet references (dropping unnecessary single quotes around a sheet name with no spaces, e.g. 'Assumptions'!B7 -> Assumptions!B7); no formula target cell, operator, or computed value changed \u2014 every cached numeric value is identical before and after.",
+      "calculation_mode_after": "automatic",
+      "formula_count_before": 6,
+      "formula_count_after": 6,
+      "tab_names_unchanged": true,
+      "named_ranges_unchanged": true,
+      "has_vba_unchanged": true,
+      "external_links_unchanged": true,
+      "cached_numeric_values_unchanged": true,
+      "verification_result": "pass"
+    },
+    {
+      "relative_path": "demo/workbooks/case_2_spreadsheet_control_failures.xlsx",
+      "pre_recalculation_sha256": "6a78f9a7056b665a15dfcc588068e5a2714622d0594af07e3221957ab5ea678a",
+      "post_recalculation_sha256": "f628a43d457670daf98089fa1248003bcf92c49bf9ab46b914f587529a5d202e",
+      "formula_manifest_sha256_before": "98f603c240a51ae4f6341159a0e772fc00912e886ab7d232f8940f730dbd3fdb",
+      "formula_manifest_sha256_after": "d12cbf9f63ea6680e741396166a578b650dc4ffddfef1445529d38be60dc054d",
+      "formula_manifest_note": "formula-manifest hash changed due to three semantically-neutral LibreOffice writer normalizations: (1) dropping unnecessary single quotes around unquoted-safe sheet names (e.g. 'Assumptions'!B7 -> Assumptions!B7); (2) collapsing a single-cell range to a bare reference (B11:B11 -> B11, identical SUM operand); (3) writing the FALSE literal as FALSE() rather than bare FALSE (identical boolean value in both Excel and LibreOffice formula grammar). No formula target cell, operator, or computed value changed; every cached numeric value is identical before and after; the intentional circular-reference and hardcoded-literal anomalies, and the VLOOKUP-unsupported formula, are all still present and detected.",
+      "calculation_mode_after": "automatic",
+      "formula_count_before": 10,
+      "formula_count_after": 10,
+      "tab_names_unchanged": true,
+      "named_ranges_unchanged": true,
+      "has_vba_unchanged": true,
+      "external_links_unchanged": true,
+      "cached_numeric_values_unchanged": true,
+      "verification_result": "pass"
+    },
+    {
+      "relative_path": "demo/workbooks/case_3_accounting_reconciliation_failure.xlsx",
+      "pre_recalculation_sha256": "98d9a565923b791ce84719acdfd32e948fdcf6a2b69396a56ab231879f97bf3b",
+      "post_recalculation_sha256": "1e4de775e291d5ef204160ef8f6bfaed1126873bde6308370ea57b8178ba2e81",
+      "formula_manifest_sha256_before": "7b5a27777f82769ec6f2d3df877f07e95ef8cf26d7200ecbae20960d8f06b1db",
+      "formula_manifest_sha256_after": "09379fd3974485e1cbe306b19c4ac33bcc3052a2b073c40915e25efd87ed38eb",
+      "formula_manifest_note": "formula-manifest hash changed only due to LibreOffice's writer normalizing cross-sheet references (dropping unnecessary single quotes around a sheet name with no spaces); no formula target cell, operator, or computed value changed; every cached numeric value is identical before and after; the reference-figures CSV (the source of the intentional currency mismatch) was not touched by this process.",
+      "calculation_mode_after": "automatic",
+      "formula_count_before": 3,
+      "formula_count_after": 3,
+      "tab_names_unchanged": true,
+      "named_ranges_unchanged": true,
+      "has_vba_unchanged": true,
+      "external_links_unchanged": true,
+      "cached_numeric_values_unchanged": true,
+      "verification_result": "pass"
+    }
+  ],
+  "output_pack_copy_verification": [
+    {
+      "canonical_path": "demo/workbooks/case_1_clean_reserve_calculation.xlsx",
+      "output_pack_path": "outputs/ai2_2026_demo_pack_20260824/case_1_clean_reserve_calculation.xlsx",
+      "canonical_sha256": "4bf75d31657b4419afa33f271ab8c316d9613895d4b29d53d02ae5f3f82e7104",
+      "output_pack_sha256": "4bf75d31657b4419afa33f271ab8c316d9613895d4b29d53d02ae5f3f82e7104",
+      "hashes_match": true
+    },
+    {
+      "canonical_path": "demo/workbooks/case_2_spreadsheet_control_failures.xlsx",
+      "output_pack_path": "outputs/ai2_2026_demo_pack_20260824/case_2_spreadsheet_control_failures.xlsx",
+      "canonical_sha256": "f628a43d457670daf98089fa1248003bcf92c49bf9ab46b914f587529a5d202e",
+      "output_pack_sha256": "f628a43d457670daf98089fa1248003bcf92c49bf9ab46b914f587529a5d202e",
+      "hashes_match": true
+    },
+    {
+      "canonical_path": "demo/workbooks/case_3_accounting_reconciliation_failure.xlsx",
+      "output_pack_path": "outputs/ai2_2026_demo_pack_20260824/case_3_accounting_reconciliation_failure.xlsx",
+      "canonical_sha256": "1e4de775e291d5ef204160ef8f6bfaed1126873bde6308370ea57b8178ba2e81",
+      "output_pack_sha256": "1e4de775e291d5ef204160ef8f6bfaed1126873bde6308370ea57b8178ba2e81",
+      "hashes_match": true
+    }
+  ],
+  "limitations": [
+    "Build-time fixture generation only \u2014 the running application never invokes LibreOffice, Microsoft Excel, or any recalculation engine at runtime.",
+    "Not proof of Microsoft Excel-semantic equivalence \u2014 LibreOffice's formula engine and writer are not guaranteed byte-identical to Excel's; equivalence here is evidenced by identical cached numeric values before and after, not by an Excel comparison.",
+    "Not approval for real or sensitive data \u2014 this process was authorised only for the synthetic, repository-controlled files listed above.",
+    "Arbitrary workbooks uploaded to the running application are never recalculated by it; automatic calc mode on an uploaded workbook means only that the workbook's own cached values are not flagged stale under this prototype's rules \u2014 it does not prove when, how, or with which engine that workbook was actually last calculated."
+  ]
+}

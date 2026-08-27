@@ -20,6 +20,7 @@ def _cell(ref, formula=None, value=None, data_type="number"):
         is_error=False,
         error_type=None,
         is_stale=False,
+        calculation_freshness="fresh",
     )
 
 

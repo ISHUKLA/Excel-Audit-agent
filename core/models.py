@@ -173,9 +173,17 @@ class CellRecord(BaseModel):
     number_format: str
     is_error: bool
     error_type: Optional[str] = None
-    # True when this is a formula cell with cached_value=None, OR the workbook's
-    # calc_mode is "manual". Either way the cached value cannot be trusted.
+    # True whenever calculation_freshness != "fresh" — kept for every existing
+    # caller (LLM data-minimization manifest, the report's stale-cell list).
     is_stale: bool
+    # "fresh": a literal cell, or a formula cell with a cached value under
+    # automatic calc mode. "stale": formula cell with no cached value, or
+    # workbook calc mode is "manual" — the cached value is known not current.
+    # "unknown": workbook calc mode could not be determined — the cached
+    # value's freshness cannot be established either way. A literal cell is
+    # always "fresh": nothing about it is recomputed, so calc mode cannot make
+    # it untrustworthy.
+    calculation_freshness: Literal["fresh", "stale", "unknown"]
 
 
 class WorkbookMeta(BaseModel):
@@ -278,8 +286,24 @@ class ReconciliationLine(BaseModel):
 
     "incomplete" is a distinct verdict, not a flavour of "pass" — it applies
     whenever completeness="partial", or when a python_vs_accounts line rests on
-    a mapping that is not approved. An unapproved mapping never produces "pass",
-    however close the numbers happen to be.
+    a mapping that is not approved, or when calculation_evidence_status is not
+    "fresh". An unapproved mapping never produces "pass", however close the
+    numbers happen to be — and neither does stale or freshness-unknown
+    calculation evidence, however close the numbers happen to be.
+
+    calculation_evidence_status is deliberately a field separate from
+    completeness: completeness measures how much of a formula chain Python
+    could independently reconstruct, while calculation_evidence_status
+    measures whether the workbook's OWN cached state for that chain can be
+    trusted at all. A chain can be 100% reconstructed (completeness="complete")
+    while resting on evidence the workbook itself never confirmed
+    (calculation_evidence_status="stale") — collapsing these into one field
+    would misrepresent one fact as the other. "not_applicable" is reserved for
+    lines with no calculation-freshness question to answer (there is currently
+    no such line type; every line traces to at least one CellRecord). There is
+    no default: every new ReconciliationLine must state this explicitly, so a
+    historical line with no recorded freshness evidence reads as "unknown" —
+    never silently as "fresh".
     """
 
     check_type: Literal["excel_vs_python", "python_vs_accounts"]
@@ -300,6 +324,23 @@ class ReconciliationLine(BaseModel):
     derivation: list[DerivationStep]
     # Required for check_type="python_vs_accounts" once a line is finalized.
     mapping_id: Optional[str] = None
+    # "fresh": no stale or freshness-unknown formula cell was found anywhere in
+    # this line's derivation. "stale"/"unknown": at least one was — see the
+    # class docstring. No default; every constructor must state it.
+    calculation_evidence_status: Literal["fresh", "stale", "unknown", "not_applicable"]
+    # Every distinct stale/unknown cell ref found in the derivation, in the
+    # deterministic order _build_derivation visits them, duplicates removed.
+    # Empty whenever calculation_evidence_status == "fresh".
+    stale_cell_refs: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _fresh_lines_carry_no_stale_refs(self):
+        if self.calculation_evidence_status == "fresh" and self.stale_cell_refs:
+            raise ValueError(
+                "a line reporting calculation_evidence_status='fresh' cannot carry "
+                f"stale_cell_refs: {self.stale_cell_refs}"
+            )
+        return self
 
 
 class ReconciliationResult(BaseModel):

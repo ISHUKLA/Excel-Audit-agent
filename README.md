@@ -272,7 +272,7 @@ pytest tests/           # Full suite
 pytest tests/test_parser.py -v
 ```
 
-**Current status (verified 27 August 2026):** 420 tests passing (`python3 -m pytest tests/ -v -rsx -p no:cacheprovider`, zero failures, zero errors, zero skips).
+**Current status (verified 27 August 2026):** 454 tests passing (`python3 -m pytest tests/ -v -rsx -p no:cacheprovider`, zero failures, zero errors, zero skips).
 
 [![CI — Release v1.0.0 Freeze](https://github.com/ISHUKLA/Excel-Audit-agent/actions/workflows/ci.yml/badge.svg?branch=release/v1.0.0-freeze)](https://github.com/ISHUKLA/Excel-Audit-agent/actions?query=branch%3Arelease%2Fv1.0.0-freeze)
 
@@ -347,6 +347,16 @@ Backups are an operational necessity, not merely good practice.
 
 ---
 
+## Calculation Freshness Provenance
+
+**A cached formula value is not proof that a workbook was ever recalculated.** Excel and other spreadsheet applications happily save a formula whose cached value has never been refreshed after an edit, and manual calculation mode means Excel itself will not recompute values until a human asks it to. This tool cannot know what happened inside Excel before the file reached it — it can only read what the file honestly records.
+
+**What "not flagged stale" means, and does not mean.** A cell's calculation evidence is `stale` when its cached value is missing, or the workbook's calculation mode is manual; it is `unknown` when the calculation mode cannot be determined at all — an absent `calcPr` element is read as `unknown`, never assumed to be `automatic`. Only when a formula cell has a cached value under a *confirmed* automatic calculation mode does this tool describe it as **not flagged stale**. That phrase is deliberate: it states that no known staleness indicator was detected under this prototype's rules. It does **not** mean "verified fresh" or "freshly recalculated," and it does not prove when, how, or with which engine the workbook was last calculated, or that it was saved after that calculation. Any formula cell that is stale or freshness-unknown — including one buried in the derivation chain beneath an output that looks fine on its own — prevents that comparison from reading as a pass, regardless of how closely the numbers agree and however loose the materiality threshold is; a reviewer can acknowledge the resulting incomplete result to continue to a report, but that acknowledgement does not and cannot make the evidence fresh.
+
+**Synthetic fixture recalculation.** Two test fixtures (`tests/fixtures/clean.xlsx`, `tests/fixtures/reserves.xlsx`) and the three competition demonstration workbooks under `demo/workbooks/` were recalculated once, at build time, using LibreOffice 26.2.5.2, specifically so their own calculation mode could be genuinely and accurately declared `automatic` rather than left `unknown`. This is a one-time, manual, build-time step recorded in [`demo/recalculation_provenance.json`](demo/recalculation_provenance.json) — engine version, executable path, and every file's before/after SHA-256 and formula-manifest hash are on record there. **It is not a capability of the running application.** The application itself never invokes LibreOffice, Microsoft Excel, or any other recalculation engine, at runtime or otherwise, and a workbook a reviewer uploads is never recalculated by it — its `automatic`/`manual`/`unknown` calc mode and its cells' cached values are read exactly as the uploaded file states them, and nothing more can be inferred about that file's opening or saving history from those values alone.
+
+---
+
 ## Known Limitations
 
 - **No independent reviewer enforced.** The same person can complete all four gates.
@@ -355,6 +365,7 @@ Backups are an operational necessity, not merely good practice.
 - **Chain verification does not defend against wholesale forgery.** Detecting that would require an anchor held outside the file.
 - **Whole workbook held in memory.** A very large file will consume proportional memory. No maximum upload size is enforced.
 - **Data minimization is informal, and only relevant if you opt in.** AI documentation is off until you explicitly choose it at Gate 3. When chosen, the local policy withholds long free text and external-link formulas and records a manifest, but cached numeric values and short text cells are sent, and the filter is a length/pattern heuristic — not a certified privacy or regulatory control.
+- **A "not flagged stale" cell is not proof of recalculation.** The tool does not perform fresh workbook recalculation of anything a reviewer uploads, and cannot prove when or with which engine an uploaded workbook was last calculated — only that no known staleness indicator was detected. An incomplete result (whether from staleness or partial formula support) is not validation, and acknowledging it does not change the verdict.
 - **Synthetic test fixtures only.** The test suite uses fictional workbooks; real-world performance and edge cases remain untested.
 
 ---

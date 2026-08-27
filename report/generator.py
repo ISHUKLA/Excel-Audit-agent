@@ -46,6 +46,7 @@ def render_report_html(report: AuditReport, audit_rows: list[dict]) -> str:
         proposed_mapping_rows=[row for row in mapping_rows if not row["is_approved"]],
         manual_mapping_rows=[row for row in mapping_rows if row["mapping_type"] != "one_to_one"],
         stale_cells=stale_cells,
+        stale_evidence_lines=_stale_evidence_lines(report.reconciliation),
         incomplete_pct=_incomplete_percentage(internal_lines),
         audit_rows=prepared_audit_rows,
         acknowledge_incomplete=acknowledge_incomplete,
@@ -162,12 +163,31 @@ def _payload(raw: Any) -> dict:
 
 
 def _incomplete_percentage(lines: list) -> Optional[float]:
-    incomplete = [
-        line for line in lines if line.verdict == "incomplete" or line.completeness == "partial"
-    ]
+    """Average formula-coverage gap, over lines incomplete FOR COVERAGE reasons.
+
+    Deliberately excludes lines that are incomplete only because their
+    calculation evidence is stale/unknown: such a line can have
+    reconstruction_coverage_pct == 100.0 (Python reconstructed every element),
+    which would otherwise average in as "0% could not be reconstructed" and
+    understate — or entirely hide — the real reason the line is incomplete.
+    Staleness is reported separately by _stale_evidence_lines(), never folded
+    into this figure.
+    """
+    incomplete = [line for line in lines if line.completeness == "partial"]
     if not incomplete:
         return None
     return sum(100.0 - line.reconstruction_coverage_pct for line in incomplete) / len(incomplete)
+
+
+def _stale_evidence_lines(lines: list) -> list:
+    """Lines whose calculation evidence is stale or freshness-unknown.
+
+    Kept separate from _incomplete_percentage's coverage figure for the same
+    reason: a fully-reconstructed (100% coverage) line can still be
+    incomplete purely because the workbook's own cached state for it was
+    never confirmed, and that fact must never be reported as "0% incomplete".
+    """
+    return [line for line in lines if line.calculation_evidence_status != "fresh"]
 
 
 def _format_number(value: Any) -> str:

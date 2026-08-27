@@ -116,3 +116,9 @@ This case proves that a numerically matching line does not override incomplete p
 | 3 – Accounts | none | pass | block | Gate 3 stops the pipeline |
 
 These are demonstration expectations for known synthetic inputs, not evidence that the tool validates an actuarial methodology or is production-certified.
+
+## Calculation-freshness provenance
+
+The three demonstration workbooks above, plus the two static parser fixtures in `tests/fixtures/`, were recalculated once, at build time, using LibreOffice 26.2.5.2 (build cd7284b4cbbfeb507e630c1aac019f4157393acb), so their workbook calc mode is genuinely declared `automatic` rather than left as `unknown`. Every cached numeric value and the set of formula-bearing cells are identical before and after; the only textual changes were LibreOffice's own writer normalizing formula syntax (dropping unnecessary quotes around unquoted-safe sheet names, collapsing a single-cell range to a bare reference, and writing `FALSE()` instead of bare `FALSE`) — none of which change any computed value or the intentional defects in Case 2 or Case 3. Full before/after hashes and per-file notes are recorded in [`recalculation_provenance.json`](recalculation_provenance.json).
+
+This was a one-time, manual, build-time fixture-generation step. It is **not** part of the running application: the application never invokes LibreOffice, Microsoft Excel, or any recalculation engine, and an arbitrary workbook a reviewer uploads is never recalculated by it. A cell not flagged stale in this prototype means only that no known staleness indicator was detected under these rules — it is not proof that the workbook was freshly recalculated in Excel, or by any particular engine, at any particular time.

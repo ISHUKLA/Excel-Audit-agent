@@ -10,6 +10,7 @@ nothing.
 import hashlib
 import pathlib
 import re
+import shutil
 
 import openpyxl
 import pytest
@@ -233,15 +234,18 @@ def test_manual_calc_mode_makes_every_formula_cell_stale():
     for cell in formula_cells:
         assert cell.cached_value is not None, "fixture lost its cached values"
         assert cell.is_stale is True
+        assert cell.calculation_freshness == "stale"
 
     # A literal is not made stale by the calc mode — it has nothing to recompute.
     assert parsed.cells["Provisions!C1"].is_stale is False
+    assert parsed.cells["Provisions!C1"].calculation_freshness == "fresh"
 
 
 def test_automatic_calc_mode_leaves_calculated_cells_fresh():
     parsed = parse_workbook(_load_fixture("auto.xlsx"))
     assert parsed.workbook_meta.calc_mode == "automatic"
     assert parsed.cells["Provisions!C5"].is_stale is False
+    assert parsed.cells["Provisions!C5"].calculation_freshness == "fresh"
 
 
 def test_missing_calc_pr_is_unknown_never_assumed_automatic(tmp_path):
@@ -254,6 +258,31 @@ def test_missing_calc_pr_is_unknown_never_assumed_automatic(tmp_path):
     wb.save(path)
     strip_calc_pr(path)
     assert parse_workbook(_bytes(path)).workbook_meta.calc_mode == "unknown"
+
+
+def test_unknown_calc_mode_marks_formula_cells_unknown_not_fresh(tmp_path):
+    """A workbook with formulas and cached values, but no calcPr at all: the
+    formula cells cannot be assumed fresh just because a value is cached."""
+    path = str(tmp_path / "auto_stripped.xlsx")
+    shutil.copyfile(str(FIXTURES_DIR / "auto.xlsx"), path)
+    strip_calc_pr(path)
+
+    parsed = parse_workbook(_bytes(path))
+    assert parsed.workbook_meta.calc_mode == "unknown"
+
+    formula_cells = [c for c in parsed.cells.values() if c.formula is not None]
+    assert len(formula_cells) == 3
+    for cell in formula_cells:
+        assert cell.cached_value is not None, "fixture lost its cached values"
+        assert cell.calculation_freshness == "unknown"
+        assert cell.is_stale is True
+
+    # A literal is not made freshness-unknown by an undetermined calc mode either.
+    literal_cells = [c for c in parsed.cells.values() if c.formula is None]
+    assert literal_cells, "fixture has no literal cells to check"
+    for cell in literal_cells:
+        assert cell.calculation_freshness == "fresh"
+        assert cell.is_stale is False
 
 
 def test_full_calc_on_load_is_read_when_present():

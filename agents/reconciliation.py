@@ -158,10 +158,11 @@ def reconcile_excel_vs_python(
 ) -> list[ReconciliationLine]:
     lines = []
     for output_ref in authoritative_outputs:
-        chain, coverage, unsupported, root_value = _build_derivation(
+        chain, coverage, unsupported, root_value, stale_cell_refs = _build_derivation(
             output_ref, parsed_file, warnings
         )
         completeness = "complete" if coverage >= 100.0 else "partial"
+        evidence_status = _evidence_status(stale_cell_refs, parsed_file)
 
         record = parsed_file.cells.get(output_ref)
         source_value = _as_number(record.cached_value) if record else None
@@ -170,6 +171,12 @@ def reconcile_excel_vs_python(
                 f"{output_ref}: the workbook's own value is stale (never recalculated, or "
                 f"the workbook is set to manual calculation) — the comparison is against a "
                 f"value Excel itself has not refreshed"
+            )
+        if evidence_status != "fresh":
+            warnings.append(
+                f"{output_ref}: calculation evidence is {evidence_status} for "
+                f"{', '.join(stale_cell_refs)} — numerical agreement is not evidence of a "
+                f"fresh Excel calculation"
             )
 
         # A partial reconstruction has no target value. Reporting the fraction
@@ -186,7 +193,12 @@ def reconcile_excel_vs_python(
                 delta=delta,
                 delta_pct=delta_pct,
                 verdict=compute_verdict(
-                    delta, delta_pct, pct_threshold, absolute_threshold, completeness
+                    delta,
+                    delta_pct,
+                    pct_threshold,
+                    absolute_threshold,
+                    completeness,
+                    evidence_status=evidence_status,
                 ),
                 pct_threshold=pct_threshold,
                 absolute_threshold=absolute_threshold,
@@ -196,6 +208,8 @@ def reconcile_excel_vs_python(
                 unsupported_elements=unsupported,
                 derivation=chain,
                 mapping_id=None,
+                calculation_evidence_status=evidence_status,
+                stale_cell_refs=stale_cell_refs,
             )
         )
     return lines
@@ -301,8 +315,13 @@ def reconcile_python_vs_accounts(
         target_value = signed_reference_amount(reference_line)
         delta, delta_pct = _delta(source_value, target_value)
         # Incompleteness propagates forward from Pass 1 regardless of what the
-        # numbers look like or whether the mapping is ever approved.
+        # numbers look like or whether the mapping is ever approved. Freshness
+        # does too: a Python figure that exactly matches an accounts figure is
+        # not evidence the underlying workbook was ever recalculated if the
+        # Pass 1 line it came from rests on stale or freshness-unknown evidence.
         completeness = best_line.completeness
+        evidence_status = best_line.calculation_evidence_status
+        stale_cell_refs = best_line.stale_cell_refs
 
         lines.append(
             ReconciliationLine(
@@ -319,6 +338,7 @@ def reconcile_python_vs_accounts(
                     absolute_threshold,
                     completeness,
                     is_ambiguous_match=is_ambiguous,
+                    evidence_status=evidence_status,
                 ),
                 pct_threshold=pct_threshold,
                 absolute_threshold=absolute_threshold,
@@ -328,6 +348,8 @@ def reconcile_python_vs_accounts(
                 unsupported_elements=best_line.unsupported_elements,
                 derivation=best_line.derivation,
                 mapping_id=mapping_id,
+                calculation_evidence_status=evidence_status,
+                stale_cell_refs=stale_cell_refs,
             )
         )
 
@@ -340,16 +362,47 @@ def reconcile_python_vs_accounts(
 # ---------------------------------------------------------------------------
 
 
+def _evidence_status(stale_cell_refs: list[str], parsed_file: ParsedFile) -> str:
+    """Reduce a set of stale/unknown cell refs to one line-level status.
+
+    "stale" (cached value confirmed not current) outranks "unknown" (currency
+    could not be determined) when a chain has both — it is the stronger claim.
+    An empty list means the chain contains no formula cell whose freshness is
+    anything but "fresh".
+    """
+    if not stale_cell_refs:
+        return "fresh"
+    freshness_values = {
+        parsed_file.cells[ref].calculation_freshness
+        for ref in stale_cell_refs
+        if ref in parsed_file.cells
+    }
+    if "stale" in freshness_values:
+        return "stale"
+    if "unknown" in freshness_values:
+        return "unknown"
+    return "fresh"
+
+
 def _build_derivation(
     root: str, parsed_file: ParsedFile, warnings: list[str]
-) -> tuple[list[DerivationStep], float, list[str], Optional[float]]:
+) -> tuple[list[DerivationStep], float, list[str], Optional[float], list[str]]:
     """Walk the cell graph out from an output and reconstruct it in Python.
 
-    Returns (chain, coverage_pct, unsupported_elements, root_value).
+    Returns (chain, coverage_pct, unsupported_elements, root_value, stale_cell_refs).
 
     `is_supported` describes a node's OWN formula. A node whose formula is
     perfectly supported but whose dependency failed still resolves to None — it
     just isn't itself the reason.
+
+    `stale_cell_refs` collects every formula cell visited (root included) whose
+    CellRecord.calculation_freshness is not "fresh" — deterministically, in visit
+    order, with duplicates removed. Python may recompute a formula node's value
+    independently of its own cached value, so a dependency's staleness does not
+    change what this function returns as `root_value`; it is collected anyway as
+    a conservative evidence-provenance signal, per the stale-state-fail-closed
+    policy: the workbook's own state for that cell was never confirmed, even
+    where today's specific recomputation happens to be correct.
     """
     graph = parsed_file.cell_dependency_graph
     reachable = _reachable_from(root, graph)
@@ -357,6 +410,16 @@ def _build_derivation(
 
     steps: dict[str, DerivationStep] = {}
     unsupported_elements: list[str] = []
+    stale_cell_refs: list[str] = []
+    seen_stale_refs: set[str] = set()
+
+    def _note_freshness(ref: str, record: CellRecord) -> None:
+        if record.calculation_freshness == "fresh":
+            return
+        if ref in seen_stale_refs:
+            return
+        seen_stale_refs.add(ref)
+        stale_cell_refs.append(ref)
 
     def resolve(ref: str) -> DerivationStep:
         if ref in steps:
@@ -382,6 +445,7 @@ def _build_derivation(
             return step
 
         step.formula = record.formula
+        _note_freshness(ref, record)
 
         if record.formula is None:
             value = _as_number(record.cached_value)
@@ -425,7 +489,7 @@ def _build_derivation(
             f"{root} could not be reconstructed even though every element is supported"
         )
 
-    return chain, coverage, unsupported_elements, root_step.resolved_value
+    return chain, coverage, unsupported_elements, root_step.resolved_value, stale_cell_refs
 
 
 def _reachable_from(root: str, graph: dict) -> set[str]:

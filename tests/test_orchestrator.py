@@ -101,6 +101,7 @@ def _parsed_file() -> ParsedFile:
                 number_format="0.00",
                 is_error=False,
                 is_stale=False,
+                calculation_freshness="fresh",
             ),
             "Provisions!C5": CellRecord(
                 cell_ref="Provisions!C5",
@@ -110,6 +111,7 @@ def _parsed_file() -> ParsedFile:
                 number_format="0.00",
                 is_error=False,
                 is_stale=False,
+                calculation_freshness="fresh",
             ),
         },
         named_ranges={},
@@ -168,6 +170,7 @@ def _line(**overrides) -> ReconciliationLine:
             )
         ],
         mapping_id=None,
+        calculation_evidence_status="fresh",
     )
     return ReconciliationLine(**{**values, **overrides})
 
@@ -1362,3 +1365,42 @@ def test_prepare_report_has_no_default_for_use_ai_documentation(monkeypatch, tmp
 
     with pytest.raises(TypeError):
         orchestrator.prepare_report(report_id, actor=ACTOR)
+
+
+# --- Work Package 2: stale calculation evidence must fail closed -----------
+
+
+def test_overall_report_verdict_cannot_be_pass_when_internal_evidence_is_stale(
+    monkeypatch, tmp_path
+):
+    """The report's headline verdict is the worse of internal/external. A
+    stale internal line must drag the whole report to 'incomplete', never
+    leave it reading as 'pass'."""
+    stale_line = _line(calculation_evidence_status="stale", stale_cell_refs=["Provisions!C5"])
+    orchestrator, _, _ = _orchestrator(tmp_path)
+    _patch_agents(monkeypatch, _result(lines=[stale_line]))
+    report_id, preview = _start_preview(orchestrator)
+
+    internal, external, final_result = orchestrator.submit_gate3_decisions(
+        report_id,
+        preview,
+        mapping_decisions=[],
+        internal_pct_threshold=DEFAULT_PCT,
+        internal_absolute_threshold=DEFAULT_ABS,
+        external_pct_threshold=DEFAULT_PCT,
+        external_absolute_threshold=DEFAULT_ABS,
+        internal_threshold_deviation_reason=None,
+        external_threshold_deviation_reason=None,
+        actor=ACTOR,
+        use_ai_documentation=False,
+        acknowledge_incomplete=True,
+    )
+
+    assert internal == "incomplete"
+    report = orchestrator.get_report(report_id)
+    assert report.translation_and_reconciliation_verdict != "pass"
+    assert report.translation_and_reconciliation_verdict == "incomplete"
+    # Numerical evidence remains visible on the assembled report.
+    assert report.reconciliation[0].source_value == stale_line.source_value
+    assert report.reconciliation[0].target_value == stale_line.target_value
+    assert report.reconciliation[0].stale_cell_refs == ["Provisions!C5"]

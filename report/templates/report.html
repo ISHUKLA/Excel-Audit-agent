@@ -90,6 +90,9 @@ against a local registry of expected names. It is not a signature, an attestatio
 {% if report.translation_and_reconciliation_verdict == "incomplete" and incomplete_pct is not none %}
 <p class="explanation">{{ "%.1f"|format(incomplete_pct) }}% of this calculation could not be reconstructed from supported formula elements - see Section 3a for details.</p>
 {% endif %}
+{% if stale_evidence_lines %}
+<div class="danger" id="stale-evidence-banner">{{ stale_evidence_lines|length }} line(s) are incomplete because their calculation evidence is stale or of unknown freshness, independent of and in addition to any formula-coverage gap above - numerical agreement, including an exact zero delta, is not evidence that the underlying Excel values were freshly calculated. See "Calculation evidence freshness" below.</div>
+{% endif %}
 <div>
   <span class="badge badge-{{ report.internal_verdict }}">Internal consistency: {{ report.internal_verdict|upper }}</span>
   {% if report.reference_figures %}
@@ -111,10 +114,26 @@ against a local registry of expected names. It is not a signature, an attestatio
 {% if report.parsed_file.workbook_meta.calc_mode in ("manual", "unknown") %}
 <div class="warning">Workbook calculation mode is {{ report.parsed_file.workbook_meta.calc_mode }}. Cached formula values may not be current.</div>
 {% endif %}
-<h3>Stale formula cells</h3>
+<h3>Cells not flagged stale</h3>
+<p class="definition">A cell described elsewhere in this report as "not flagged stale" has a cached value under a confirmed automatic calculation mode - no known staleness indicator was detected under this prototype's rules. That is not the same claim as "verified fresh" or "freshly recalculated": it does not prove when, how, or with which engine the workbook was last calculated, or that it was saved afterward. This tool never recalculates an uploaded workbook itself.</p>
+<h3>Stale or freshness-unknown formula cells</h3>
 {% if stale_cells %}
-<ul>{% for cell in stale_cells %}<li>{{ cell.cell_ref }}</li>{% endfor %}</ul>
+<ul>{% for cell in stale_cells %}<li>{{ cell.cell_ref }} - {{ "stale (cached value missing, or workbook calculation mode is manual)" if cell.calculation_freshness == "stale" else "freshness unknown (workbook calculation mode could not be determined)" }}</li>{% endfor %}</ul>
 {% else %}<p class="muted">None.</p>{% endif %}
+
+<h3>Calculation evidence freshness</h3>
+<p class="definition">Formula coverage (Section 3a) measures how much of a calculation Python could independently reconstruct. Calculation freshness measures whether the workbook's own cached state for that calculation can be trusted at all. These are two separate facts: a line can be 100% reconstructed while resting on evidence the workbook itself never confirmed, and a stale or freshness-unknown line can never read as a pass, however closely its numbers agree and however loose its materiality threshold is.</p>
+{% if stale_evidence_lines %}
+<table>
+  <thead><tr><th>Line</th><th>Check type</th><th>Freshness</th><th>Affected cell reference(s)</th></tr></thead>
+  <tbody>{% for line in stale_evidence_lines %}<tr>
+    <td>{{ line.label }}</td>
+    <td>{{ "Internal (Excel vs Python)" if line.check_type == "excel_vs_python" else "Accounts (Python vs accounts)" }}</td>
+    <td class="status status-incomplete">{{ line.calculation_evidence_status|upper }}</td>
+    <td>{{ line.stale_cell_refs|join(", ") if line.stale_cell_refs else "-" }}</td>
+  </tr>{% endfor %}</tbody>
+</table>
+{% else %}<p class="muted">None - every reconciliation line rests on calculation evidence not flagged stale.</p>{% endif %}
 
 {% if report.reference_figures %}
 <h2>Section 1b - Accounting reconciliation context</h2>
@@ -181,17 +200,23 @@ against a local registry of expected names. It is not a signature, an attestatio
 <h2>Section 3a - Internal reconciliation (Excel vs Python)</h2>
 {% if internal_lines %}
 <table>
-  <thead><tr><th>Label</th><th>Excel value</th><th>Python value</th><th>Delta</th><th>Delta %</th><th>Verdict</th><th>Coverage</th></tr></thead>
+  <thead><tr><th>Label</th><th>Excel value</th><th>Python value</th><th>Delta</th><th>Delta %</th><th>Verdict</th><th>Formula coverage</th><th>Calculation freshness</th></tr></thead>
   <tbody>{% for line in internal_lines %}<tr>
     <td>{{ line.label }}</td>
     <td>{{ line.source_value|number }}</td><td>{{ line.target_value|number }}</td>
-    {% if line.verdict == "incomplete" %}<td>not comparable</td><td>not comparable</td>{% else %}<td>{{ line.delta|number }}</td><td>{{ line.delta_pct|percentage }}</td>{% endif %}
+    {% if line.delta is none %}<td>not comparable</td><td>not comparable</td>{% else %}<td>{{ line.delta|number }}</td><td>{{ line.delta_pct|percentage }}</td>{% endif %}
     <td class="status status-{{ line.verdict }}">{{ line.verdict }}</td>
     <td>{{ "%.1f"|format(line.reconstruction_coverage_pct) }}%</td>
+    <td class="{{ 'status status-incomplete' if line.calculation_evidence_status != 'fresh' else '' }}">{{ line.calculation_evidence_status|replace("fresh", "not flagged stale")|upper }}</td>
   </tr>
-  {% if line.reconstruction_coverage_pct < 100 %}<tr><td colspan="7">
+  {% if line.reconstruction_coverage_pct < 100 %}<tr><td colspan="8">
     <details open><summary>Unsupported formula elements</summary>
       {% if line.unsupported_elements %}<ul>{% for element in line.unsupported_elements %}<li>{{ element }}</li>{% endfor %}</ul>{% else %}<p>Reason not recorded.</p>{% endif %}
+    </details>
+  </td></tr>{% endif %}
+  {% if line.calculation_evidence_status != "fresh" %}<tr><td colspan="8">
+    <details open><summary>Stale/unknown calculation evidence</summary>
+      <p>Numerical agreement above, including an exact zero delta, is not evidence that {{ line.label }} was freshly calculated in Excel. Affected cell reference(s): {{ line.stale_cell_refs|join(", ") if line.stale_cell_refs else "not recorded" }}.</p>
     </details>
   </td></tr>{% endif %}
   {% endfor %}</tbody>

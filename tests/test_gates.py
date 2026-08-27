@@ -102,6 +102,7 @@ def a_parsed_file():
                 number_format="General",
                 is_error=False,
                 is_stale=False,
+                calculation_freshness="fresh",
             )
         },
         named_ranges={},
@@ -147,6 +148,7 @@ def a_line(**overrides):
         unsupported_elements=[],
         derivation=[],
         mapping_id=None,
+        calculation_evidence_status="fresh",
     )
     return ReconciliationLine(**{**defaults, **overrides})
 
@@ -442,6 +444,62 @@ def test_gate_3_passes_a_clean_internal_reconciliation(audit_log):
     assert internal == "pass"
     assert external == "not_performed"
     assert result.verdicts_are_final is True
+
+
+# ---------------------------------------------------------------------------
+# Work Package 2 — the freshness cap survives every Gate 3 recomputation
+# ---------------------------------------------------------------------------
+
+
+def _stale_line(**overrides):
+    return a_line(
+        calculation_evidence_status="stale",
+        stale_cell_refs=["Provisions!C5"],
+        **overrides,
+    )
+
+
+def test_gate_3_preview_preserves_the_freshness_cap():
+    result = a_result(lines=[_stale_line()])
+    internal, external, preview = preview_reconciliation(
+        result,
+        internal_pct_threshold=1.0,
+        internal_absolute_threshold=1_000_000.0,
+        external_pct_threshold=1.0,
+        external_absolute_threshold=1_000_000.0,
+        default_pct_threshold=DEFAULT_PCT,
+        default_absolute_threshold=DEFAULT_ABS,
+        context_match_verdict="not_checked",
+    )
+    assert internal == "incomplete"
+    assert preview.lines[0].verdict == "incomplete"
+    assert preview.verdicts_are_final is False
+
+
+def test_gate_3_final_recomputation_preserves_the_freshness_cap(audit_log):
+    result = a_result(lines=[_stale_line()])
+    internal, external, final_result = run_gate_3(
+        audit_log,
+        result,
+        pct_threshold=1.0,
+        absolute_threshold=1_000_000.0,
+        threshold_deviation_reason="testing that generous thresholds do not override staleness",
+        acknowledge_incomplete=True,
+    )
+    assert internal == "incomplete"
+    assert final_result.lines[0].verdict == "incomplete"
+    assert final_result.verdicts_are_final is True
+
+
+def test_gate_3_acknowledgement_permits_continuation_but_does_not_change_the_verdict(audit_log):
+    result = a_result(lines=[_stale_line()])
+    with pytest.raises(GateBlockedError, match="explicitly acknowledged"):
+        run_gate_3(audit_log, result)
+
+    internal, _, final_result = run_gate_3(audit_log, result, acknowledge_incomplete=True)
+    assert internal == "incomplete"
+    assert final_result.lines[0].verdict == "incomplete"
+    assert final_result.lines[0].calculation_evidence_status == "stale"
 
 
 def test_gate_3_blocks_on_a_blocking_line(audit_log):

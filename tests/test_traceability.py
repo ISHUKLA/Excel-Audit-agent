@@ -65,6 +65,7 @@ def a_line(**overrides):
         unsupported_elements=[],
         derivation=[],
         mapping_id=None,
+        calculation_evidence_status="fresh",
     )
     return ReconciliationLine(**{**defaults, **overrides})
 
@@ -357,6 +358,7 @@ def test_a_finding_traces_to_its_own_exact_cell():
                 number_format="General",
                 is_error=False,
                 is_stale=False,
+                calculation_freshness="fresh",
             )
         },
         graph={"Provisions!C7": ["Provisions!A1"]},
