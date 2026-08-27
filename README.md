@@ -272,9 +272,11 @@ pytest tests/           # Full suite
 pytest tests/test_parser.py -v
 ```
 
-**Current status (verified 27 August 2026):** 454 tests passing (`python3 -m pytest tests/ -v -rsx -p no:cacheprovider`, zero failures, zero errors, zero skips).
+**Current status (verified locally 27 August 2026):** 454 tests passing (`python3 -m pytest tests/ -v -rsx -p no:cacheprovider`, zero failures, zero errors, zero skips), run locally on Python 3.13.
 
-[![CI — Release v1.0.0 Freeze](https://github.com/ISHUKLA/Excel-Audit-agent/actions/workflows/ci.yml/badge.svg?branch=release/v1.0.0-freeze)](https://github.com/ISHUKLA/Excel-Audit-agent/actions?query=branch%3Arelease%2Fv1.0.0-freeze)
+[![CI](https://github.com/ISHUKLA/Excel-Audit-agent/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ISHUKLA/Excel-Audit-agent/actions/workflows/ci.yml)
+
+CI runs the full suite on Python 3.11 (matching the Docker runtime) and Python 3.13 on every push and pull request to `main`, plus a Docker build-and-health-check smoke test. The badge above and the numbers it links to reflect GitHub's own record of those runs; they are evidence only after a workflow run has actually completed on `main` — a local `pytest` pass reported in this file is not GitHub CI evidence on its own.
 
 The test suite covers:
 - Clean workbooks and messy input (blank tabs, broken formulas, inconsistent labels).
