@@ -15,6 +15,9 @@ concurrency:
 
 permissions:
   contents: read
+  # gitleaks-action needs to list the PR's commits to scan them; this is
+  # read-only and does not grant PR-comment write access.
+  pull-requests: read
 
 jobs:
   secret-scan:

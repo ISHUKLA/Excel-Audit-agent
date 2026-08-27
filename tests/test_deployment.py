@@ -173,4 +173,7 @@ def test_ci_docker_smoke_test_guarantees_cleanup_via_trap():
 def test_ci_uses_least_privilege_permissions():
     workflow = _load_ci_workflow()
 
-    assert workflow["permissions"] == {"contents": "read"}
+    # contents:read is the baseline; pull-requests:read is the only addition,
+    # required so gitleaks-action can list the PR's commits to scan them —
+    # it grants no write access, in particular no PR-comment posting.
+    assert workflow["permissions"] == {"contents": "read", "pull-requests": "read"}
