@@ -52,7 +52,7 @@ This tool automates the legwork — parsing the spreadsheet, reconstructing its 
 
 ## Deployment Posture
 
-**Default and recommended: run locally.** `audit.db` and any uploaded workbooks stay on your machine. Nothing leaves except the Anthropic API call itself (see **Security and data handling** below).
+**Default and recommended: run locally.** `audit.db` and any uploaded workbooks stay on your machine. The only thing that can leave is the optional Anthropic API call for tab documentation, and only if you explicitly opt in at Gate 3 (see **Optional AI documentation and what leaves the machine** below).
 
 **Docker:** The same trust boundary applies only if the `/data` volume remains on the same machine. Do not mount it from network storage or sync it to cloud storage without separately considering that exposure.
 
@@ -79,8 +79,8 @@ This tool automates the legwork — parsing the spreadsheet, reconstructing its 
 4. **Review findings (Gate 2).**
    For each finding, click "Confirm", "Override", or "Dismiss". If overriding or dismissing, enter a reason. Designate one or more output cells to reconcile (e.g., the final reserve total). Click "Submit all decisions".
 
-5. **Set materiality thresholds (Gate 3).**
-   The tool shows internal consistency (Excel vs. Python) and accounts reconciliation (Python vs. supplied figures) side by side. Set materiality thresholds for each — the UI suggests 1%, but the choice is yours. Review proposed account mappings. Click "Submit materiality and mapping decisions".
+5. **Set materiality thresholds and choose AI documentation (Gate 3).**
+   The tool shows internal consistency (Excel vs. Python) and accounts reconciliation (Python vs. supplied figures) side by side. Set materiality thresholds for each — the UI suggests 1%, but the choice is yours. Review proposed account mappings. Read the AI documentation disclosure and explicitly choose "Use optional Claude documentation" or "Continue without AI documentation" — neither is preselected. Click "Confirm reconciliation".
 
 6. **Record named approval (Gate 4).**
    Enter your name and role. Click "Record approval". The PDF is generated and ready for download.
@@ -193,7 +193,7 @@ This table makes explicit where the AI is involved and where the decisions are e
 | Detecting anomalies (hardcoded literals, circular refs, etc.) | Deterministic Python | Rule-based; no LLM. Detects specific patterns. |
 | Reconstructing formulas in Python | Deterministic Python | Supported formulas only. Unsupported formulas marked as partial. |
 | Reconciling Python output against accounts figures | Deterministic Python | Uses signed-net convention (debit +, credit −). Exact equality or materiality threshold—no LLM judgment. |
-| Drafting tab documentation (method, assumptions, data sources) | AI-generated | Claude generates plain-language summaries. Data sent is minimized per `core/llm_data_policy.py`. |
+| Drafting tab documentation (method, assumptions, data sources) | AI-generated, **optional** | Claude generates plain-language summaries only if the reviewer explicitly opts in at Gate 3. Declining sends nothing and does not block the report. Data sent when enabled is minimized per `core/llm_data_policy.py`, but the filter is a heuristic, not a certified privacy control — see "Optional AI documentation" above for the exact categories sent. |
 | Confirming context (Gate 1) | Human decision | Reviewer verifies the workbook bytes and context. |
 | Disposing of findings (Gate 2) | Human decision | Reviewer confirms, overrides, or dismisses each anomaly. |
 | Setting materiality thresholds (Gate 3) | Human decision | Thresholds are never chosen by the tool. |
@@ -272,7 +272,7 @@ pytest tests/           # Full suite
 pytest tests/test_parser.py -v
 ```
 
-**Current status:** 384 tests passing.
+**Current status (verified 27 August 2026):** 420 tests passing (`python3 -m pytest tests/ -v -rsx -p no:cacheprovider`, zero failures, zero errors, zero skips).
 
 [![CI — Release v1.0.0 Freeze](https://github.com/ISHUKLA/Excel-Audit-agent/actions/workflows/ci.yml/badge.svg?branch=release/v1.0.0-freeze)](https://github.com/ISHUKLA/Excel-Audit-agent/actions?query=branch%3Arelease%2Fv1.0.0-freeze)
 
@@ -289,15 +289,46 @@ The test suite covers:
 
 ## Security and Data Handling
 
-### What Leaves the Machine
+### Optional AI documentation and what leaves the machine
 
-Only the Anthropic API call in Agent 4 (documentation) sends data outside your machine:
+**Claude documentation (Agent 4) is optional and off by default in the sense that nothing is
+transmitted until you explicitly say so.** At Gate 3, before any Anthropic call can be made, you
+choose either "Use optional Claude documentation" or "Continue without AI documentation." Neither
+option is preselected, and rendering the screen makes no call. Declining does not block anything:
+findings, reconciliation, verdicts, Gate 4, and PDF generation all work identically either way.
 
-- Tab names and structure (not cell values).
-- Formula patterns (not workbook data).
-- Numeric summary of findings and reconciliation results.
+If you choose to use it, an Anthropic API call is the only thing that sends data outside your
+machine, and the payload for each included cell contains:
 
-Cell values, amounts, account labels, and personally identifying information are withheld. See [`core/llm_data_policy.py`](core/llm_data_policy.py) for the exact rules.
+- Tab names.
+- Cell references for included cells.
+- **Exact formula text, including any embedded string literals.**
+- **Cached numeric cell values.**
+- **Short text cell values below the current 40-character threshold** (this can include short
+  labels).
+- The cell's data type and stale-state indicator.
+- In-tab named-range names.
+- The designated authoritative-output cell references.
+- Your professional role category, communicated through role-specific system-prompt guidance.
+
+**Correction:** earlier documentation in this project stated that cell values, amounts, and
+account labels were withheld. That was inaccurate. Cached numeric values and short text cells
+(including short labels) are sent when they are not otherwise excluded. Short text and formula
+literals may contain personal, client, account, or commercially sensitive information. The rule
+that withholds long free text (≥40 characters) and external-link formulas is a length/pattern
+heuristic — it is **not** a PII detector and **not** a certified privacy control.
+
+**Genuinely never sent** through this documentation payload, whether or not you opt in: the
+complete workbook file bytes; reference-figure amounts, account numbers, or account labels
+(`ReferenceFigures` is never passed to the documentation payload builder); accounting mappings;
+materiality thresholds; reviewer name; entity; reporting period; currency; accounting basis; long
+non-formula text (≥40 characters); and formulas recognised as external-workbook links, or their
+paths. See [`core/llm_data_policy.py`](core/llm_data_policy.py) for the exact filtering rules and
+the full disclosure text shown at Gate 3.
+
+**Competition demonstrations use synthetic data only.** Real or sensitive company data is outside
+this prototype's approved use unless separately authorised and governed — the demo cases shipped
+with this repo are entirely fictional (see "Three Demonstration Cases" above).
 
 ### What Stays Local
 
@@ -323,7 +354,7 @@ Backups are an operational necessity, not merely good practice.
 - **Audit log is tamper-evident, not tamper-proof.** Someone with file access can modify `audit.db`; verification detects this after the fact.
 - **Chain verification does not defend against wholesale forgery.** Detecting that would require an anchor held outside the file.
 - **Whole workbook held in memory.** A very large file will consume proportional memory. No maximum upload size is enforced.
-- **Data minimization is informal.** The local policy withholds data and records a manifest, but this is not a certified privacy or regulatory control.
+- **Data minimization is informal, and only relevant if you opt in.** AI documentation is off until you explicitly choose it at Gate 3. When chosen, the local policy withholds long free text and external-link formulas and records a manifest, but cached numeric values and short text cells are sent, and the filter is a length/pattern heuristic — not a certified privacy or regulatory control.
 - **Synthetic test fixtures only.** The test suite uses fictional workbooks; real-world performance and edge cases remain untested.
 
 ---

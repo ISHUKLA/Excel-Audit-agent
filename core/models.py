@@ -12,6 +12,25 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from core.workbook_identity import validate_hash_format
 
+# Shared, exact wording for AuditReport.ai_documentation_status, so the UI and
+# the PDF template never drift from each other or invent their own phrasing.
+AI_DOCUMENTATION_STATUS_LABELS: dict[str, str] = {
+    "generated": "AI documentation generated.",
+    "declined": "AI documentation declined — deterministic results unaffected.",
+    "validation_failed": (
+        "AI documentation validation failed — manual documentation review is required. "
+        "No AI-generated text was accepted; this does not affect any verdict."
+    ),
+    "unavailable": (
+        "AI documentation was unavailable for this report. No AI-generated text was "
+        "included; this does not affect any verdict."
+    ),
+    "not_recorded": (
+        "This report predates the explicit per-report AI documentation choice; no "
+        "status was recorded."
+    ),
+}
+
 
 class FileContext(BaseModel):
     """What the human says this workbook is, including the accounting context
@@ -388,6 +407,7 @@ class AuditLogRow(BaseModel):
         "gate_decision",
         "state_snapshot",
         "llm_call",
+        "llm_use_decision",
         "report_approved",
         "mapping_decision",
         "chain_verification",
@@ -469,6 +489,12 @@ class AuditReport(BaseModel):
     traceability_index: list[TraceabilityEntry]
     documentation: list[TabDocumentation]
     llm_data_manifest: list[LLMDataManifestEntry]
+    # Additive field with a safe historic default so reports/snapshots assembled
+    # before this control existed remain readable. "not_recorded" means the
+    # report predates the explicit per-report AI choice, not that AI was used.
+    ai_documentation_status: Literal[
+        "generated", "declined", "validation_failed", "unavailable", "not_recorded"
+    ] = "not_recorded"
     translation_and_reconciliation_verdict: Literal["pass", "warn", "block", "incomplete"]
     internal_verdict: Literal["pass", "warn", "block", "incomplete"]
     external_verdict: Literal["pass", "warn", "block", "incomplete", "not_performed"]

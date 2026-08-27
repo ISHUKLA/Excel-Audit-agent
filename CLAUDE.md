@@ -194,6 +194,12 @@ These apply to every prompt, every session.
     three are valid human dispositions, and "approved" implies an endorsement
     the latter two never received. Use "reviewed and dispositioned," and show the
     actual disposition.
+23. No external AI call may occur without an explicit per-report use decision
+    recorded before the call. Declining AI documentation must not block
+    deterministic completion. This is a decision inside the existing Gate 3
+    workflow, not a fifth gate — see `agents/orchestrator.py`'s
+    `prepare_report`/`submit_gate3_decisions` and the `llm_use_decision` audit
+    event.
 
 ---
 

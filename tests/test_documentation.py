@@ -275,3 +275,117 @@ def test_each_role_receives_explicit_guidance(monkeypatch, role, required_text):
     _run(_parsed_file(), _file_context(role), client)
 
     assert required_text.lower() in client.messages.calls[0]["system"].lower()
+
+
+# --- Work Package 1, Phase E: outbound-payload transparency regressions ----
+#
+# These pin down the exact categories the Phase A-D inventory found were
+# transmitted but undisclosed. Each assertion targets one disclosed category
+# from the Gate 3 consent screen and the README, so a future change that
+# silently starts (or stops) sending a category is caught here, not just in
+# the UI copy.
+
+
+def test_outbound_payload_contains_cached_numeric_values():
+    """Item 12: cached numeric values ARE included, not withheld."""
+    parsed = _parsed_file()
+    payload, _ = minimize_for_llm("Reserves", parsed, ["Reserves!B2"])
+
+    assert payload["cells"]["Reserves!A1"]["value"] == 1001.0
+    assert payload["cells"]["Reserves!B2"]["value"] == 1251.0
+
+
+def test_outbound_payload_contains_permitted_short_text_values():
+    """Item 13: short text (< 40 chars) is sent, e.g. a short account label."""
+    parsed = _parsed_file()
+    parsed.cells["Reserves!D1"] = _cell(
+        "Reserves!D1", "Provision - Acme", data_type="text"
+    )
+
+    payload, manifest = minimize_for_llm("Reserves", parsed, ["Reserves!B2"])
+
+    assert payload["cells"]["Reserves!D1"]["value"] == "Provision - Acme"
+    assert "Reserves!D1" in manifest.cell_refs_included
+
+
+def test_outbound_payload_contains_formula_text_with_embedded_literals():
+    """Item 14: formula text, including string literals inside it, is sent verbatim."""
+    parsed = _parsed_file()
+    parsed.cells["Reserves!B2"] = _cell(
+        "Reserves!B2", 1250.0, formula='=IF(A1>0,"Acme Life SA",A1)'
+    )
+    parsed.cell_dependency_graph["Reserves!B2"] = ["Reserves!A1"]
+
+    payload, _ = minimize_for_llm("Reserves", parsed, ["Reserves!B2"])
+
+    assert payload["cells"]["Reserves!B2"]["formula"] == '=IF(A1>0,"Acme Life SA",A1)'
+
+
+def test_external_workbook_formulas_remain_excluded():
+    """Item 15."""
+    parsed = _parsed_file()
+    external_formula = "=[budget.xlsx]Sheet1!A1"
+    parsed.cells["Reserves!E1"] = _cell("Reserves!E1", 5.0, formula=external_formula)
+    parsed.cell_dependency_graph["Reserves!E1"] = []
+    parsed.external_links = [external_formula]
+
+    payload, manifest = minimize_for_llm("Reserves", parsed, ["Reserves!B2"])
+
+    assert "Reserves!E1" not in payload["cells"]
+    assert manifest.exclusion_reasons["Reserves!E1"] == "external link path, not sent"
+
+
+def test_long_free_text_remains_excluded():
+    """Item 16."""
+    parsed = _parsed_file()
+    long_text = "x" * 45
+    parsed.cells["Reserves!F1"] = _cell("Reserves!F1", long_text, data_type="text")
+
+    payload, manifest = minimize_for_llm("Reserves", parsed, ["Reserves!B2"])
+
+    assert "Reserves!F1" not in payload["cells"]
+    assert manifest.exclusion_reasons["Reserves!F1"] == (
+        "free text over length threshold, possible PII"
+    )
+
+
+def test_reference_figures_are_never_reachable_by_the_payload_builder():
+    """Item 17: minimize_for_llm's signature never accepts ReferenceFigures at all."""
+    import inspect
+
+    signature = inspect.signature(minimize_for_llm)
+    assert "reference_figures" not in signature.parameters
+
+
+def test_reviewer_name_entity_period_currency_and_basis_are_absent(monkeypatch):
+    """Item 18: FileContext fields beyond user_role never reach the payload."""
+    monkeypatch.setattr("agents.documentation.time.sleep", lambda _: None)
+    client = _FakeClient([_valid_json()])
+    file_context = FileContext(
+        filename="reserves.xlsx",
+        description="Q4 reserve calculation",
+        user_role="actuary",
+        entity="Acme Life SA",
+        period="2025-Q4",
+        currency="EUR",
+        basis="IFRS 17",
+        confirmed_workbook_hash="a" * 64,
+        uploaded_at=datetime.now(timezone.utc),
+    )
+
+    _run(_parsed_file(), file_context, client)
+
+    sent_request = client.messages.calls[0]["messages"][0]["content"]
+    for sensitive in ("Acme Life SA", "2025-Q4", "EUR", "IFRS 17"):
+        assert sensitive not in sent_request
+
+
+def test_role_specific_system_guidance_communicates_the_role_category(monkeypatch):
+    """Item 19: the professional role category is transmitted via system-prompt
+    selection even though it is never a payload field."""
+    monkeypatch.setattr("agents.documentation.time.sleep", lambda _: None)
+    client = _FakeClient([_valid_json()])
+
+    _run(_parsed_file(), _file_context("cfo"), client)
+
+    assert "role='cfo'" in client.messages.calls[0]["system"]

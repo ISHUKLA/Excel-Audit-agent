@@ -255,6 +255,7 @@ against a local registry of expected names. It is not a signature, an attestatio
   <p><strong>Role notes:</strong> {{ document.role_notes or "None" }}</p>
 </div>
 {% endfor %}
+{% elif report.ai_documentation_status == "declined" %}<p class="muted">{{ ai_documentation_status_label }} No tab documentation was generated because the reviewer declined the optional Claude documentation step.</p>
 {% else %}<p class="muted">No tab documentation was generated.</p>{% endif %}
 
 <h2>Section 5 - Traceability index (For auditor review)</h2>
@@ -282,7 +283,14 @@ against a local registry of expected names. It is not a signature, an attestatio
 
 <section class="section-six">
 <h2>Section 6 - Data sent to third-party AI service</h2>
-<p>Documentation for this report was generated using the Anthropic API under Anthropic's commercial terms. Only the cell ranges listed below were transmitted; free-text cells over 40 characters and external-link references were withheld by default. See <a href="{{ anthropic_retention_url }}">Anthropic's current API data retention documentation</a> for Anthropic's data handling terms - this report does not constitute a legal or regulatory determination that this transmission is compliant with any specific jurisdiction's data protection requirements; that determination is the preparer's responsibility.</p>
+<p><strong>AI documentation status:</strong> {{ ai_documentation_status_label }}</p>
+{% if report.ai_documentation_status == "generated" or report.ai_documentation_status == "validation_failed" %}
+<p>Optional Claude documentation was used for this report, on the reviewer's explicit per-report choice at Gate 3, under Anthropic's commercial terms. When enabled, the payload sent for each included cell contains: tab names; cell references for included cells; exact formula text, including any embedded string literals; cached numeric cell values; short text cell values below the current 40-character threshold; the cell's data type and stale-state indicator; in-tab named-range names; and the designated authoritative-output cell references. The reviewer's professional role category is also communicated, because it selects role-specific system-prompt guidance. Short text and formula literals may contain personal, client, account, or commercially sensitive information; the filtering rule that withholds long free text and external-link formulas is a length/pattern heuristic, not a PII detector or a certified privacy control.</p>
+<p>The following are never included in this documentation payload: the complete workbook file bytes; reference-figure amounts, reference account numbers, or reference account labels supplied through ReferenceFigures; accounting mappings; materiality thresholds; reviewer name; entity; reporting period; currency; accounting basis; non-formula text at or above 40 characters; and formulas recognised as external-workbook links, or their paths.</p>
+<p>See <a href="{{ anthropic_retention_url }}">Anthropic's current API data retention documentation</a> for Anthropic's data handling terms - this report does not constitute a legal or regulatory determination that this transmission is compliant with any specific jurisdiction's data protection requirements; that determination is the preparer's responsibility.</p>
+{% else %}
+<p>No data was transmitted to Anthropic for this report. The reviewer declined optional Claude documentation at Gate 3; every deterministic finding, reconciliation result, mapping, and verdict in this report is unaffected by that choice.</p>
+{% endif %}
 {% if report.llm_data_manifest %}
 <table>
   <thead><tr><th>Tab</th><th>Cells included</th><th>Cells excluded</th><th>Exclusion reasons</th></tr></thead>

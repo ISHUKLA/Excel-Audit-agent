@@ -25,7 +25,10 @@ from core.models import (
 _MODEL = "claude-sonnet-4-6"
 _MAX_TOKENS = 1024
 _RATE_LIMIT_DELAY_SECONDS = 1
-_FALLBACK_METHOD_SUMMARY = "LLM output invalid — manual review required."
+# Public so callers (the orchestrator) can detect a validation-failure fallback
+# without re-deriving the exact string or re-parsing raw model output.
+FALLBACK_METHOD_SUMMARY = "LLM output invalid — manual review required."
+_FALLBACK_METHOD_SUMMARY = FALLBACK_METHOD_SUMMARY
 
 _BASE_SYSTEM_PROMPT = (
     "You are an expert actuary and financial auditor.\n"
