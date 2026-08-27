@@ -134,3 +134,60 @@ def test_a_nonzero_difference_blocks_when_both_thresholds_are_zero():
 @pytest.mark.parametrize("delta_pct", [0.0, 0.0009, 0.001, 0.009, 0.01, 0.5])
 def test_every_verdict_is_one_of_the_four_states(delta_pct):
     assert verdict(1.0, delta_pct) in {"pass", "warn", "block", "incomplete"}
+
+
+# ---------------------------------------------------------------------------
+# Work Package 2 — the freshness cap is applied last and overrides pass/warn
+# ---------------------------------------------------------------------------
+
+
+def test_stale_evidence_caps_a_zero_delta_pass_at_incomplete():
+    assert (
+        compute_verdict(0.0, 0.0, 0.01, 100.0, "complete", evidence_status="stale")
+        == "incomplete"
+    )
+
+
+def test_unknown_evidence_caps_a_zero_delta_pass_at_incomplete():
+    assert (
+        compute_verdict(0.0, 0.0, 0.01, 100.0, "complete", evidence_status="unknown")
+        == "incomplete"
+    )
+
+
+def test_stale_evidence_caps_at_incomplete_under_zero_thresholds():
+    assert (
+        compute_verdict(0.0, 0.0, 0.0, 0.0, "complete", evidence_status="stale")
+        == "incomplete"
+    )
+
+
+def test_stale_evidence_caps_at_incomplete_under_generous_thresholds():
+    assert (
+        compute_verdict(1.0, 0.001, 0.5, 1_000_000.0, "complete", evidence_status="stale")
+        == "incomplete"
+    )
+
+
+def test_stale_evidence_caps_a_warn_verdict_at_incomplete_too():
+    warn = compute_verdict(50.0, 0.005, PCT, ABS, "complete")
+    assert warn == "warn"
+    assert (
+        compute_verdict(50.0, 0.005, PCT, ABS, "complete", evidence_status="stale")
+        == "incomplete"
+    )
+
+
+def test_stale_evidence_does_not_soften_a_genuine_block():
+    """A block from a large numeric disagreement is left as a block, not
+    softened to incomplete — staleness only ever caps pass/warn."""
+    assert compute_verdict(5.0, 0.02, PCT, ABS, "complete") == "block"
+    assert (
+        compute_verdict(5.0, 0.02, PCT, ABS, "complete", evidence_status="stale") == "block"
+    )
+
+
+def test_fresh_evidence_is_the_default_and_changes_nothing():
+    assert compute_verdict(0.0, 0.0, PCT, ABS, "complete") == compute_verdict(
+        0.0, 0.0, PCT, ABS, "complete", evidence_status="fresh"
+    )

@@ -15,7 +15,9 @@ from core.models import CellRecord, ParsedFile, ReferenceFigureLine, ReferenceFi
 NOW = datetime(2026, 8, 10, tzinfo=timezone.utc)
 
 
-def cell(ref, formula=None, value=None, stale=False):
+def cell(ref, formula=None, value=None, stale=False, freshness=None):
+    if freshness is None:
+        freshness = "stale" if stale else "fresh"
     return CellRecord(
         cell_ref=ref,
         formula=formula,
@@ -24,7 +26,8 @@ def cell(ref, formula=None, value=None, stale=False):
         number_format="General",
         is_error=False,
         error_type=None,
-        is_stale=stale,
+        is_stale=stale or freshness != "fresh",
+        calculation_freshness=freshness,
     )
 
 
@@ -213,6 +216,137 @@ def test_a_stale_source_value_is_warned_about_not_silently_compared():
 
     run_reconciliation(parsed(cells, graph), ["Provisions!C5"], warnings=warnings)
     assert any("stale" in w for w in warnings)
+
+
+# ---------------------------------------------------------------------------
+# Work Package 2 — stale calculation evidence must fail closed
+# ---------------------------------------------------------------------------
+
+
+def _stale_workbook(freshness="stale"):
+    workbook = simple_sum_workbook()
+    cells = dict(workbook.cells)
+    cells["Provisions!C5"] = cell(
+        "Provisions!C5", formula="=SUM(C1:C4)", value=100.0, freshness=freshness
+    )
+    return parsed(cells, workbook.cell_dependency_graph)
+
+
+def test_stale_authoritative_output_with_zero_delta_is_incomplete():
+    line = run_reconciliation(_stale_workbook(), ["Provisions!C5"]).lines[0]
+    assert line.delta == 0.0
+    assert line.calculation_evidence_status == "stale"
+    assert line.verdict == "incomplete"
+    # Numerical evidence remains visible even though the verdict is capped.
+    assert line.source_value == 100.0
+    assert line.target_value == 100.0
+    assert line.reconstruction_coverage_pct == 100.0
+
+
+def test_stale_authoritative_output_with_zero_thresholds_is_incomplete():
+    line = run_reconciliation(
+        _stale_workbook(), ["Provisions!C5"], pct_threshold=0.0, absolute_threshold=0.0
+    ).lines[0]
+    assert line.verdict == "incomplete"
+
+
+def test_stale_authoritative_output_with_generous_thresholds_is_incomplete():
+    line = run_reconciliation(
+        _stale_workbook(), ["Provisions!C5"], pct_threshold=0.5, absolute_threshold=1_000_000.0
+    ).lines[0]
+    assert line.verdict == "incomplete"
+
+
+def test_unknown_freshness_authoritative_output_is_also_incomplete():
+    line = run_reconciliation(_stale_workbook(freshness="unknown"), ["Provisions!C5"]).lines[0]
+    assert line.calculation_evidence_status == "unknown"
+    assert line.verdict == "incomplete"
+
+
+def test_fresh_looking_output_with_a_stale_dependency_is_incomplete():
+    """The root cell (C5) itself has a cached value under automatic mode — it
+    looks fresh on its own. One of its dependencies (C2) is a formula cell
+    whose own cached value was never confirmed. The line must still be capped,
+    per the conservative chain-wide freshness policy."""
+    cells = {
+        "Provisions!C1": cell("Provisions!C1", value=10.0),
+        "Provisions!C2": cell("Provisions!C2", formula="=C1*2", value=20.0, stale=True),
+        "Provisions!C3": cell("Provisions!C3", value=30.0),
+        "Provisions!C5": cell("Provisions!C5", formula="=SUM(C1:C3)", value=60.0),
+    }
+    graph = {
+        "Provisions!C5": ["Provisions!C1", "Provisions!C2", "Provisions!C3"],
+        "Provisions!C2": ["Provisions!C1"],
+        "Provisions!C1": [],
+        "Provisions!C3": [],
+    }
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!C5"]).lines[0]
+    assert line.calculation_evidence_status == "stale"
+    assert line.stale_cell_refs == ["Provisions!C2"]
+    assert line.verdict == "incomplete"
+    # Python's own reconstruction is unaffected — it independently recomputed
+    # C2 rather than trusting its cached value — so the number itself is not
+    # wrong; only the verdict is capped, per the class-level design note.
+    assert line.target_value == 60.0
+
+
+def test_multiple_stale_dependency_cells_are_identified_without_duplication():
+    cells = {
+        "Provisions!C1": cell("Provisions!C1", formula="=1+1", value=2.0, stale=True),
+        "Provisions!C2": cell("Provisions!C2", formula="=2+2", value=4.0, freshness="unknown"),
+        "Provisions!C3": cell("Provisions!C3", value=10.0),
+        "Provisions!C5": cell("Provisions!C5", formula="=C1+C2+C3", value=16.0, stale=True),
+    }
+    graph = {
+        "Provisions!C5": ["Provisions!C1", "Provisions!C2", "Provisions!C3"],
+        "Provisions!C1": [],
+        "Provisions!C2": [],
+        "Provisions!C3": [],
+    }
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!C5"]).lines[0]
+    # Root is "stale" (the stronger claim), even though a dependency is only
+    # "unknown" — and every affected ref appears exactly once.
+    assert line.calculation_evidence_status == "stale"
+    assert sorted(line.stale_cell_refs) == ["Provisions!C1", "Provisions!C2", "Provisions!C5"]
+    assert len(line.stale_cell_refs) == len(set(line.stale_cell_refs))
+
+
+def test_mixed_fresh_and_stale_authoritative_outputs_only_affects_the_stale_one():
+    cells = dict(simple_sum_workbook().cells)
+    cells["Provisions!D1"] = cell("Provisions!D1", formula="=C1*2", value=20.0, stale=True)
+    graph = dict(simple_sum_workbook().cell_dependency_graph)
+    graph["Provisions!D1"] = ["Provisions!C1"]
+
+    result = run_reconciliation(parsed(cells, graph), ["Provisions!C5", "Provisions!D1"])
+    by_label = {line.label: line for line in result.lines}
+    fresh_line = next(l for l in result.lines if "D1" not in l.stale_cell_refs and l.calculation_evidence_status == "fresh")
+    stale_line = next(l for l in result.lines if l.calculation_evidence_status == "stale")
+
+    assert fresh_line.verdict == "pass"
+    assert stale_line.verdict == "incomplete"
+
+
+def test_external_accounts_equality_cannot_pass_on_stale_workbook_evidence():
+    """The accounts figure matches Python's reconstruction exactly, but the
+    Python line it came from rests on a stale authoritative-output cell."""
+    result = run_reconciliation(
+        _stale_workbook(),
+        ["Provisions!C5"],
+        reference([gl_line("GL-001", "Technical provisions", 100.0, debit_credit="debit")]),
+    )
+    external_line = next(line for line in result.lines if line.check_type == "python_vs_accounts")
+    assert external_line.delta == 0.0
+    assert external_line.calculation_evidence_status == "stale"
+    assert external_line.verdict == "incomplete"
+
+
+def test_a_fully_fresh_clean_case_still_passes():
+    """Regression guard: nothing about the freshness cap changes a genuinely
+    fresh line's verdict."""
+    line = run_reconciliation(simple_sum_workbook(), ["Provisions!C5"]).lines[0]
+    assert line.calculation_evidence_status == "fresh"
+    assert line.stale_cell_refs == []
+    assert line.verdict == "pass"
 
 
 def test_a_blank_cell_inside_a_sum_is_zero_and_warned_about():

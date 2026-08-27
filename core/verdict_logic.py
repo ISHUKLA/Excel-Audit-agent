@@ -18,6 +18,7 @@ def compute_verdict(
     absolute_threshold: float,
     completeness: Literal["complete", "partial"],
     is_ambiguous_match: bool = False,
+    evidence_status: Literal["fresh", "stale", "unknown", "not_applicable"] = "fresh",
 ) -> Literal["pass", "warn", "block", "incomplete"]:
     """The verdict for one reconciliation line.
 
@@ -35,6 +36,16 @@ def compute_verdict(
     An ambiguous match is capped at "warn": if nobody is certain these two
     figures are the same figure, agreement between them is not evidence.
 
+    Order of operations, in this order and no other: (1) the numeric
+    threshold verdict; (2) the ambiguity cap; (3) the freshness fail-closed
+    cap. Step 3 runs last and overrides both of the others: whenever
+    evidence_status is not "fresh", a verdict that would otherwise read
+    "pass" or "warn" is forced to "incomplete" — a zero delta, a zero-width
+    threshold, and a generous threshold all reach step 3 exactly the same way
+    everything else does, so none of them can buy back a pass. A "block"
+    verdict is left as "block": a genuine large numeric disagreement on top
+    of stale evidence is worth flagging as a block, not softened.
+
     PRECONDITION: `delta` is non-negative. Agent 3 computes it as
     abs(source - target), so this holds by construction. A signed delta passed
     in here would compare as smaller than the threshold and read as "pass".
@@ -47,21 +58,21 @@ def compute_verdict(
     # Keep the independent ambiguity cap because matching the wrong figures is
     # not made reliable by their values happening to agree.
     if delta == 0 and delta_pct == 0:
-        return "warn" if is_ambiguous_match else "pass"
+        raw = "warn" if is_ambiguous_match else "pass"
+    else:
+        pct_verdict = (
+            "pass"
+            if delta_pct < pct_threshold / 10
+            else ("warn" if delta_pct < pct_threshold else "block")
+        )
+        abs_verdict = (
+            "pass"
+            if delta < absolute_threshold / 10
+            else ("warn" if delta < absolute_threshold else "block")
+        )
+        worse = pct_verdict if _ORDER[pct_verdict] >= _ORDER[abs_verdict] else abs_verdict
+        raw = "warn" if (is_ambiguous_match and worse == "pass") else worse
 
-    pct_verdict = (
-        "pass"
-        if delta_pct < pct_threshold / 10
-        else ("warn" if delta_pct < pct_threshold else "block")
-    )
-    abs_verdict = (
-        "pass"
-        if delta < absolute_threshold / 10
-        else ("warn" if delta < absolute_threshold else "block")
-    )
-
-    worse = pct_verdict if _ORDER[pct_verdict] >= _ORDER[abs_verdict] else abs_verdict
-
-    if is_ambiguous_match and worse == "pass":
-        return "warn"
-    return worse
+    if evidence_status != "fresh" and raw in ("pass", "warn"):
+        return "incomplete"
+    return raw

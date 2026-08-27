@@ -889,6 +889,11 @@ def screen_3_reconciliation() -> None:
             "I acknowledge that the reconciliation result is incomplete",
             key="acknowledge_incomplete",
         )
+        st.caption(
+            "This acknowledgement lets the pipeline continue to a report. It does not "
+            "change any verdict, does not make stale or freshness-unknown evidence "
+            "fresh, and is not a remediation or validation of the underlying result."
+        )
 
     st.markdown("---")
     use_ai_documentation, ai_transmission_acknowledged = _ai_choice_ui("gate3_ai_documentation")
@@ -1283,6 +1288,14 @@ def _unreviewed_mapping_ids(result: ReconciliationResult) -> list[str]:
     return [mapping.mapping_id for mapping in result.mappings if mapping.mapping_id not in reviewed]
 
 
+_FRESHNESS_LABELS = {
+    "fresh": "Not flagged stale",
+    "stale": "Stale",
+    "unknown": "Freshness unknown",
+    "not_applicable": "Not applicable",
+}
+
+
 def _render_reconciliation_table(lines: list, heading: str) -> None:
     st.markdown(f"#### {heading}")
     if not lines:
@@ -1299,7 +1312,14 @@ def _render_reconciliation_table(lines: list, heading: str) -> None:
                     f"{line.delta_pct * 100:.2f}%" if line.delta_pct is not None else "not comparable"
                 ),
                 "Verdict": line.verdict.upper(),
-                "Coverage": f"{line.reconstruction_coverage_pct:.1f}%",
+                # Reconstruction coverage (how much of the formula Python could
+                # rebuild) is a DIFFERENT fact from calculation freshness (whether
+                # the workbook's own cached state can be trusted at all). 100%
+                # coverage does not mean the Excel values were freshly calculated.
+                "Formula coverage": f"{line.reconstruction_coverage_pct:.1f}%",
+                "Calculation freshness": _FRESHNESS_LABELS.get(
+                    line.calculation_evidence_status, line.calculation_evidence_status
+                ),
             }
             for line in lines
         ]
@@ -1309,6 +1329,14 @@ def _render_reconciliation_table(lines: list, heading: str) -> None:
         hide_index=True,
         width="stretch",
     )
+    if any(line.calculation_evidence_status != "fresh" for line in lines):
+        st.warning(
+            "One or more lines above rest on calculation evidence that is stale or "
+            "of unknown freshness. Numerical agreement — including an exact zero "
+            "delta — is not evidence that the underlying Excel values were freshly "
+            "calculated, and no materiality threshold can override this. See the "
+            "affected-cell details below."
+        )
 
 
 def _verdict_cell_style(value: object) -> str:
@@ -1323,8 +1351,25 @@ def _render_incomplete_details(lines: list) -> None:
         if line.verdict != "incomplete":
             continue
         with st.expander(
-            f"{line.label}: {line.reconstruction_coverage_pct:.1f}% reconstructed"
+            f"{line.label}: {line.reconstruction_coverage_pct:.1f}% formula coverage, "
+            f"{_FRESHNESS_LABELS.get(line.calculation_evidence_status, line.calculation_evidence_status).lower()}"
         ):
+            if line.calculation_evidence_status != "fresh":
+                st.error(
+                    f"Calculation evidence for **{line.label}** is "
+                    f"**{_FRESHNESS_LABELS.get(line.calculation_evidence_status, line.calculation_evidence_status).lower()}**. "
+                    "The following cell(s) in its derivation are stale or of unknown "
+                    "freshness — meaning either the cached value was never confirmed by "
+                    "a recalculation, or the workbook's calculation mode could not be "
+                    "determined at all:"
+                )
+                for ref in line.stale_cell_refs:
+                    st.write(f"- `{ref}`")
+                st.caption(
+                    "This is why this line cannot read as a pass, however close the "
+                    "numbers are: numerical agreement is not evidence of a fresh Excel "
+                    "calculation."
+                )
             if line.unsupported_elements:
                 for element in line.unsupported_elements:
                     st.write(f"- {element}")

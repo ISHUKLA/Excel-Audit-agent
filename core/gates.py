@@ -381,6 +381,7 @@ def _evaluate_reconciliation(
             absolute_threshold=absolute_threshold,
             completeness=line.completeness,
             is_ambiguous_match=is_ambiguous,
+            evidence_status=line.calculation_evidence_status,
         )
         line.pct_threshold = pct_threshold
         line.absolute_threshold = absolute_threshold

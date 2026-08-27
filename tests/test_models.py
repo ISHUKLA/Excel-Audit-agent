@@ -69,6 +69,7 @@ def a_cell(**overrides):
         is_error=False,
         error_type=None,
         is_stale=False,
+        calculation_freshness="fresh",
     )
     return CellRecord(**{**defaults, **overrides})
 
@@ -143,6 +144,7 @@ def a_recon_line(**overrides):
         unsupported_elements=[],
         derivation=[a_derivation_step()],
         mapping_id=None,
+        calculation_evidence_status="fresh",
     )
     return ReconciliationLine(**{**defaults, **overrides})
 
@@ -396,7 +398,9 @@ def test_cell_record_holds_formula_and_cached_value_together():
 def test_cell_record_is_stale_when_formula_has_no_cached_value():
     """A formula that was never recalculated: the formula survives, the value
     is None, and is_stale says why — three separate facts, none lost."""
-    cell = a_cell(formula="=SUM(C1:C4)", cached_value=None, is_stale=True)
+    cell = a_cell(
+        formula="=SUM(C1:C4)", cached_value=None, is_stale=True, calculation_freshness="stale"
+    )
     assert cell.formula is not None
     assert cell.cached_value is None
     assert cell.is_stale is True
