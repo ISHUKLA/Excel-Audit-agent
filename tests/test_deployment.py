@@ -24,7 +24,7 @@ def test_dockerfile_has_the_required_runtime_and_mounted_evidence_path():
         "libpango-1.0-0",
         "libpangoft2-1.0-0",
         "libpangocairo-1.0-0",
-        "libgdk-pixbuf2.0-0",
+        "libgdk-pixbuf-2.0-0",
         "libffi-dev",
         "shared-mime-info",
     ):
