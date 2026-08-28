@@ -1,0 +1,45 @@
+{
+  "case_number": 4,
+  "case_title": "Claims reserve roll-forward and GL reconciliation",
+  "synthetic_data": true,
+  "workbook_path": "demo/workbooks/case_4_claims_reserve_roll_forward.xlsx",
+  "reference_csv_path": "demo/reference_figures/case_4_reference_figures.csv",
+  "gate1_context": {
+    "entity": "Aurora General Insurance SA",
+    "period": "2025-Q4",
+    "currency": "EUR",
+    "basis": "IFRS 17 – synthetic demonstration"
+  },
+  "authoritative_output_cells": ["Controls!B4"],
+  "expected_finding_categories": {},
+  "expected_finding_count": 0,
+  "calculation_mode": "automatic (committed fixture)",
+  "calculation_status": "not flagged stale — this is not a claim of 'verified fresh' or 'freshly recalculated'",
+  "reconstruction_coverage_pct": 100.0,
+  "internal_source_value": -1400000.0,
+  "internal_python_target_value": -1400000.0,
+  "internal_delta": 0.0,
+  "expected_internal_verdict": "pass",
+  "reference_signed_value": -1400000.0,
+  "external_delta": 0.0,
+  "mapping": {
+    "cardinality": "one-to-one",
+    "requires_human_approval": true
+  },
+  "expected_external_verdict": "pass (only after the proposed mapping is approved by a named human)",
+  "expected_overall_result": "pass after Gate 3 mapping approval; PDF available only after Gate 4",
+  "required_human_actions": [
+    "Confirm Gate 1 context",
+    "Dispose of zero findings (none present)",
+    "Approve the one-to-one account mapping at Gate 3 — a confident fuzzy match never self-approves",
+    "Set materiality thresholds at Gate 3",
+    "AI documentation is optional; declining it does not block the pipeline",
+    "Record a named approval at Gate 4"
+  ],
+  "material_limitations": [
+    "Synthetic demonstration data only; not derived from a policyholder, insurer, ledger, actuarial model, or production workbook.",
+    "This is a workflow demonstration, not IFRS 17 methodology validation.",
+    "'Not flagged stale' does not prove the workbook was recalculated by Microsoft Excel; the committed fixture's cached values were genuinely recalculated at build time via an authorised, one-time LibreOffice pass — see demo/recalculation_provenance.json.",
+    "The signed accounting orientation (credit = negative) is a deliberate demonstration of the existing sign convention, not a new convention."
+  ]
+}

@@ -92,6 +92,29 @@
       "external_links_unchanged": true,
       "cached_numeric_values_unchanged": true,
       "verification_result": "pass"
+    },
+    {
+      "relative_path": "demo/workbooks/case_4_claims_reserve_roll_forward.xlsx",
+      "pre_recalculation_sha256": "63dc2f68e35bfb4c79ae78de2bd3636668033d8ea9e2867a4e04017c0a8d273d",
+      "post_recalculation_sha256": "8275e543b83874d6efa5cfad2cbefe90415a7279ddc96b5ea158cd1be2513c21",
+      "formula_manifest_sha256_before": "15eabf535061986b43537a8c425ff2668046d93a074e566c292d1faa3e2efa4b",
+      "formula_manifest_sha256_after": "15eabf535061986b43537a8c425ff2668046d93a074e566c292d1faa3e2efa4b",
+      "formula_manifest_note": "formula text unchanged; formula-manifest hash identical.",
+      "calculation_mode_after": "automatic",
+      "formula_count_before": 9,
+      "formula_count_after": 9,
+      "tab_names_unchanged": true,
+      "named_ranges_unchanged": true,
+      "has_vba_unchanged": true,
+      "external_links_unchanged": true,
+      "cached_numeric_values_unchanged": true,
+      "expected_values_verified": {
+        "Rollforward!B9": 1400000.0,
+        "Controls!B3": 1400000.0,
+        "Controls!B4": -1400000.0,
+        "Controls!B5": 150000.0
+      },
+      "verification_result": "pass"
     }
   ],
   "output_pack_copy_verification": [
@@ -114,6 +137,13 @@
       "output_pack_path": "outputs/ai2_2026_demo_pack_20260824/case_3_accounting_reconciliation_failure.xlsx",
       "canonical_sha256": "1e4de775e291d5ef204160ef8f6bfaed1126873bde6308370ea57b8178ba2e81",
       "output_pack_sha256": "1e4de775e291d5ef204160ef8f6bfaed1126873bde6308370ea57b8178ba2e81",
+      "hashes_match": true
+    },
+    {
+      "canonical_path": "demo/workbooks/case_4_claims_reserve_roll_forward.xlsx",
+      "output_pack_path": "outputs/ai2_2026_demo_pack_20260824/case_4_claims_reserve_roll_forward.xlsx",
+      "canonical_sha256": "8275e543b83874d6efa5cfad2cbefe90415a7279ddc96b5ea158cd1be2513c21",
+      "output_pack_sha256": "8275e543b83874d6efa5cfad2cbefe90415a7279ddc96b5ea158cd1be2513c21",
       "hashes_match": true
     }
   ],

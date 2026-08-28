@@ -13,7 +13,7 @@ def load_case(case_number: int) -> dict:
     """Load a demonstration case.
 
     Args:
-        case_number: 1, 2, or 3
+        case_number: 1, 2, 3, or 4
 
     Returns:
         dict with keys:
@@ -53,10 +53,19 @@ def load_case(case_number: int) -> dict:
             "basis": "IFRS 17 – synthetic demonstration",
             "description": "Case 3: Accounting reconciliation failure (currency mismatch with reference figures)",
         },
+        4: {
+            "workbook": "case_4_claims_reserve_roll_forward.xlsx",
+            "reference_csv": "case_4_reference_figures.csv",
+            "entity": "Aurora General Insurance SA",
+            "period": "2025-Q4",
+            "currency": "EUR",
+            "basis": "IFRS 17 – synthetic demonstration",
+            "description": "Case 4: Claims reserve roll-forward with signed GL reconciliation",
+        },
     }
 
     if case_number not in cases:
-        raise ValueError(f"Case {case_number} not found. Choose 1, 2, or 3.")
+        raise ValueError(f"Case {case_number} not found. Choose 1, 2, 3, or 4.")
 
     case_spec = cases[case_number]
 
@@ -94,4 +103,5 @@ def list_cases() -> list[dict]:
         {"number": 1, "name": "Clean Reserve Calculation (pass)"},
         {"number": 2, "name": "Spreadsheet Control Failures (incomplete)"},
         {"number": 3, "name": "Accounting Reconciliation Failure (block)"},
+        {"number": 4, "name": "Claims Reserve Roll-Forward (pass after mapping approval)"},
     ]

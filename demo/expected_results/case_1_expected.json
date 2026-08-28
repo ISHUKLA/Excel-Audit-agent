@@ -1,0 +1,30 @@
+{
+  "case_number": 1,
+  "case_title": "Clean reserve calculation",
+  "synthetic_data": true,
+  "workbook_path": "demo/workbooks/case_1_clean_reserve_calculation.xlsx",
+  "reference_csv_path": "demo/reference_figures/case_1_reference_figures.csv",
+  "gate1_context": {
+    "entity": "Aurora Life SA",
+    "period": "2025-Q4",
+    "currency": "EUR",
+    "basis": "IFRS 17 – synthetic demonstration"
+  },
+  "authoritative_output_cells": ["Reserve Calculation!B12"],
+  "expected_finding_categories": {},
+  "expected_finding_count": 0,
+  "expected_internal_verdict": "pass",
+  "expected_external_verdict": "pass",
+  "expected_overall_result": "pass, PDF available after Gate 4",
+  "required_human_actions": [
+    "Confirm Gate 1 context",
+    "Dispose of zero findings (none present)",
+    "Approve the proposed account mapping at Gate 3",
+    "Set materiality thresholds at Gate 3",
+    "Record a named approval at Gate 4"
+  ],
+  "material_limitations": [
+    "Synthetic demonstration data only; not derived from a real workbook.",
+    "Does not validate actuarial methodology or assumptions."
+  ]
+}

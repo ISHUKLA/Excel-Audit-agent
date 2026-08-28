@@ -4,6 +4,15 @@ One line per meaningful change. This is the project's lightweight change-control
 record — it exists so that a reviewer can reconstruct what changed and when
 without reading the git log.
 
+## 2026-08-27 — CI runs release checks on main pull requests
+
+- Replaced the frozen-branch-only workflow (`release/v1.0.0-freeze`) with `.github/workflows/ci.yml` triggering on push to `main`, pull requests targeting `main`, and manual `workflow_dispatch`.
+- Added a Python version matrix (3.11, matching the Docker runtime; 3.13, matching the verified local development environment) with pip caching via `actions/setup-python`.
+- Split secret scanning into its own job (gitleaks, PR-comment posting disabled) and scoped workflow permissions to `contents: read`.
+- Repaired the Docker smoke test: the health check now polls `http://127.0.0.1:8501/_stcore/health` from the runner host (the application image has no `curl`), the container is bound to loopback only, cleanup runs unconditionally via a shell `trap`, and container logs are captured on failure.
+- Updated the README CI badge/link to `main`, removed the stale Python-3.9.6-only verification claim from `requirements.txt`, and stated explicitly that GitHub CI evidence applies only after an actual workflow run — a local `pytest` pass is not that evidence.
+- No application-level authentication, hosted deployment, or LibreOffice runtime dependency was added.
+
 ## 2026-08-27 — Prevent stale calculation evidence from producing a pass verdict
 
 - Added `CellRecord.calculation_freshness` (`fresh`/`stale`/`unknown`), computed in `agents/parser.py`: a missing cached value or manual calculation mode is `stale`; an undetermined calculation mode is `unknown`; a literal (non-formula) cell is always `fresh`, since nothing about it is recomputed. `is_stale` is retained for every existing caller, widened to mean `calculation_freshness != "fresh"`.

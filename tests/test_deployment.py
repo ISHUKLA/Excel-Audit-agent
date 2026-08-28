@@ -24,7 +24,7 @@ def test_dockerfile_has_the_required_runtime_and_mounted_evidence_path():
         "libpango-1.0-0",
         "libpangoft2-1.0-0",
         "libpangocairo-1.0-0",
-        "libgdk-pixbuf2.0-0",
+        "libgdk-pixbuf-2.0-0",
         "libffi-dev",
         "shared-mime-info",
     ):
@@ -102,3 +102,78 @@ def test_readme_leads_with_local_first_posture_and_plain_limitations():
     assert "tamper-evident, not tamper-proof" in readme
     assert "Data minimization is informal" in readme
     assert "not a certified privacy or regulatory control" in readme
+
+
+# ---------------------------------------------------------------------------
+# Work Package 3 — CI runs release checks on main, not a frozen release branch
+# ---------------------------------------------------------------------------
+
+
+def _load_ci_workflow() -> dict:
+    import yaml
+
+    return yaml.safe_load(_read(".github/workflows/ci.yml"))
+
+
+def test_ci_triggers_on_push_and_pull_request_to_main():
+    workflow = _load_ci_workflow()
+    on = workflow.get("on") or workflow.get(True)  # PyYAML parses bare `on:` as True
+
+    assert on["push"]["branches"] == ["main"]
+    assert on["pull_request"]["branches"] == ["main"]
+
+
+def test_ci_supports_manual_dispatch():
+    workflow = _load_ci_workflow()
+    on = workflow.get("on") or workflow.get(True)
+
+    assert "workflow_dispatch" in on
+
+
+def test_ci_does_not_claim_release_freeze_branch_as_its_only_target():
+    workflow_text = _read(".github/workflows/ci.yml")
+
+    assert "release/v1.0.0-freeze" not in workflow_text
+
+
+def test_ci_tests_python_3_11_and_3_13():
+    workflow = _load_ci_workflow()
+    matrix = workflow["jobs"]["test"]["strategy"]["matrix"]
+
+    assert set(matrix["python-version"]) == {"3.11", "3.13"}
+
+
+def test_ci_runs_the_complete_suite_command():
+    workflow_text = _read(".github/workflows/ci.yml")
+
+    assert "python -m pytest tests/ -v -rsx -p no:cacheprovider" in workflow_text
+
+
+def test_ci_docker_smoke_test_waits_on_the_host_visible_health_endpoint():
+    workflow_text = _read(".github/workflows/ci.yml")
+
+    assert "http://127.0.0.1:8501/_stcore/health" in workflow_text
+    # The health check must run from the runner host against the published
+    # port, not rely on curl existing inside the application image.
+    assert "--health-cmd" not in workflow_text
+
+
+def test_ci_docker_smoke_test_binds_loopback_only():
+    workflow_text = _read(".github/workflows/ci.yml")
+
+    assert "-p 127.0.0.1:8501:8501" in workflow_text
+
+
+def test_ci_docker_smoke_test_guarantees_cleanup_via_trap():
+    workflow_text = _read(".github/workflows/ci.yml")
+
+    assert "trap cleanup EXIT" in workflow_text
+
+
+def test_ci_uses_least_privilege_permissions():
+    workflow = _load_ci_workflow()
+
+    # contents:read is the baseline; pull-requests:read is the only addition,
+    # required so gitleaks-action can list the PR's commits to scan them —
+    # it grants no write access, in particular no PR-comment posting.
+    assert workflow["permissions"] == {"contents": "read", "pull-requests": "read"}

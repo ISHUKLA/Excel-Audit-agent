@@ -1,6 +1,6 @@
-# AIÂ² 2026 demonstration workbook guide
+# AI² 2026 demonstration workbook guide
 
-This pack contains three entirely synthetic Excel workbooks designed to exercise the Excel Audit Agent's successful, incomplete, and externally blocked paths. No workbook or reference file contains client, policyholder, insurer, ledger, or production data.
+This pack contains four entirely synthetic Excel workbooks designed to exercise the Excel Audit Agent's successful, incomplete, externally blocked, and actuarial-to-finance reconciliation paths. No workbook or reference file contains client, policyholder, insurer, ledger, or production data.
 
 ## Common application settings
 
@@ -14,7 +14,7 @@ This pack contains three entirely synthetic Excel workbooks designed to exercise
 
 Files:
 
-- `workbooks/01_clean_reserve_calculation.xlsx`
+- `workbooks/case_1_clean_reserve_calculation.xlsx`
 - `reference_figures/case_1_reference_figures.csv`
 
 Gate 1 context:
@@ -44,7 +44,7 @@ Expected outcomes:
 
 ## Case 2 – Spreadsheet control failures
 
-File: `workbooks/02_spreadsheet_control_failures.xlsx`
+File: `workbooks/case_2_spreadsheet_control_failures.xlsx`
 
 Gate 1 context:
 
@@ -72,7 +72,7 @@ The workbook's cached value for `Reserve Calculation!B14` is 2,641,600. The audi
 
 Files:
 
-- `workbooks/03_accounts_reconciliation_failure.xlsx`
+- `workbooks/case_3_accounting_reconciliation_failure.xlsx`
 - `reference_figures/case_3_reference_figures.csv`
 
 Gate 1 context:
@@ -107,6 +107,38 @@ Expected outcomes:
 
 This case proves that a numerically matching line does not override incomplete population or incompatible accounting context, and that internal and external verdicts are never collapsed.
 
+## Case 4 – Claims reserve roll-forward and GL reconciliation
+
+Files:
+
+- `workbooks/case_4_claims_reserve_roll_forward.xlsx`
+- `reference_figures/case_4_reference_figures.csv`
+
+Gate 1 context:
+
+| Field | Workbook | Reference figures |
+|---|---|---|
+| Entity | Aurora General Insurance SA | Aurora General Insurance SA |
+| Period | 2025-Q4 | 2025-Q4 |
+| Currency | EUR | EUR |
+| Basis | IFRS 17 – synthetic demonstration | IFRS 17 – synthetic demonstration |
+
+At Gate 2, designate `Controls!B4` as the authoritative output.
+
+Expected outcomes:
+
+- Anomaly findings: none.
+- Closing claims reserve (`Rollforward!B9`): `1,250,000 + 480,000 − 390,000 + 85,000 − 25,000 = 1,400,000`.
+- `Controls!B4` (`Net claims reserve`) converts the positive actuarial magnitude to a signed credit accounting balance: `-1,400,000`.
+- Internal reconstruction: complete, 100% coverage, delta `0`, preview verdict `pass`.
+- Reference figures: account `2200`, `Net claims reserve`, amount `1,400,000`, `credit` — the signed reference amount is `-1,400,000`.
+- Proposed accounting mapping: one-to-one, human approval required — a confident fuzzy match never self-approves.
+- External reconciliation after mapping approval: delta `0`, verdict `pass`.
+- AI documentation is optional for this case; declining it does not block the pipeline.
+- PDF: available only after the Gate 4 named approval record.
+
+This case is a synthetic workflow demonstration, not IFRS 17 methodology validation.
+
 ## Expected-result summary
 
 | Case | Findings | Internal result | External result | Intended endpoint |
@@ -114,11 +146,12 @@ This case proves that a numerically matching line does not override incomplete p
 | 1 – Clean | none | pass | pass after mapping approval | PDF after Gate 4 |
 | 2 – Controls | blocker + warnings | incomplete | not performed | explicit incomplete acknowledgement; findings remain recorded |
 | 3 – Accounts | none | pass | block | Gate 3 stops the pipeline |
+| 4 – Reserve roll-forward | none | pass | pass after mapping approval | PDF after Gate 4 |
 
 These are demonstration expectations for known synthetic inputs, not evidence that the tool validates an actuarial methodology or is production-certified.
 
 ## Calculation-freshness provenance
 
-The three demonstration workbooks above, plus the two static parser fixtures in `tests/fixtures/`, were recalculated once, at build time, using LibreOffice 26.2.5.2 (build cd7284b4cbbfeb507e630c1aac019f4157393acb), so their workbook calc mode is genuinely declared `automatic` rather than left as `unknown`. Every cached numeric value and the set of formula-bearing cells are identical before and after; the only textual changes were LibreOffice's own writer normalizing formula syntax (dropping unnecessary quotes around unquoted-safe sheet names, collapsing a single-cell range to a bare reference, and writing `FALSE()` instead of bare `FALSE`) — none of which change any computed value or the intentional defects in Case 2 or Case 3. Full before/after hashes and per-file notes are recorded in [`recalculation_provenance.json`](recalculation_provenance.json).
+The four demonstration workbooks above, plus the two static parser fixtures in `tests/fixtures/`, were recalculated once, at build time, using LibreOffice 26.2.5.2 (build cd7284b4cbbfeb507e630c1aac019f4157393acb), so their workbook calc mode is genuinely declared `automatic` rather than left as `unknown`. Every cached numeric value and the set of formula-bearing cells are identical before and after; the only textual changes were LibreOffice's own writer normalizing formula syntax (dropping unnecessary quotes around unquoted-safe sheet names, collapsing a single-cell range to a bare reference, and writing `FALSE()` instead of bare `FALSE`) — none of which change any computed value or the intentional defects in Case 2 or Case 3. Full before/after hashes and per-file notes are recorded in [`recalculation_provenance.json`](recalculation_provenance.json).
 
 This was a one-time, manual, build-time fixture-generation step. It is **not** part of the running application: the application never invokes LibreOffice, Microsoft Excel, or any recalculation engine, and an arbitrary workbook a reviewer uploads is never recalculated by it. A cell not flagged stale in this prototype means only that no known staleness indicator was detected under these rules — it is not proof that the workbook was freshly recalculated in Excel, or by any particular engine, at any particular time.

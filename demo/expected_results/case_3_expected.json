@@ -1,0 +1,34 @@
+{
+  "case_number": 3,
+  "case_title": "Accounting reconciliation failure",
+  "synthetic_data": true,
+  "workbook_path": "demo/workbooks/case_3_accounting_reconciliation_failure.xlsx",
+  "reference_csv_path": "demo/reference_figures/case_3_reference_figures.csv",
+  "gate1_context": {
+    "entity": "Aurora Life SA",
+    "period": "2025-Q4",
+    "currency": "EUR",
+    "basis": "IFRS 17 – synthetic demonstration"
+  },
+  "authoritative_output_cells": [
+    "Reserve Summary!B7",
+    "Reserve Summary!B8",
+    "Reserve Summary!B9"
+  ],
+  "expected_finding_categories": {},
+  "expected_finding_count": 0,
+  "expected_internal_verdict": "pass",
+  "expected_external_verdict": "block",
+  "expected_overall_result": "block; Gate 3 stops before a report can be produced",
+  "required_human_actions": [
+    "Confirm Gate 1 context",
+    "Dispose of zero findings (none present)",
+    "Review the currency-mismatch evidence surfaced at Gate 3",
+    "Cannot proceed to Gate 4 while the external verdict is block"
+  ],
+  "material_limitations": [
+    "Synthetic demonstration data only; not derived from a real workbook.",
+    "The reference figures are intentionally in GBP while the workbook claims EUR — this is a deliberate context-mismatch demonstration, not a real currency conversion.",
+    "Numerical agreement alone is never treated as evidence that the comparison is valid; entity/period/currency agreement is checked first."
+  ]
+}

@@ -90,7 +90,7 @@ This tool automates the legwork — parsing the spreadsheet, reconstructing its 
 
 ---
 
-## Three Demonstration Cases
+## Four Demonstration Cases
 
 All demonstration workbooks are entirely synthetic. No real client, policyholder, insurer, ledger, or production data is included.
 
@@ -108,6 +108,11 @@ All demonstration workbooks are entirely synthetic. No real client, policyholder
 - File: `demo/workbooks/case_3_accounting_reconciliation_failure.xlsx`
 - Reference figures: `demo/reference_figures/case_3_reference_figures.csv` (intentionally in GBP while the workbook claims EUR).
 - What it shows: Numerically matching figures with a currency mismatch. Internal verdict: pass (figures match). External verdict: block (context mismatch prevents reliance on the accounts reconciliation). Expected outcome: Gate 3 stops the pipeline; the report names the mismatch as evidence.
+
+**Case 4: Claims reserve roll-forward and GL reconciliation**
+- File: `demo/workbooks/case_4_claims_reserve_roll_forward.xlsx`
+- Reference figures: `demo/reference_figures/case_4_reference_figures.csv`
+- What it shows: An actuarial claims-reserve movement (opening reserve, incurred claims, paid claims, assumption strengthening, FX) rolled forward to a closing reserve, then bridged to a signed general-ledger credit balance at `Controls!B4`. The reserve magnitude is always non-negative; the credit orientation carries the sign, so `Controls!B4` is `-1,400,000` against a workbook closing reserve of `+1,400,000`. Internal verdict: pass. Proposed mapping requires explicit human approval before the external verdict can be `pass`. AI documentation is optional here, not mandatory. This is a synthetic workflow demonstration, not IFRS 17 methodology validation, and reproducing this result is not a claim of actuarial methodology validation.
 
 ---
 
@@ -201,19 +206,20 @@ This table makes explicit where the AI is involved and where the decisions are e
 
 ---
 
-## Measured Synthetic Benchmark
+## Synthetic Demonstration Scope
 
-**Status:** Synthetic test cases only; no production benchmark exists yet.
+**Status:** Synthetic test cases only; no timing benchmark, production or otherwise, has been measured.
 
-The three demonstration cases (Cases 1–3, see above) are designed to exercise the full pipeline and measure performance on well-understood workbooks:
+The four demonstration cases (Cases 1–4, see above) are small, well-understood workbooks designed to exercise the full pipeline's distinct paths:
 
-- **Case 1 (clean):** 3 tabs, 8 cells, 0 findings → expected run time <2 seconds.
-- **Case 2 (control failures):** 2 tabs, 14 cells, 3 findings → expected run time <2 seconds.
-- **Case 3 (accounts mismatch):** 2 tabs, 3 outputs, currency mismatch → expected run time <2 seconds.
+- **Case 1 (clean):** 3 tabs, 8 cells, 0 findings.
+- **Case 2 (control failures):** 2 tabs, 14 cells, 3 findings.
+- **Case 3 (accounts mismatch):** 2 tabs, 3 outputs, currency mismatch.
+- **Case 4 (reserve roll-forward):** 4 tabs, 9 formula cells, signed GL bridge.
 
-All timings exclude Anthropic API latency (Agent 4 documentation call). With the API call, expect an additional 3–8 seconds depending on network and API availability.
+No run-time figures are published here because none have been measured and recorded; this is scope and structure, not a performance claim.
 
-**Production benchmark:** Not yet measured. The tool has not been tested on real workbooks of varying size and complexity. Performance on large files (>10 MB, >10,000 cells) is unknown.
+**Production scale:** Not yet exercised. The tool has not been tested on real workbooks of varying size and complexity. Behaviour on large files (>10 MB, >10,000 cells) is unknown.
 
 ---
 
@@ -272,9 +278,11 @@ pytest tests/           # Full suite
 pytest tests/test_parser.py -v
 ```
 
-**Current status (verified 27 August 2026):** 454 tests passing (`python3 -m pytest tests/ -v -rsx -p no:cacheprovider`, zero failures, zero errors, zero skips).
+**Current status (verified locally 27 August 2026):** 487 tests passing (`python3 -m pytest tests/ -v -rsx -p no:cacheprovider`, zero failures, zero errors, zero skips), run locally on Python 3.13.
 
-[![CI — Release v1.0.0 Freeze](https://github.com/ISHUKLA/Excel-Audit-agent/actions/workflows/ci.yml/badge.svg?branch=release/v1.0.0-freeze)](https://github.com/ISHUKLA/Excel-Audit-agent/actions?query=branch%3Arelease%2Fv1.0.0-freeze)
+[![CI](https://github.com/ISHUKLA/Excel-Audit-agent/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ISHUKLA/Excel-Audit-agent/actions/workflows/ci.yml)
+
+CI runs the full suite on Python 3.11 (matching the Docker runtime) and Python 3.13 on every push and pull request to `main`, plus a Docker build-and-health-check smoke test. The badge above and the numbers it links to reflect GitHub's own record of those runs; they are evidence only after a workflow run has actually completed on `main` — a local `pytest` pass reported in this file is not GitHub CI evidence on its own.
 
 The test suite covers:
 - Clean workbooks and messy input (blank tabs, broken formulas, inconsistent labels).
@@ -328,7 +336,7 @@ the full disclosure text shown at Gate 3.
 
 **Competition demonstrations use synthetic data only.** Real or sensitive company data is outside
 this prototype's approved use unless separately authorised and governed — the demo cases shipped
-with this repo are entirely fictional (see "Three Demonstration Cases" above).
+with this repo are entirely fictional (see "Four Demonstration Cases" above).
 
 ### What Stays Local
 

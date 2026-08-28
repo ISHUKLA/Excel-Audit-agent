@@ -1,0 +1,34 @@
+{
+  "case_number": 2,
+  "case_title": "Spreadsheet control failures",
+  "synthetic_data": true,
+  "workbook_path": "demo/workbooks/case_2_spreadsheet_control_failures.xlsx",
+  "reference_csv_path": null,
+  "gate1_context": {
+    "entity": "Aurora Life SA",
+    "period": "2025-Q4",
+    "currency": "EUR",
+    "basis": "IFRS 17 – synthetic demonstration"
+  },
+  "authoritative_output_cells": ["Reserve Calculation!B14"],
+  "expected_finding_categories": {
+    "circular_reference": 1,
+    "hardcoded_literal": 1,
+    "unsupported_formula": 1
+  },
+  "expected_finding_count": 3,
+  "expected_internal_verdict": "incomplete",
+  "expected_external_verdict": "not_performed",
+  "expected_overall_result": "incomplete; requires explicit acknowledgement to proceed to a report",
+  "required_human_actions": [
+    "Confirm Gate 1 context",
+    "Dispose of each of the 3 findings individually (confirm, override, or dismiss with a reason)",
+    "Explicitly acknowledge the incomplete reconstruction at Gate 3 to continue",
+    "Record a named approval at Gate 4"
+  ],
+  "material_limitations": [
+    "Synthetic demonstration data only; not derived from a real workbook.",
+    "No reference figures supplied — the external (accounts) comparison is not performed, not silently skipped.",
+    "VLOOKUP is outside the supported formula catalogue and is never reconstructed."
+  ]
+}
