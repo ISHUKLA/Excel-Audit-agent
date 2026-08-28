@@ -137,39 +137,55 @@ def _chain_integrity_error(exc: ChainIntegrityError) -> None:
     )
 
 
-def _workbook_identity_panel(uploaded_file) -> Optional[str]:
+def _effective_workbook_bytes(uploaded_file) -> tuple[Optional[bytes], str]:
+    """Resolve the bytes Gate 1 is actually about to bind to: an upload takes
+    priority over a loaded demo case, matching whichever the reviewer acted on
+    most recently. Used to drive the identity panel below, so a demo case's
+    identity is shown and confirmed exactly like an upload's — never seeded
+    only after "Start audit" is clicked.
+    """
+    if uploaded_file is not None:
+        return uploaded_file.getvalue(), uploaded_file.name
+    demo_bytes = st.session_state.get("demo_workbook_bytes")
+    if demo_bytes:
+        return demo_bytes, st.session_state.get("demo_workbook_label", "Demo workbook")
+    return None, "Not uploaded"
+
+
+def _workbook_identity_panel(workbook_bytes: Optional[bytes], display_name: str) -> Optional[str]:
     """Show which workbook is being confirmed, and reset the confirmation if it
     changes. Rendering and session bookkeeping only — the binding is enforced in
     the orchestrator, which never trusts anything decided here.
 
     A filename is not an identity: two different workbooks can share a name. The
     short hash is for the eye, the full 64 characters are what can actually be
-    checked against an external record, so both are shown.
+    checked against an external record, so both are shown. Works identically
+    whether the bytes came from an upload or a loaded demonstration case.
     """
-    if uploaded_file is None:
+    if workbook_bytes is None:
         st.session_state.confirmed_workbook_hash = None
         return None
 
-    workbook_bytes = uploaded_file.getvalue()
     workbook_hash = sha256_bytes(workbook_bytes)
 
-    # Requirement 4: a new file — even one with the same name — invalidates the
-    # previous confirmation, because it is a different workbook.
+    # Requirement 4: a new identity — a different upload, a different demo
+    # case, or switching between the two — invalidates the previous
+    # confirmation, because it is a different workbook.
     if st.session_state.get("confirmed_workbook_hash") != workbook_hash:
         st.session_state.confirmed_workbook_hash = workbook_hash
         st.session_state.gate1_context_confirmed = False
 
     st.markdown("**Workbook identity**")
     identity_columns = st.columns([1, 1, 2])
-    identity_columns[0].metric("File", uploaded_file.name)
+    identity_columns[0].metric("File", display_name)
     identity_columns[1].metric("Size", f"{len(workbook_bytes):,} bytes")
     identity_columns[2].metric("SHA-256 (short)", workbook_hash[:12])
     st.code(workbook_hash, language=None)
     st.caption(
-        "The full SHA-256 of the uploaded bytes. Reproduce it with "
+        "The full SHA-256 of these bytes. Reproduce it with "
         "`shasum -a 256 <file>`. Confirming below binds this review to these "
-        "exact bytes; uploading a different file, even under the same name, "
-        "clears the confirmation."
+        "exact bytes; uploading a different file or loading a different demo "
+        "case, even under the same name, clears the confirmation."
     )
     return workbook_hash
 
@@ -196,6 +212,7 @@ def screen_1_upload() -> None:
                 case_data = load_case(demo_cases[selected_idx]["number"])
                 # Seed input fields (don't auto-confirm Gate 1)
                 st.session_state.demo_workbook_bytes = case_data["workbook_bytes"]
+                st.session_state.demo_workbook_label = case_names[selected_idx]
                 st.session_state.demo_reference_path = case_data["reference_csv_path"]
                 st.session_state.file_description = case_data["description"]
                 st.session_state.file_entity = case_data["entity"]
@@ -324,9 +341,11 @@ def screen_1_upload() -> None:
             control_total = None
             control_confirmed = False
 
+    effective_bytes, effective_name = _effective_workbook_bytes(uploaded_file)
+
     st.subheader("Gate 1 — Confirm context before parsing")
     context_summary = [
-        ("Workbook", "Filename", uploaded_file.name if uploaded_file else "Not uploaded"),
+        ("Workbook", "Filename", effective_name),
         ("Workbook", "Description", description.strip() or "Not supplied"),
         ("Review", "Reviewer", reviewer_name.strip() or "Not supplied"),
         ("Review", "Role", role.upper() if role in {"cro", "cfo"} else role.title()),
@@ -353,7 +372,7 @@ def screen_1_upload() -> None:
         )
     st.table(pd.DataFrame(context_summary, columns=["Area", "Field", "Confirmed context"]))
 
-    workbook_hash = _workbook_identity_panel(uploaded_file)
+    workbook_hash = _workbook_identity_panel(effective_bytes, effective_name)
 
     gate1_confirmed = st.checkbox(
         "I confirm that the workbook and reference-figure context shown above is accurate.",
@@ -364,24 +383,15 @@ def screen_1_upload() -> None:
     if not st.button("Start audit", type="primary", disabled=not gate1_confirmed):
         return
 
-    # Use demo bytes if available, otherwise require file upload
-    workbook_bytes = None
-    filename_for_context = "Demo workbook"
-    if st.session_state.get("demo_workbook_bytes"):
-        workbook_bytes = st.session_state.demo_workbook_bytes
-        st.session_state.demo_workbook_bytes = None  # Consume once
-    elif uploaded_file is not None:
-        workbook_bytes = uploaded_file.getvalue()
-        filename_for_context = uploaded_file.name
-    else:
+    if effective_bytes is None:
         st.error("Please upload an .xlsx file or load a demonstration case.")
         return
 
-    # The identity panel above only hashes uploaded_file — a demo case's bytes
-    # never pass through it, so workbook_hash would be None there. Recompute
-    # from whichever bytes are actually about to be parsed, so the hash bound
-    # into FileContext always matches them.
-    workbook_hash = sha256_bytes(workbook_bytes)
+    # These are exactly the bytes and hash shown and confirmed above — never
+    # recomputed here, so confirmation binds to the identity actually rendered.
+    workbook_bytes = effective_bytes
+    filename_for_context = effective_name
+    st.session_state.demo_workbook_bytes = None  # Consume once the run starts
 
     if not description.strip():
         st.error("Please describe what this file does.")

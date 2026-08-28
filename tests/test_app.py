@@ -4,11 +4,12 @@ from pathlib import Path
 from types import SimpleNamespace
 import runpy
 
+import pytest
 from streamlit.testing.v1 import AppTest
 
 import agents.orchestrator as orchestrator_module
 from agents.orchestrator import Orchestrator
-from app import _pdf_error_message, _preparation_error_message
+from app import _effective_workbook_bytes, _pdf_error_message, _preparation_error_message, _workbook_identity_panel
 from core.audit_log import AuditLog
 from core.state_store import StateStore
 
@@ -525,3 +526,168 @@ def test_gate3_using_ai_calls_the_mocked_client_exactly_once_after_decision_is_l
 
     event_types = [row["event_type"] for row in audit_log.get_rows(report_id)]
     assert event_types.index("llm_use_decision") < event_types.index("llm_call")
+
+
+# --------------------------------------------------------------------------
+# Gate 1 workbook identity — demo cases (P0 fix)
+#
+# _workbook_identity_panel previously received only the file_uploader's
+# value, so loading a demo case skipped identity display and confirmation
+# reset entirely; the hash was computed a second time, only after "Start
+# audit" was clicked. These tests exercise the real app.py functions inside
+# a genuine Streamlit script context (AppTest), proving the fix behaviourally
+# rather than by source inspection alone.
+# --------------------------------------------------------------------------
+
+
+def test_loading_case_4_displays_its_identity_and_correct_hash():
+    """Requirement 1: loading a demo case must show its identity panel, not
+    "Not uploaded", and the hash must be the real SHA-256 of its bytes."""
+    from core.workbook_identity import sha256_bytes
+    from demo_cases import load_case
+
+    expected_bytes = load_case(4)["workbook_bytes"]
+    expected_hash = sha256_bytes(expected_bytes)
+
+    app = _initial_app()
+    selector = next(s for s in app.selectbox if s.key == "demo_case_selector")
+    case4_index = next(
+        i for i, label in enumerate(selector.options) if label.startswith("Case 4")
+    )
+    app = selector.set_value(case4_index).run(timeout=20)
+
+    load_button = next(b for b in app.button if b.label == "Load case")
+    app = load_button.click().run(timeout=20)
+    assert not app.exception
+
+    assert app.session_state["demo_workbook_bytes"] == expected_bytes
+    assert app.session_state["confirmed_workbook_hash"] == expected_hash
+
+    identity_text = " ".join(md.value for md in app.markdown)
+    assert "Workbook identity" in identity_text
+    metric_values = {m.label: m.value for m in app.metric}
+    assert metric_values["Size"] == f"{len(expected_bytes):,} bytes"
+    assert metric_values["SHA-256 (short)"] == expected_hash[:12]
+    code_values = [c.value for c in app.code]
+    assert expected_hash in code_values
+
+
+def test_displayed_hash_equals_hash_passed_to_file_context():
+    """Requirement 2: the hash bound into FileContext must be the exact
+    value returned by _workbook_identity_panel, never recomputed later."""
+    source = APP_PATH.read_text()
+    panel_call = source.find("workbook_hash = _workbook_identity_panel(")
+    file_context_call = source.find("confirmed_workbook_hash=workbook_hash")
+    run_call = source.find("expected_workbook_hash=workbook_hash")
+    assert panel_call != -1 and file_context_call != -1 and run_call != -1
+    assert panel_call < file_context_call < run_call
+    # The hash is computed in exactly one place — inside the identity panel
+    # itself — never a second time after confirmation.
+    assert source.count("sha256_bytes(workbook_bytes)") == 1
+
+
+def test_switching_from_case_1_to_case_4_clears_confirmation():
+    """Requirement 3: switching identity, including demo-to-demo, resets a
+    prior confirmation — not just a different upload under the same name."""
+
+    def script():
+        import streamlit as st
+
+        from app import _workbook_identity_panel
+
+        _workbook_identity_panel(b"case-1-bytes", "Case 1: Clean Reserve Calculation (pass)")
+        st.session_state.gate1_context_confirmed = True
+        _workbook_identity_panel(
+            b"case-4-bytes", "Case 4: Claims Reserve Roll-Forward (pass after mapping approval)"
+        )
+        st.session_state.after_switch_confirmed = st.session_state.gate1_context_confirmed
+
+    at = AppTest.from_function(script).run(timeout=20)
+    assert not at.exception
+    assert at.session_state["after_switch_confirmed"] is False
+
+
+def test_reloading_identical_bytes_does_not_create_a_false_mismatch():
+    """Requirement 4: re-selecting the same case (identical bytes and name)
+    must not clear a confirmation that is still valid."""
+
+    def script():
+        import streamlit as st
+
+        from app import _workbook_identity_panel
+
+        same_bytes = b"identical-workbook-bytes"
+        _workbook_identity_panel(same_bytes, "Case 1: Clean Reserve Calculation (pass)")
+        st.session_state.gate1_context_confirmed = True
+        _workbook_identity_panel(same_bytes, "Case 1: Clean Reserve Calculation (pass)")
+        st.session_state.still_confirmed = st.session_state.gate1_context_confirmed
+
+    at = AppTest.from_function(script).run(timeout=20)
+    assert not at.exception
+    assert at.session_state["still_confirmed"] is True
+
+
+def test_uploading_a_workbook_after_selecting_a_demo_clears_confirmation():
+    """Requirement 5: an upload takes priority over — and must invalidate —
+    a previously confirmed demo-case identity."""
+
+    def script():
+        from types import SimpleNamespace
+
+        import streamlit as st
+
+        from app import _effective_workbook_bytes, _workbook_identity_panel
+
+        st.session_state.demo_workbook_bytes = b"demo-bytes-case-4"
+        st.session_state.demo_workbook_label = "Case 4: Claims Reserve Roll-Forward (pass after mapping approval)"
+        demo_bytes, demo_name = _effective_workbook_bytes(None)
+        _workbook_identity_panel(demo_bytes, demo_name)
+        st.session_state.gate1_context_confirmed = True
+
+        fake_upload = SimpleNamespace(
+            getvalue=lambda: b"a-real-uploaded-workbook", name="my_reserves.xlsx"
+        )
+        up_bytes, up_name = _effective_workbook_bytes(fake_upload)
+        _workbook_identity_panel(up_bytes, up_name)
+        st.session_state.final_confirmed = st.session_state.gate1_context_confirmed
+        st.session_state.final_name = up_name
+
+    at = AppTest.from_function(script).run(timeout=20)
+    assert not at.exception
+    assert at.session_state["final_confirmed"] is False
+    assert at.session_state["final_name"] == "my_reserves.xlsx"
+
+
+def test_the_uploaded_workbook_path_continues_to_work():
+    """Requirement 6: an upload with no demo case loaded still resolves to
+    its own bytes and filename, unaffected by the demo-case fallback."""
+    fake_upload = SimpleNamespace(getvalue=lambda: b"upload-only-bytes", name="workbook.xlsx")
+
+    def script():
+        import streamlit as st
+
+        from app import _effective_workbook_bytes
+
+        st.session_state.pop("demo_workbook_bytes", None)
+
+    at = AppTest.from_function(script).run(timeout=20)
+    assert not at.exception
+    # Exercised directly: no Streamlit widget context is required to prove
+    # the resolution logic itself, only that session_state was consulted.
+    workbook_bytes, name = _effective_workbook_bytes(fake_upload)
+    assert workbook_bytes == b"upload-only-bytes"
+    assert name == "workbook.xlsx"
+
+
+def test_altered_bytes_are_refused_by_the_orchestrator():
+    """Requirement 7: this is Decision 4's existing guarantee (see
+    test_app_surfaces_a_workbook_identity_mismatch_without_deciding_it and
+    core/test_workbook_identity.py) — re-asserted here so the Gate 1 identity
+    fix does not silently regress it. The confirmed hash shown and bound at
+    Gate 1 is the one checked; a byte-for-byte different workbook is refused
+    before anything is parsed or recorded."""
+    from core.workbook_identity import WorkbookIdentityError, verify_bytes_match
+
+    confirmed_hash = "a" * 64
+    with pytest.raises(WorkbookIdentityError):
+        verify_bytes_match(b"different bytes than were confirmed", confirmed_hash)
