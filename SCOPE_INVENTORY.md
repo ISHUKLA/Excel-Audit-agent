@@ -1,5 +1,7 @@
 # SCOPE_INVENTORY.md
 
+> **Historical — superseded.** This document reflects a code-inspection snapshot from 2026-08-23, before the CI Python-version fix, Work Packages 3–4, and the Gate 1 identity fix. It is retained for record only; it does not describe the current repository. See `README.md`'s "Test Status and CI" section for the current, verified state.
+
 **Report Date:** 2026-08-23  
 **Python Version Compatibility Issue:** Tests cannot run on Python 3.9.6 due to use of `|` union syntax (requires Python 3.10+). All classifications below are based on code inspection, not test execution.
 

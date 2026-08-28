@@ -16,7 +16,7 @@ This tool automates the legwork — parsing the spreadsheet, reconstructing its 
 
 ![Excel Audit Agent Interface](docs/screenshot.png)
 
-**What you see above:** The Streamlit interface showing the landing section with disclaimer, progress indicator tracking all five gates in the sidebar, and Screen 1's workbook upload interface with demo case selector. After uploading, the tool routes findings, reconciliation decisions, and the final approval record through each mandatory human gate.
+**What you see above:** The Streamlit interface showing the landing section with disclaimer, a progress indicator tracking the four human gates across five workflow screens in the sidebar, and Screen 1's workbook upload interface with demo case selector. After uploading, the tool routes findings, reconciliation decisions, and the final approval record through each mandatory human gate.
 
 ---
 
@@ -65,13 +65,12 @@ This tool automates the legwork — parsing the spreadsheet, reconstructing its 
 1. **Start the application.**
    ```
    pip install -r requirements.txt
-   export ANTHROPIC_API_KEY="sk-ant-..."
    streamlit run app.py
    ```
-   Open `http://localhost:8501`.
+   Open `http://localhost:8501`. Setting `ANTHROPIC_API_KEY` is **optional** — only needed if you choose Agent 4's AI documentation at Gate 3; the full deterministic pipeline runs without it.
 
 2. **Load a demonstration case (optional).**
-   On Screen 1, expand "📚 Load a demonstration case" and select Case 1 (clean reserve calculation). The UI fills with synthetic data — entity, period, currency, and reference figures.
+   On Screen 1, expand "📚 Load a demonstration case" and select **Case 4** (claims reserve roll-forward — the principal competition demonstration; see "Four Demonstration Cases" below). The UI fills with synthetic data — entity, period, currency, and reference figures.
 
 3. **Confirm context (Gate 1).**
    Review the displayed context summary. Check the checkbox "I confirm that the workbook and reference-figure context shown above is accurate." Click "Start audit". The parser runs; findings appear on the next screen.
@@ -135,8 +134,8 @@ graph TB
     Anomaly -->|Findings| UI
     UI -->|Gate 2: Review findings| Reconciliation
     Reconciliation -->|Verdicts + mappings| UI
-    UI -->|Gate 3: Set materiality| Documentation
-    Documentation -->|Tab summaries| Report
+    UI -->|Gate 3: Set materiality + choose AI| Documentation
+    Documentation -.->|"Optional: tab summaries<br/>(reviewer may decline)"| Report
     UI -->|Gate 4: Record approval| Report
     Report -->|PDF| User
 
@@ -227,11 +226,11 @@ No run-time figures are published here because none have been measured and recor
 
 ### Requirements
 
-- **Python 3.9+** (3.11 recommended).
+- **Python 3.11 or 3.13** — the two versions actually tested, in CI and locally (3.11 is also the Docker runtime). Other versions are untested; do not assume they work.
   - macOS: `brew install python@3.11`
   - Linux: `apt install python3.11` (Debian/Ubuntu) or equivalent
   - Windows: [Official installer](https://www.python.org/downloads/windows/) or `winget install Python.Python.3.11`
-- An Anthropic API key (for Agent 4 documentation only; not required to run Agents 1–3).
+- **Optional:** an Anthropic API key, needed only if you choose to use Agent 4's AI-generated documentation. The full deterministic pipeline (Agents 1–3, all four gates, the PDF report) runs and completes with no API key at all — declining AI documentation is a normal, supported path, not a degraded one.
 - On Linux/Docker: Pango and GDK-PixBuf libraries (the Dockerfile installs these).
 
 **Test-only dependency:** Regenerating test fixtures requires LibreOffice (not needed to run the app or test suite; fixtures are pre-calculated). See [FIXTURE_MIGRATION.md](FIXTURE_MIGRATION.md).
@@ -278,7 +277,7 @@ pytest tests/           # Full suite
 pytest tests/test_parser.py -v
 ```
 
-**Current status (verified locally 27 August 2026):** 487 tests passing (`python3 -m pytest tests/ -v -rsx -p no:cacheprovider`, zero failures, zero errors, zero skips), run locally on Python 3.13.
+**Current status (verified 28 August 2026, commit `4332d95`):** 494 tests passed, locally and in GitHub CI on Python 3.11 and 3.13 (`python3 -m pytest tests/ -v -rsx -p no:cacheprovider`, zero failures, zero errors, zero skips).
 
 [![CI](https://github.com/ISHUKLA/Excel-Audit-agent/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ISHUKLA/Excel-Audit-agent/actions/workflows/ci.yml)
 
@@ -390,7 +389,7 @@ This tool was built with assistance from Claude (Anthropic's language model). Th
 
 **Reconciliation logic:** The two-pass reconciliation (Excel vs. Python, Python vs. accounts), mapping proposal flow, and verdict computation were AI-written and thoroughly tested.
 
-**Test suite:** 384 tests covering clean cases, messy input, boundary conditions, and end-to-end flows were AI-written. All tests pass.
+**Test suite:** 494 tests covering clean cases, messy input, boundary conditions, and end-to-end flows were AI-written. All tests pass — see "Test Status and CI" above for the current verified count.
 
 **Streamlit interface and PDF report:** The five-screen UI, gate enforcement, and PDF report generation via Jinja2 + WeasyPrint were AI-written.
 

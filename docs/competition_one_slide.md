@@ -23,7 +23,7 @@ bridged to a signed general-ledger credit balance — the kind of
 actuarial-to-finance handoff that is usually reconciled by hand.
 
 **Technical evidence.**
-- 463 automated tests passing locally, covering clean and messy input.
+- 494 automated tests passed on the submitted commit, locally and in GitHub CI on Python 3.11 and 3.13.
 - An append-only, hash-chained audit log (tamper-evident, not tamper-proof).
 - A stale/unknown calculation status that can never silently produce a pass,
   under any threshold — including a zero delta.
