@@ -202,6 +202,21 @@ def screen_1_upload() -> None:
                 st.session_state.file_period = case_data["period"]
                 st.session_state.file_currency = case_data["currency"]
                 st.session_state.file_basis = case_data["basis"]
+                # The reference-figures context fields default to the workbook
+                # context only on their first render; once their widget key
+                # exists in session_state that default is never reapplied, so
+                # loading a different case after that point left them stale
+                # and produced a false context mismatch at Gate 3. Seed them
+                # explicitly every time a case is (re)loaded.
+                if case_data["reference_csv_path"]:
+                    st.session_state.include_reference = True
+                    st.session_state.ref_source_label = case_data["description"]
+                    st.session_state.ref_entity = case_data["entity"]
+                    st.session_state.ref_period = case_data["period"]
+                    st.session_state.ref_currency = case_data["currency"]
+                    st.session_state.ref_basis = case_data["basis"]
+                else:
+                    st.session_state.include_reference = False
                 st.info(f"✓ Case {demo_cases[selected_idx]['number']} loaded. Proceed through all gates normally.")
                 st.rerun()
             except Exception as e:
