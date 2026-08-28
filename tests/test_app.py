@@ -640,33 +640,36 @@ def test_uploading_a_workbook_after_selecting_a_demo_clears_confirmation():
 
         st.session_state.demo_workbook_bytes = b"demo-bytes-case-4"
         st.session_state.demo_workbook_label = "Case 4: Claims Reserve Roll-Forward (pass after mapping approval)"
-        demo_bytes, demo_name = _effective_workbook_bytes(None)
-        _workbook_identity_panel(demo_bytes, demo_name)
+        demo_bytes, demo_name, demo_source = _effective_workbook_bytes(None)
+        _workbook_identity_panel(demo_bytes, demo_name, demo_source)
         st.session_state.gate1_context_confirmed = True
+        st.session_state.demo_first_source = demo_source
 
         fake_upload = SimpleNamespace(
             getvalue=lambda: b"a-real-uploaded-workbook", name="my_reserves.xlsx"
         )
-        up_bytes, up_name = _effective_workbook_bytes(fake_upload)
-        _workbook_identity_panel(up_bytes, up_name)
+        up_bytes, up_name, up_source = _effective_workbook_bytes(fake_upload)
+        _workbook_identity_panel(up_bytes, up_name, up_source)
         st.session_state.final_confirmed = st.session_state.gate1_context_confirmed
         st.session_state.final_name = up_name
+        st.session_state.final_source = up_source
 
     at = AppTest.from_function(script).run(timeout=20)
     assert not at.exception
+    assert at.session_state["demo_first_source"] == "demo"
     assert at.session_state["final_confirmed"] is False
     assert at.session_state["final_name"] == "my_reserves.xlsx"
+    assert at.session_state["final_source"] == "upload"
 
 
 def test_the_uploaded_workbook_path_continues_to_work():
     """Requirement 6: an upload with no demo case loaded still resolves to
-    its own bytes and filename, unaffected by the demo-case fallback."""
+    its own bytes, filename, and an explicit 'upload' source, unaffected by
+    the demo-case fallback."""
     fake_upload = SimpleNamespace(getvalue=lambda: b"upload-only-bytes", name="workbook.xlsx")
 
     def script():
         import streamlit as st
-
-        from app import _effective_workbook_bytes
 
         st.session_state.pop("demo_workbook_bytes", None)
 
@@ -674,9 +677,100 @@ def test_the_uploaded_workbook_path_continues_to_work():
     assert not at.exception
     # Exercised directly: no Streamlit widget context is required to prove
     # the resolution logic itself, only that session_state was consulted.
-    workbook_bytes, name = _effective_workbook_bytes(fake_upload)
+    workbook_bytes, name, source = _effective_workbook_bytes(fake_upload)
     assert workbook_bytes == b"upload-only-bytes"
     assert name == "workbook.xlsx"
+    assert source == "upload"
+
+
+# ---------------------------------------------------------------------------
+# P1 — active-source tracking (upload vs. demo case)
+#
+# An upload silently taking precedence over a just-loaded demo case (or the
+# reverse) was not a hidden integrity failure — the identity panel always
+# showed the bytes actually bound — but nothing told the reviewer WHICH
+# source was active, so the "case loaded" message could read as though the
+# demo case were about to run when an upload was still in effect. These
+# tests exercise both orderings end to end through _effective_workbook_bytes
+# and _workbook_identity_panel exactly as screen_1_upload calls them.
+# ---------------------------------------------------------------------------
+
+
+def test_upload_first_then_demo_load_keeps_the_upload_as_active_source():
+    """Uploading a workbook, then loading a demo case afterwards, must still
+    report and bind to the upload — the demo case is seeded but inactive."""
+
+    def script():
+        from types import SimpleNamespace
+
+        import streamlit as st
+
+        from app import _effective_workbook_bytes, _workbook_identity_panel
+
+        fake_upload = SimpleNamespace(
+            getvalue=lambda: b"my-own-workbook-bytes", name="my_workbook.xlsx"
+        )
+        up_bytes, up_name, up_source = _effective_workbook_bytes(fake_upload)
+        _workbook_identity_panel(up_bytes, up_name, up_source)
+        st.session_state.gate1_context_confirmed = True
+
+        # A demo case is then loaded — seeded, but the upload stays active.
+        st.session_state.demo_workbook_bytes = b"demo-bytes-case-1"
+        st.session_state.demo_workbook_label = "Case 1: Clean Reserve Calculation (pass)"
+        eff_bytes, eff_name, eff_source = _effective_workbook_bytes(fake_upload)
+        _workbook_identity_panel(eff_bytes, eff_name, eff_source)
+
+        st.session_state.active_source = eff_source
+        st.session_state.active_name = eff_name
+        st.session_state.active_bytes = eff_bytes
+        # The upload's identity was already confirmed and hasn't changed —
+        # confirmation must NOT be cleared by a demo case that isn't active.
+        st.session_state.still_confirmed = st.session_state.gate1_context_confirmed
+
+    at = AppTest.from_function(script).run(timeout=20)
+    assert not at.exception
+    assert at.session_state["active_source"] == "upload"
+    assert at.session_state["active_name"] == "my_workbook.xlsx"
+    assert at.session_state["active_bytes"] == b"my-own-workbook-bytes"
+    assert at.session_state["still_confirmed"] is True
+
+
+def test_demo_first_then_upload_switches_active_source_to_upload():
+    """Loading a demo case, then uploading a workbook afterwards, must
+    switch the active source to the upload and clear the prior confirmation
+    — the upload is a different identity, even though the demo bytes are
+    still sitting in session state."""
+
+    def script():
+        from types import SimpleNamespace
+
+        import streamlit as st
+
+        from app import _effective_workbook_bytes, _workbook_identity_panel
+
+        st.session_state.demo_workbook_bytes = b"demo-bytes-case-3"
+        st.session_state.demo_workbook_label = "Case 3: Accounting Reconciliation Failure (block)"
+        demo_bytes, demo_name, demo_source = _effective_workbook_bytes(None)
+        _workbook_identity_panel(demo_bytes, demo_name, demo_source)
+        st.session_state.gate1_context_confirmed = True
+        st.session_state.source_before_upload = demo_source
+
+        fake_upload = SimpleNamespace(
+            getvalue=lambda: b"an-uploaded-workbook", name="uploaded.xlsx"
+        )
+        eff_bytes, eff_name, eff_source = _effective_workbook_bytes(fake_upload)
+        _workbook_identity_panel(eff_bytes, eff_name, eff_source)
+
+        st.session_state.active_source = eff_source
+        st.session_state.active_name = eff_name
+        st.session_state.confirmed_after_upload = st.session_state.gate1_context_confirmed
+
+    at = AppTest.from_function(script).run(timeout=20)
+    assert not at.exception
+    assert at.session_state["source_before_upload"] == "demo"
+    assert at.session_state["active_source"] == "upload"
+    assert at.session_state["active_name"] == "uploaded.xlsx"
+    assert at.session_state["confirmed_after_upload"] is False
 
 
 def test_altered_bytes_are_refused_by_the_orchestrator():

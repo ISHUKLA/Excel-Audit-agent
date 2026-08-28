@@ -137,22 +137,32 @@ def _chain_integrity_error(exc: ChainIntegrityError) -> None:
     )
 
 
-def _effective_workbook_bytes(uploaded_file) -> tuple[Optional[bytes], str]:
+def _effective_workbook_bytes(uploaded_file) -> tuple[Optional[bytes], str, str]:
     """Resolve the bytes Gate 1 is actually about to bind to: an upload takes
     priority over a loaded demo case, matching whichever the reviewer acted on
     most recently. Used to drive the identity panel below, so a demo case's
     identity is shown and confirmed exactly like an upload's — never seeded
     only after "Start audit" is clicked.
+
+    Returns (bytes, display_name, source) where source is "upload", "demo",
+    or "none" — the caller uses this to make the ACTIVE source explicit,
+    since an upload silently taking precedence over a just-loaded demo case
+    (or vice versa) is not visible from the bytes alone.
     """
     if uploaded_file is not None:
-        return uploaded_file.getvalue(), uploaded_file.name
+        return uploaded_file.getvalue(), uploaded_file.name, "upload"
     demo_bytes = st.session_state.get("demo_workbook_bytes")
     if demo_bytes:
-        return demo_bytes, st.session_state.get("demo_workbook_label", "Demo workbook")
-    return None, "Not uploaded"
+        return demo_bytes, st.session_state.get("demo_workbook_label", "Demo workbook"), "demo"
+    return None, "Not uploaded", "none"
 
 
-def _workbook_identity_panel(workbook_bytes: Optional[bytes], display_name: str) -> Optional[str]:
+_SOURCE_LABELS = {"upload": "Uploaded file", "demo": "Demonstration case", "none": "None"}
+
+
+def _workbook_identity_panel(
+    workbook_bytes: Optional[bytes], display_name: str, source: str = "upload"
+) -> Optional[str]:
     """Show which workbook is being confirmed, and reset the confirmation if it
     changes. Rendering and session bookkeeping only — the binding is enforced in
     the orchestrator, which never trusts anything decided here.
@@ -160,7 +170,9 @@ def _workbook_identity_panel(workbook_bytes: Optional[bytes], display_name: str)
     A filename is not an identity: two different workbooks can share a name. The
     short hash is for the eye, the full 64 characters are what can actually be
     checked against an external record, so both are shown. Works identically
-    whether the bytes came from an upload or a loaded demonstration case.
+    whether the bytes came from an upload or a loaded demonstration case — the
+    "Active source" line makes explicit which one, since an upload takes
+    priority over a demo case without the case-load message saying so.
     """
     if workbook_bytes is None:
         st.session_state.confirmed_workbook_hash = None
@@ -180,6 +192,7 @@ def _workbook_identity_panel(workbook_bytes: Optional[bytes], display_name: str)
     identity_columns[0].metric("File", display_name)
     identity_columns[1].metric("Size", f"{len(workbook_bytes):,} bytes")
     identity_columns[2].metric("SHA-256 (short)", workbook_hash[:12])
+    st.caption(f"Active source: **{_SOURCE_LABELS.get(source, source)}**")
     st.code(workbook_hash, language=None)
     st.caption(
         "The full SHA-256 of these bytes. Reproduce it with "
@@ -234,7 +247,18 @@ def screen_1_upload() -> None:
                     st.session_state.ref_basis = case_data["basis"]
                 else:
                     st.session_state.include_reference = False
-                st.info(f"✓ Case {demo_cases[selected_idx]['number']} loaded. Proceed through all gates normally.")
+                if st.session_state.get("workbook_upload") is not None:
+                    st.warning(
+                        f"Case {demo_cases[selected_idx]['number']} data was seeded, but an "
+                        "uploaded file is still active and takes precedence — remove it below "
+                        "to actually audit this demo case. Check \"Active source\" in the "
+                        "Workbook identity panel to confirm which one is bound."
+                    )
+                else:
+                    st.info(
+                        f"✓ Case {demo_cases[selected_idx]['number']} loaded. Proceed through "
+                        "all gates normally."
+                    )
                 st.rerun()
             except Exception as e:
                 st.error(f"Could not load case: {e}")
@@ -341,7 +365,7 @@ def screen_1_upload() -> None:
             control_total = None
             control_confirmed = False
 
-    effective_bytes, effective_name = _effective_workbook_bytes(uploaded_file)
+    effective_bytes, effective_name, effective_source = _effective_workbook_bytes(uploaded_file)
 
     st.subheader("Gate 1 — Confirm context before parsing")
     context_summary = [
@@ -372,7 +396,7 @@ def screen_1_upload() -> None:
         )
     st.table(pd.DataFrame(context_summary, columns=["Area", "Field", "Confirmed context"]))
 
-    workbook_hash = _workbook_identity_panel(effective_bytes, effective_name)
+    workbook_hash = _workbook_identity_panel(effective_bytes, effective_name, effective_source)
 
     gate1_confirmed = st.checkbox(
         "I confirm that the workbook and reference-figure context shown above is accurate.",
