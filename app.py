@@ -377,6 +377,12 @@ def screen_1_upload() -> None:
         st.error("Please upload an .xlsx file or load a demonstration case.")
         return
 
+    # The identity panel above only hashes uploaded_file — a demo case's bytes
+    # never pass through it, so workbook_hash would be None there. Recompute
+    # from whichever bytes are actually about to be parsed, so the hash bound
+    # into FileContext always matches them.
+    workbook_hash = sha256_bytes(workbook_bytes)
+
     if not description.strip():
         st.error("Please describe what this file does.")
         return
