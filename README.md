@@ -70,10 +70,10 @@ This tool automates the legwork — parsing the spreadsheet, reconstructing its 
    Open `http://localhost:8501`. Setting `ANTHROPIC_API_KEY` is **optional** — only needed if you choose Agent 4's AI documentation at Gate 3; the full deterministic pipeline runs without it.
 
 2. **Load a demonstration case (optional).**
-   On Screen 1, expand "📚 Load a demonstration case" and select **Case 4** (claims reserve roll-forward — the principal competition demonstration; see "Four Demonstration Cases" below). The UI fills with synthetic data — entity, period, currency, and reference figures.
+   On Screen 1, expand "📚 Load a demonstration case" and select **Case 4** (claims reserve roll-forward — the principal competition demonstration; see "Four Demonstration Cases" below). The UI fills with synthetic data — entity, period, currency, and reference figures. If you had already uploaded a file before loading the case, the upload stays active; the "Workbook identity" panel's **Active source** line always tells you which one (upload or demo case) is actually about to be audited.
 
 3. **Confirm context (Gate 1).**
-   Review the displayed context summary. Check the checkbox "I confirm that the workbook and reference-figure context shown above is accurate." Click "Start audit". The parser runs; findings appear on the next screen.
+   Review the displayed context summary and the workbook identity panel (filename, size, SHA-256, active source). Under "Add reference figures", if you're following Case 4, set the **"Signed net control total"** to `-1400000` and check "I confirm this extract ties to the control total above" — this field has no default and, left unset or wrong, blocks Gate 3 with a discrepancy even when every individual line reconciles. Check the checkbox "I confirm that the workbook and reference-figure context shown above is accurate." Click "Start audit". The parser runs; findings appear on the next screen.
 
 4. **Review findings (Gate 2).**
    For each finding, click "Confirm", "Override", or "Dismiss". If overriding or dismissing, enter a reason. Designate one or more output cells to reconcile (e.g., the final reserve total). Click "Submit all decisions".
@@ -428,7 +428,7 @@ See [CLAUDE.md](CLAUDE.md) for the full development methodology, rule set, and b
 
 ## Roadmap
 
-The current release (v1.0.0) ships the five-gate pipeline, local-first deployment, and an audit log with hash-chain verification. Post-MVP scope includes:
+The current release (v1.0.0) ships the four-gate pipeline, local-first deployment, and an audit log with hash-chain verification. Post-MVP scope includes:
 
 - **Hosted operation with real authentication.** Application-level access control for multi-user deployments.
 - **Performance benchmarks on real workbooks.** Testing against production files of varying size and formula complexity.
