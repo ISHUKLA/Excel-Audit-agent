@@ -1,4 +1,4 @@
-# Excel Translation & Reconciliation Assistant
+# Excel Translation & Reconciliation Assistant (Glass box)
 
 *A human-governed agentic AI tool for reviewing actuarial and financial spreadsheets.*
 
