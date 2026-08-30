@@ -2,6 +2,8 @@
 
 *A human-governed agentic AI tool for reviewing actuarial and financial spreadsheets.*
 
+**[▶ Watch the demo video](https://www.youtube.com/watch?v=bvdnjimTNCQ)**
+
 ---
 
 ## The Problem
