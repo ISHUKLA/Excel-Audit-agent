@@ -1583,3 +1583,88 @@ def test_if_inequality_operators():
     assert result.lines[0].target_value == 1.0
     assert result.lines[1].target_value == 1.0
     assert result.lines[2].target_value == 1.0
+
+
+# ---------------------------------------------------------------------------
+# Step 13 — Acceptance test exercising all 16 implemented functions
+# ---------------------------------------------------------------------------
+
+
+def test_acceptance_all_supported_functions():
+    """Comprehensive test exercising Group A-D functions (16 total).
+    Group E (VLOOKUP/INDEX/MATCH) deferred to Phase 2."""
+    cells = {
+        # Inputs
+        "Provisions!B1": cell("Provisions!B1", value=10.0),
+        "Provisions!B2": cell("Provisions!B2", value=-15.0),
+        "Provisions!B3": cell("Provisions!B3", value=1.755),
+        "Provisions!B4": cell("Provisions!B4", value=0.5),
+        "Provisions!B5": cell("Provisions!B5", value=100.0),
+        # Group A — ABS, INT
+        "Provisions!C1": cell("Provisions!C1", formula="=ABS(B2)", value=15.0),
+        "Provisions!C2": cell("Provisions!C2", formula="=INT(B3)", value=1.0),
+        # Group B — ROUND, ROUNDUP, ROUNDDOWN, CEILING, FLOOR
+        "Provisions!C3": cell("Provisions!C3", formula="=ROUND(B3,2)", value=1.76),
+        "Provisions!C4": cell("Provisions!C4", formula="=ROUNDUP(B3,1)", value=1.8),
+        "Provisions!C5": cell("Provisions!C5", formula="=ROUNDDOWN(B3,1)", value=1.7),
+        "Provisions!C6": cell("Provisions!C6", formula="=CEILING(B4,0.1)", value=0.5),
+        "Provisions!C7": cell("Provisions!C7", formula="=FLOOR(B4,0.1)", value=0.5),
+        # Group C — SUMIF, SUMIFS, COUNTIF, COUNTIFS, AVERAGEIF, AVERAGEIFS
+        "Provisions!D1": cell("Provisions!D1", value="A"),
+        "Provisions!D2": cell("Provisions!D2", value="B"),
+        "Provisions!D3": cell("Provisions!D3", value="A"),
+        "Provisions!E1": cell("Provisions!E1", value=100.0),
+        "Provisions!E2": cell("Provisions!E2", value=200.0),
+        "Provisions!E3": cell("Provisions!E3", value=150.0),
+        "Provisions!C8": cell("Provisions!C8", formula='=SUMIF(D1:D3,"A",E1:E3)', value=250.0),
+        "Provisions!C9": cell("Provisions!C9", formula='=COUNTIF(D1:D3,"A")', value=2.0),
+        "Provisions!C10": cell("Provisions!C10", formula='=AVERAGEIF(D1:D3,"A",E1:E3)', value=125.0),
+        # Group D — MINIFS, MAXIFS
+        "Provisions!F1": cell("Provisions!F1", value=50.0),
+        "Provisions!F2": cell("Provisions!F2", value=75.0),
+        "Provisions!F3": cell("Provisions!F3", value=25.0),
+        "Provisions!C11": cell("Provisions!C11", formula='=MINIFS(F1:F3,D1:D3,"A")', value=25.0),
+        "Provisions!C12": cell("Provisions!C12", formula='=MAXIFS(F1:F3,D1:D3,"A")', value=50.0),
+        # Group C final — IF
+        "Provisions!C13": cell("Provisions!C13", formula="=IF(B5>50,1000,500)", value=1000.0),
+        # Summary (all above rolled up)
+        "Provisions!C14": cell("Provisions!C14", formula="=SUM(C1:C13)", value=1474.26),
+    }
+    graph = {
+        "Provisions!C1": ["Provisions!B2"],
+        "Provisions!C2": ["Provisions!B3"],
+        "Provisions!C3": ["Provisions!B3"],
+        "Provisions!C4": ["Provisions!B3"],
+        "Provisions!C5": ["Provisions!B3"],
+        "Provisions!C6": ["Provisions!B4"],
+        "Provisions!C7": ["Provisions!B4"],
+        "Provisions!C8": ["Provisions!D1", "Provisions!D2", "Provisions!D3", "Provisions!E1", "Provisions!E2", "Provisions!E3"],
+        "Provisions!C9": ["Provisions!D1", "Provisions!D2", "Provisions!D3"],
+        "Provisions!C10": ["Provisions!D1", "Provisions!D2", "Provisions!D3", "Provisions!E1", "Provisions!E2", "Provisions!E3"],
+        "Provisions!C11": ["Provisions!F1", "Provisions!F2", "Provisions!F3", "Provisions!D1", "Provisions!D2", "Provisions!D3"],
+        "Provisions!C12": ["Provisions!F1", "Provisions!F2", "Provisions!F3", "Provisions!D1", "Provisions!D2", "Provisions!D3"],
+        "Provisions!C13": ["Provisions!B5"],
+        "Provisions!C14": ["Provisions!C1", "Provisions!C2", "Provisions!C3", "Provisions!C4", "Provisions!C5", "Provisions!C6", "Provisions!C7", "Provisions!C8", "Provisions!C9", "Provisions!C10", "Provisions!C11", "Provisions!C12", "Provisions!C13"],
+        "Provisions!B1": [],
+        "Provisions!B2": [],
+        "Provisions!B3": [],
+        "Provisions!B4": [],
+        "Provisions!B5": [],
+        "Provisions!D1": [],
+        "Provisions!D2": [],
+        "Provisions!D3": [],
+        "Provisions!E1": [],
+        "Provisions!E2": [],
+        "Provisions!E3": [],
+        "Provisions!F1": [],
+        "Provisions!F2": [],
+        "Provisions!F3": [],
+    }
+    result = run_reconciliation(parsed(cells, graph), ["Provisions!C14"])
+
+    # Verify all functions were reconstructed correctly
+    assert len(result.lines) == 1
+    assert result.lines[0].target_value == pytest.approx(1474.26)
+    assert result.lines[0].delta == pytest.approx(0.0)
+    assert result.lines[0].verdict == "pass"
+    assert result.lines[0].completeness == "complete"
