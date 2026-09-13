@@ -52,6 +52,39 @@ This tool automates the legwork — parsing the spreadsheet, reconstructing its 
 
 ---
 
+## Supported Formula Catalogue
+
+The reconstruction engine supports 16 functions across four groups:
+
+**Group A — Basic arithmetic (2 functions)**
+- `ABS` — absolute value
+- `INT` — integer (floor towards negative infinity)
+
+**Group B — Rounding (5 functions)**
+- `ROUND` — round to nearest (banker's rounding on .5)
+- `ROUNDUP` — round away from zero
+- `ROUNDDOWN` — round towards zero
+- `CEILING` — round up to significance multiple
+- `FLOOR` — round down to significance multiple
+
+**Group C — Conditional aggregation (7 functions)**
+- `SUM` — sum a range (blank cells treated as zero)
+- `SUMIF` — conditional sum with criteria
+- `SUMIFS` — sum with multiple criteria
+- `COUNTIF` — count matching cells
+- `COUNTIFS` — count with multiple criteria
+- `AVERAGEIF` — average matching numeric cells (excludes blanks)
+- `AVERAGEIFS` — average with multiple criteria
+- `IF` — conditional branching on comparison expressions
+
+**Group D — Min/Max with criteria (2 functions)**
+- `MINIFS` — minimum of matching numeric cells
+- `MAXIFS` — maximum of matching numeric cells
+
+**Planned future support:** Group E lookup functions (`VLOOKUP`, `INDEX`, `MATCH`) are in the design phase; array formulas remain out of scope.
+
+---
+
 ## Deployment Posture
 
 **Default and recommended: run locally.** `audit.db` and any uploaded workbooks stay on your machine. The only thing that can leave is the optional Anthropic API call for tab documentation, and only if you explicitly opt in at Gate 3 (see **Optional AI documentation and what leaves the machine** below).
