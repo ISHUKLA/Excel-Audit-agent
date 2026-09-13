@@ -17,6 +17,7 @@ that sets it True.
 """
 
 import ast
+import math
 import operator
 import re
 from typing import Optional
@@ -28,8 +29,18 @@ from rapidfuzz import fuzz
 # Single source of truth for how a cell reference is parsed. Imported rather
 # than re-declared so the graph the parser built and the substitutions made here
 # can never drift apart.
+from agents.comparison import evaluate_criteria
 from agents.parser import _CELL_REF_PATTERN, _expand_range, _normalize
 from core.accounting import signed_reference_amount
+from core.formula_catalogue import SUPPORTED_FUNCTIONS as _SUPPORTED_FUNCTIONS
+from core.numeric_utils import (
+    NumericUtilsError,
+    ceiling_to_significance,
+    excel_round,
+    floor_to_significance,
+    rounddown_to_significance,
+    roundup_to_significance,
+)
 from core.models import (
     AccountMapping,
     CellRecord,
@@ -45,14 +56,22 @@ from core.verdict_logic import compute_verdict
 DEFAULT_PCT_THRESHOLD = 0.01
 DEFAULT_ABSOLUTE_THRESHOLD = 100.0
 
-# Deliberately small. Anything outside it is reported as unsupported rather than
-# approximated — a partially-interpreted VLOOKUP is a wrong number wearing a
-# right number's clothes.
-_SUPPORTED_FUNCTIONS = {"SUM"}
+# _SUPPORTED_FUNCTIONS above is imported from core/formula_catalogue.py, the
+# single source of truth for the catalogue. Deliberately small there. Anything
+# outside it is reported as unsupported rather than approximated — a
+# partially-interpreted VLOOKUP is a wrong number wearing a right number's
+# clothes.
 
 _FUNCTION_PATTERN = re.compile(r"([A-Za-z_][A-Za-z0-9_.]*)\s*\(")
 _SUM_PATTERN = re.compile(r"SUM\(([^()]*)\)", re.IGNORECASE)
+_INNERMOST_CALL_PATTERN = re.compile(r"([A-Za-z_][A-Za-z0-9_.]*)\(([^()]*)\)")
 _STRING_LITERAL_PATTERN = re.compile(r'"[^"]*"')
+
+# Bounds the innermost-out function-unwrapping loop in _evaluate. Not a
+# correctness limit — no formula in scope for this catalogue nests anywhere
+# near this deep — just a fail-closed ceiling so a malformed formula can't
+# spin the loop forever.
+_MAX_FUNCTION_NESTING = 25
 
 _ALLOWED_OPERATORS = {
     ast.Add: operator.add,
@@ -412,6 +431,16 @@ def _build_derivation(
     unsupported_elements: list[str] = []
     stale_cell_refs: list[str] = []
     seen_stale_refs: set[str] = set()
+    # Cells that were genuinely blank, not an explicit 0. DerivationStep.
+    # resolved_value stores 0.0 for both (arithmetic evaluators like SUM
+    # need the "blank in range" case to be a plain, gate-passing number —
+    # see the `any(child.resolved_value is None ...)` check below, which
+    # would otherwise treat every blank dependency as unresolved). But
+    # AVERAGEIF-family evaluators need to tell "matched AND blank" (excluded
+    # from the denominator) apart from "matched AND explicitly 0" (counted)
+    # — this set is how `values` is built to preserve that distinction for
+    # them without changing what arithmetic functions see.
+    blank_refs: set[str] = set()
 
     def _note_freshness(ref: str, record: CellRecord) -> None:
         if record.calculation_freshness == "fresh":
@@ -442,23 +471,39 @@ def _build_derivation(
             # A referenced cell that holds nothing. Excel reads it as zero.
             warnings.append(f"{ref}: referenced but empty — treated as 0, per Excel's convention")
             step.resolved_value = 0.0
+            blank_refs.add(ref)
             return step
 
         step.formula = record.formula
         _note_freshness(ref, record)
 
         if record.formula is None:
-            value = _as_number(record.cached_value)
-            if value is None and record.cached_value is not None:
+            raw = record.cached_value
+            if isinstance(raw, bool):
+                # Checked before the (int, float) branch: bool is an int
+                # subclass in Python, and a boolean cell (a flag column
+                # feeding a criteria match) is not the same value as 0/1.
+                step.resolved_value = raw
+            elif isinstance(raw, (int, float)):
+                step.resolved_value = float(raw)
+            elif isinstance(raw, str):
+                # A text leaf — a class-of-business label, say — is not
+                # unsupported merely for holding text. It only becomes a
+                # problem at the point something tries to use it as a
+                # number: arithmetic-only evaluators (SUM, ABS, ROUND, ...)
+                # already fail closed on a non-numeric substitution at their
+                # own evaluation step; a criteria-matching function
+                # (SUMIF, COUNTIF, IF) is exactly what CAN use this value.
+                step.resolved_value = raw
+            elif raw is None:
+                warnings.append(f"{ref}: blank cell — treated as 0, per Excel's convention")
+                step.resolved_value = 0.0
+                blank_refs.add(ref)
+            else:
                 step.is_supported = False
                 unsupported_elements.append(
-                    f"{ref} holds a non-numeric value ({record.cached_value!r}) used in arithmetic "
-                    f"(unsupported)"
+                    f"{ref} holds a value of an unsupported type ({raw!r}) (unsupported)"
                 )
-                return step
-            if value is None:
-                warnings.append(f"{ref}: blank cell — treated as 0, per Excel's convention")
-            step.resolved_value = value if value is not None else 0.0
             return step
 
         reason = _unsupported_reason(record.formula)
@@ -472,7 +517,14 @@ def _build_derivation(
             # Own formula is fine; something underneath it isn't.
             return step
 
-        values = {dep: child.resolved_value for dep, child in resolved_dependencies.items()}
+        # A blank dependency reads as None here, not the 0.0 stored on its
+        # own DerivationStep — restoring the distinction arithmetic
+        # evaluators (SUM) already know how to treat as 0, and AVERAGEIF-
+        # family evaluators need to exclude from a denominator instead.
+        values = {
+            dep: (None if dep in blank_refs else child.resolved_value)
+            for dep, child in resolved_dependencies.items()
+        }
         step.resolved_value = _evaluate(record.formula, ref, values, warnings)
         return step
 
@@ -521,14 +573,45 @@ def _cycle_nodes(reachable: set[str], graph: dict) -> set[str]:
 # ---------------------------------------------------------------------------
 
 
+# Functions whose catalogue entry legitimately takes a string literal
+# argument — a criteria like ">100" or a wildcard pattern like "Motor*" is
+# not "text used in arithmetic," it's exactly what the function expects.
+# IF is included here because its condition argument can contain text
+# comparisons like IF(B1="Motor", ...). Every other function still has
+# its own string literals rejected by the blanket check below.
+_CRITERIA_CONSUMING_FUNCTIONS = {"SUMIF", "SUMIFS", "COUNTIF", "COUNTIFS", "AVERAGEIF", "AVERAGEIFS", "MINIFS", "MAXIFS", "IF"}
+_FUNCTION_CALL_NAME_PATTERN = re.compile(r"[A-Za-z_][A-Za-z0-9_.]*$")
+
+
+def _criteria_call_spans(formula: str) -> list[tuple[int, int]]:
+    """(args_start, args_end) for every call in `formula` to a function in
+    `_CRITERIA_CONSUMING_FUNCTIONS` — the spans a string literal is allowed
+    to fall inside without being flagged as "text used in arithmetic"."""
+    spans = []
+    stack: list[tuple[int, Optional[str]]] = []
+    for i, ch in enumerate(formula):
+        if ch == "(":
+            name_match = _FUNCTION_CALL_NAME_PATTERN.search(formula[:i])
+            name = name_match.group(0).upper() if name_match else None
+            stack.append((i + 1, name))
+        elif ch == ")" and stack:
+            args_start, name = stack.pop()
+            if name in _CRITERIA_CONSUMING_FUNCTIONS:
+                spans.append((args_start, i))
+    return spans
+
+
 def _unsupported_reason(formula: str) -> Optional[str]:
     """Why this formula is outside the catalogue, or None if it is inside it."""
     if formula.startswith("{="):
         return "an array formula (unsupported)"
     if "[" in formula and ".xls" in formula:
         return "a reference to another workbook (unsupported)"
-    if _STRING_LITERAL_PATTERN.search(formula):
-        return "a text literal in arithmetic (unsupported)"
+
+    exempt_spans = _criteria_call_spans(formula)
+    for literal_match in _STRING_LITERAL_PATTERN.finditer(formula):
+        if not any(start <= literal_match.start() < end for start, end in exempt_spans):
+            return "a text literal in arithmetic (unsupported)"
 
     functions = {name.upper() for name in _FUNCTION_PATTERN.findall(formula)}
     outside = sorted(functions - _SUPPORTED_FUNCTIONS)
@@ -537,46 +620,760 @@ def _unsupported_reason(formula: str) -> Optional[str]:
     return None
 
 
-def _evaluate(formula: str, own_ref: str, values: dict, warnings: list[str]) -> Optional[float]:
-    """Compute a supported formula from its already-resolved dependencies."""
-    own_tab = own_ref.split("!", 1)[0]
-    expr = formula[1:] if formula.startswith("=") else formula
+def _resolve_and_eval_expr(expr_text: str, own_tab: str, values: dict) -> Optional[float]:
+    """Substitute bare cell references in `expr_text` and evaluate the arithmetic.
 
-    def _sum_replacement(match: re.Match) -> str:
-        total = 0.0
-        for argument in match.group(1).split(","):
-            for key in _references_in(argument.strip(), own_tab):
-                value = values.get(key)
-                if value is None:
-                    warnings.append(
-                        f"{own_ref}: {key} is blank inside a SUM — treated as 0, per Excel's "
-                        f"convention"
-                    )
-                    value = 0.0
-                total += value
-        return repr(total)
+    Shared by the final pass over a formula (after every function call has
+    been unwrapped to a literal) and by any function's own argument — ABS's
+    or INT's single "value" argument can itself be a cell reference or an
+    arithmetic expression, not just a number, and both need the same
+    reference-resolution rules a bare SUM argument gets.
 
-    expr = _SUM_PATTERN.sub(_sum_replacement, expr)
+    Raises `_UnresolvableReference` for a bare range (only meaningful inside
+    a function that expects one, like SUM), a reference truly absent from
+    `values` (never resolved), or — since dependency resolution now carries
+    text/bool leaves through rather than rejecting them (Step 6) — a
+    reference that resolved to something arithmetic can't use. Excel's own
+    behavior for `=A1*2` where A1 is text is #VALUE!, not zero: fail closed
+    here rather than crash on `float("n/a")` or silently coerce.
+
+    A reference PRESENT in `values` but mapped to None is a genuinely blank
+    cell (Step 8's blank/zero distinction, added for AVERAGEIF's
+    denominator) — for arithmetic, that is Excel's ordinary "blank reads as
+    0" convention, same as a blank cell inside SUM. The None-vs-absent
+    distinction matters: `key not in values` means this reference isn't
+    even a recognized dependency (a real problem); `values[key] is None`
+    means it resolved successfully to nothing.
+    """
 
     def _reference_replacement(match: re.Match) -> str:
         quoted, plain, start, end = match.groups()
         if end:
             raise _UnresolvableReference("a bare range outside SUM")
         tab = quoted or plain or own_tab
-        value = values.get(f"{tab}!{_normalize(start)}")
-        if value is None:
+        key = f"{tab}!{_normalize(start)}"
+        if key not in values:
             raise _UnresolvableReference(f"{tab}!{start}")
+        value = values[key]
+        if value is None:
+            return repr(0.0)
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise _UnresolvableReference(f"{tab}!{start} is not numeric")
         return repr(float(value))
 
+    substituted = _CELL_REF_PATTERN.sub(_reference_replacement, expr_text)
+    if re.search(r"[A-Za-z]", substituted):
+        return None
+    return _safe_eval_arithmetic(substituted)
+
+
+def _sum_evaluator(args_text: str, own_tab: str, values: dict, warnings: list[str], own_ref: str) -> float:
+    """SUM(range, ...) — ranges expanded, blank cells treated as 0.
+
+    An argument that is already a plain number is added directly rather than
+    passed through `_references_in` (which only ever finds cell references).
+    This matters as soon as SUM can appear nested with another function, e.g.
+    SUM(ABS(C1), C2): by the time this evaluator sees it, ABS(C1) has already
+    been unwrapped to a literal like "10.0", and that argument has no cell
+    reference in it at all — treating it as "no references found" would
+    silently drop it from the total instead of adding it.
+
+    A text or boolean cell inside the range is SKIPPED, not an error — this
+    is Excel's actual documented SUM behavior (SUM ignores non-numeric cells
+    in a range) and is deliberately different from bare arithmetic like
+    `=A1*2`, where a text A1 is a #VALUE! error. Since Step 6, a dependency
+    cell holding text is a normal, fully-supported leaf (core/models.py's
+    DerivationStep.resolved_value widening), so this is the first evaluator
+    that can actually observe one.
+    """
+    total = 0.0
+    for argument in args_text.split(","):
+        argument = argument.strip()
+        try:
+            total += float(argument)
+            continue
+        except ValueError:
+            pass
+        for key in _references_in(argument, own_tab):
+            value = values.get(key)
+            if value is None:
+                warnings.append(
+                    f"{own_ref}: {key} is blank inside a SUM — treated as 0, per Excel's "
+                    f"convention"
+                )
+                value = 0.0
+            elif isinstance(value, bool) or not isinstance(value, (int, float)):
+                continue
+            total += value
+    return total
+
+
+def _abs_evaluator(
+    args_text: str, own_tab: str, values: dict, warnings: list[str], own_ref: str
+) -> Optional[float]:
+    """ABS(value) — the single argument may itself be a reference or expression."""
+    inner = _resolve_and_eval_expr(args_text, own_tab, values)
+    return None if inner is None else abs(inner)
+
+
+def _int_evaluator(
+    args_text: str, own_tab: str, values: dict, warnings: list[str], own_ref: str
+) -> Optional[float]:
+    """INT(value) — rounds DOWN toward negative infinity, matching Excel exactly.
+
+    This is not truncation toward zero: INT(-8.9) == -9 in Excel, the same
+    way math.floor(-8.9) == -9 in Python. A truncating implementation
+    (int(-8.9) == -8, or math.trunc) gives the wrong sign-dependent answer for
+    every negative non-integer input — the kind of asymmetry this catalogue's
+    correctness notes exist to catch before it ships.
+    """
+    inner = _resolve_and_eval_expr(args_text, own_tab, values)
+    return None if inner is None else float(math.floor(inner))
+
+
+def _split_two_args(args_text: str) -> Optional[tuple[str, str]]:
+    """Split a two-argument function's raw argument text on its single
+    top-level comma. None of Group B's arguments can themselves contain a
+    comma (no text literals, no nested calls — those were already unwrapped
+    before this evaluator runs), so a plain split is safe here."""
+    parts = args_text.split(",")
+    if len(parts) != 2:
+        return None
+    return parts[0].strip(), parts[1].strip()
+
+
+def _make_value_and_second_arg_evaluator(kernel, second_arg_is_digit_count: bool):
+    """Factory for the five Group B rounding evaluators.
+
+    Every one of them has the same shape: resolve two numeric arguments,
+    then hand them to the Decimal-based kernel from core/numeric_utils.py.
+    Writing that shape once here is what "use the shared arithmetic, don't
+    reimplement rounding per function" (Step 4) actually means in code — a
+    bug in the kernel is exactly one place to fix, not five.
+    """
+
+    def evaluator(
+        args_text: str, own_tab: str, values: dict, warnings: list[str], own_ref: str
+    ) -> Optional[float]:
+        split = _split_two_args(args_text)
+        if split is None:
+            return None
+        value = _resolve_and_eval_expr(split[0], own_tab, values)
+        second = _resolve_and_eval_expr(split[1], own_tab, values)
+        if value is None or second is None:
+            return None
+        try:
+            return kernel(value, int(second) if second_arg_is_digit_count else second)
+        except NumericUtilsError:
+            # A domain error in the kernel (none currently raise for Group B's
+            # inputs — significance 0 is handled inside the kernel itself —
+            # but fail closed rather than propagate a raw exception if that
+            # ever changes).
+            return None
+
+    return evaluator
+
+
+_round_evaluator = _make_value_and_second_arg_evaluator(excel_round, second_arg_is_digit_count=True)
+_roundup_evaluator = _make_value_and_second_arg_evaluator(
+    roundup_to_significance, second_arg_is_digit_count=True
+)
+_rounddown_evaluator = _make_value_and_second_arg_evaluator(
+    rounddown_to_significance, second_arg_is_digit_count=True
+)
+_ceiling_evaluator = _make_value_and_second_arg_evaluator(
+    ceiling_to_significance, second_arg_is_digit_count=False
+)
+_floor_evaluator = _make_value_and_second_arg_evaluator(
+    floor_to_significance, second_arg_is_digit_count=False
+)
+
+
+# ---------------------------------------------------------------------------
+# Group C — criteria consumers (SUMIF, and everything that shares its shape)
+# ---------------------------------------------------------------------------
+
+
+def _split_function_args(args_text: str) -> list[str]:
+    """Top-level comma split, quote-aware.
+
+    Unlike Group B's `_split_two_args`, a criteria argument can be a quoted
+    text literal that itself contains a comma (e.g. a criteria like
+    "Motor, Comprehensive" — unusual, but not impossible), so a plain
+    `.split(",")` is not safe here. No nested function calls can appear in
+    `args_text` either way — `_INNERMOST_CALL_PATTERN` guarantees that by
+    construction — so only quotes need tracking, not parentheses.
+    """
+    parts: list[str] = []
+    current: list[str] = []
+    in_quotes = False
+    for ch in args_text:
+        if ch == '"':
+            in_quotes = not in_quotes
+            current.append(ch)
+        elif ch == "," and not in_quotes:
+            parts.append("".join(current))
+            current = []
+        else:
+            current.append(ch)
+    parts.append("".join(current))
+    return [part.strip() for part in parts]
+
+
+def _split_ampersand(text: str) -> list[str]:
+    """Top-level `&` split, quote-aware — Excel's string concatenation
+    operator, used to build a criteria from a cell reference, e.g.
+    `">"&B1`. A `&` inside a quoted literal is not a split point."""
+    parts: list[str] = []
+    current: list[str] = []
+    in_quotes = False
+    for ch in text:
+        if ch == '"':
+            in_quotes = not in_quotes
+            current.append(ch)
+        elif ch == "&" and not in_quotes:
+            parts.append("".join(current).strip())
+            current = []
+        else:
+            current.append(ch)
+    parts.append("".join(current).strip())
+    return parts
+
+
+def _stringify_for_concat(value) -> str:
+    """How a resolved value reads as text when concatenated with `&` — used
+    only when a criteria has more than one `&`-joined piece, so a numeric
+    piece and a text piece combine the way Excel would display them, not the
+    way Python's str() would (str(10.0) is "10.0"; Excel's is "10")."""
+    if isinstance(value, bool):
+        return "TRUE" if value else "FALSE"
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    return str(value)
+
+
+def _resolve_criteria_piece(piece: str, own_tab: str, values: dict):
+    """One `&`-joined fragment of a criteria argument, resolved to whatever
+    it actually is: a quoted text literal, TRUE/FALSE, a bare number, or a
+    cell reference (resolved through `values`, exactly like any other
+    dependency — a criteria built from `">"&B1` reads B1's ALREADY-RESOLVED
+    value here, never re-parses the workbook independently)."""
+    piece = piece.strip()
+    if len(piece) >= 2 and piece.startswith('"') and piece.endswith('"'):
+        return piece[1:-1]
+    if piece.upper() == "TRUE":
+        return True
+    if piece.upper() == "FALSE":
+        return False
     try:
-        substituted = _CELL_REF_PATTERN.sub(_reference_replacement, expr)
+        return float(piece)
+    except ValueError:
+        pass
+    match = _CELL_REF_PATTERN.fullmatch(piece)
+    if match:
+        quoted, plain, start, end = match.groups()
+        if end:
+            raise _UnresolvableReference("a bare range used as a criteria value")
+        tab = quoted or plain or own_tab
+        key = f"{tab}!{_normalize(start)}"
+        if key not in values:
+            raise _UnresolvableReference(f"{tab}!{start}")
+        value = values[key]
+        # A genuinely blank cell (key present, value None — see Step 8's
+        # blank/zero distinction) reads as empty text here, matching
+        # Excel's own behavior when a blank cell is used in a criteria or
+        # concatenated with &.
+        return "" if value is None else value
+    raise _UnresolvableReference(f"unrecognized criteria fragment: {piece!r}")
+
+
+def _resolve_criteria_arg(arg_text: str, own_tab: str, values: dict):
+    """A full criteria argument, which may be a single literal/reference or
+    several pieces joined by `&` (string concatenation) — the shape
+    `SUMIF(A:A, ">"&B1, C:C)` produces. A single piece keeps its own type
+    (a number stays a number, so `evaluate_criteria` can still tell a
+    numeric criteria from a text one); multiple pieces are always text,
+    matching what `&` actually does in Excel."""
+    pieces = _split_ampersand(arg_text)
+    if len(pieces) == 1:
+        return _resolve_criteria_piece(pieces[0], own_tab, values)
+    return "".join(_stringify_for_concat(_resolve_criteria_piece(p, own_tab, values)) for p in pieces)
+
+
+def _is_numeric_cell_value(value) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _sumif_evaluator(
+    args_text: str, own_tab: str, values: dict, warnings: list[str], own_ref: str
+) -> Optional[float]:
+    """SUMIF(range, criteria, [sum_range]).
+
+    `range` and `sum_range` must expand to the same number of cells — Excel
+    also supports a sum_range smaller than range with shape expansion from
+    its top-left cell; that alignment rule is not implemented here, and a
+    mismatched count fails closed (returns None, an unsupported result)
+    rather than guess which cells line up.
+    """
+    parts = _split_function_args(args_text)
+    if len(parts) not in (2, 3):
+        return None
+
+    range_refs = _references_in(parts[0], own_tab)
+    sum_range_refs = _references_in(parts[2], own_tab) if len(parts) == 3 else range_refs
+    if len(range_refs) != len(sum_range_refs) or not range_refs:
+        return None
+
+    criteria_value = _resolve_criteria_arg(parts[1], own_tab, values)
+
+    total = 0.0
+    for range_ref, sum_ref in zip(range_refs, sum_range_refs):
+        if evaluate_criteria(values.get(range_ref), criteria_value):
+            matched = values.get(sum_ref)
+            if _is_numeric_cell_value(matched):
+                total += matched
+            # A blank or text cell in a MATCHING row contributes 0, the same
+            # way SUM silently skips a non-numeric cell — not a warning-
+            # worthy event, since SUMIF's sum_range is expected to be numeric
+            # and a stray text cell there is Excel's own behavior to ignore it.
+    return total
+
+
+def _collect_criteria_pairs(
+    pair_args: list[str], own_tab: str, values: dict, expected_length: Optional[int]
+) -> Optional[tuple[list[list[str]], list, int]]:
+    """Shared core of SUMIFS/COUNTIF/COUNTIFS: `pair_args` is a flat
+    [range1, criteria1, range2, criteria2, ...] list. Every range must
+    expand to the same cell count — the first one seen sets the standard if
+    `expected_length` isn't already fixed by a caller (SUMIFS' sum_range).
+
+    Returns (range_groups, criteria_values, length), or None if the argument
+    count is odd, empty, or any range's length doesn't match — fails closed
+    rather than guess an alignment Excel itself wouldn't accept either.
+    """
+    if not pair_args or len(pair_args) % 2 != 0:
+        return None
+    range_groups: list[list[str]] = []
+    criteria_values = []
+    length = expected_length
+    for i in range(0, len(pair_args), 2):
+        refs = _references_in(pair_args[i], own_tab)
+        if length is None:
+            length = len(refs)
+        if not refs or len(refs) != length:
+            return None
+        range_groups.append(refs)
+        criteria_values.append(_resolve_criteria_arg(pair_args[i + 1], own_tab, values))
+    return range_groups, criteria_values, length
+
+
+def _sumifs_evaluator(
+    args_text: str, own_tab: str, values: dict, warnings: list[str], own_ref: str
+) -> Optional[float]:
+    """SUMIFS(sum_range, criteria_range1, criteria1, [criteria_range2, criteria2, ...]).
+
+    Every criteria pair must match (AND) for a row to contribute to the sum
+    — this is the argument-order inverse of SUMIF, where sum_range comes
+    LAST and is optional. Excel made these two functions' argument order
+    genuinely different; reusing SUMIF's evaluator here would silently
+    misalign sum_range with the wrong argument.
+    """
+    parts = _split_function_args(args_text)
+    if len(parts) < 3:
+        return None
+    sum_refs = _references_in(parts[0], own_tab)
+    if not sum_refs:
+        return None
+    collected = _collect_criteria_pairs(parts[1:], own_tab, values, expected_length=len(sum_refs))
+    if collected is None:
+        return None
+    range_groups, criteria_values, length = collected
+
+    total = 0.0
+    for index in range(length):
+        if all(
+            evaluate_criteria(values.get(refs[index]), criteria)
+            for refs, criteria in zip(range_groups, criteria_values)
+        ):
+            matched = values.get(sum_refs[index])
+            if _is_numeric_cell_value(matched):
+                total += matched
+    return total
+
+
+def _countifs_evaluator(
+    args_text: str, own_tab: str, values: dict, warnings: list[str], own_ref: str
+) -> Optional[float]:
+    """COUNTIFS(criteria_range1, criteria1, [criteria_range2, criteria2, ...])
+    — counts rows where every criteria pair matches. COUNTIF (below) is this
+    function called with exactly one pair, not a separate implementation."""
+    parts = _split_function_args(args_text)
+    collected = _collect_criteria_pairs(parts, own_tab, values, expected_length=None)
+    if collected is None:
+        return None
+    range_groups, criteria_values, length = collected
+
+    count = 0
+    for index in range(length):
+        if all(
+            evaluate_criteria(values.get(refs[index]), criteria)
+            for refs, criteria in zip(range_groups, criteria_values)
+        ):
+            count += 1
+    return float(count)
+
+
+def _countif_evaluator(
+    args_text: str, own_tab: str, values: dict, warnings: list[str], own_ref: str
+) -> Optional[float]:
+    """COUNTIF(range, criteria) — the legacy single-criteria-pair form of
+    COUNTIFS, not a duplicated implementation."""
+    return _countifs_evaluator(args_text, own_tab, values, warnings, own_ref)
+
+
+def _averageif_evaluator(
+    args_text: str, own_tab: str, values: dict, warnings: list[str], own_ref: str
+) -> Optional[float]:
+    """AVERAGEIF(range, criteria, [average_range]).
+
+    The denominator is "cells that matched the criteria AND held a number"
+    — not "every cell in the range." A matching row whose average_range
+    cell is blank or text is excluded from BOTH the numerator and the
+    denominator, the same way AVERAGE ignores non-numeric cells; it is NOT
+    counted as a zero, which would silently pull the average down.
+
+    No matching numeric cell is Excel's #DIV/0! — returned here as None
+    (an honest "could not be reconstructed") rather than 0.0, which would
+    read as a false numeric agreement instead of the reconstruction gap it
+    actually is. Matching the cached #DIV/0! text exactly is Step 12's
+    verdict-granularity work, not this evaluator's job.
+    """
+    parts = _split_function_args(args_text)
+    if len(parts) not in (2, 3):
+        return None
+    range_refs = _references_in(parts[0], own_tab)
+    average_range_refs = _references_in(parts[2], own_tab) if len(parts) == 3 else range_refs
+    if len(range_refs) != len(average_range_refs) or not range_refs:
+        return None
+
+    criteria_value = _resolve_criteria_arg(parts[1], own_tab, values)
+
+    total = 0.0
+    count = 0
+    for range_ref, average_ref in zip(range_refs, average_range_refs):
+        if evaluate_criteria(values.get(range_ref), criteria_value):
+            matched = values.get(average_ref)
+            if _is_numeric_cell_value(matched):
+                total += matched
+                count += 1
+    if count == 0:
+        return None
+    return total / count
+
+
+def _averageifs_evaluator(
+    args_text: str, own_tab: str, values: dict, warnings: list[str], own_ref: str
+) -> Optional[float]:
+    """AVERAGEIFS(average_range, criteria_range1, criteria1, ...) — same
+    argument-order shape as SUMIFS (average_range first, then pairs), and
+    the same "matching AND numeric" denominator rule as AVERAGEIF above."""
+    parts = _split_function_args(args_text)
+    if len(parts) < 3:
+        return None
+    average_range_refs = _references_in(parts[0], own_tab)
+    if not average_range_refs:
+        return None
+    collected = _collect_criteria_pairs(
+        parts[1:], own_tab, values, expected_length=len(average_range_refs)
+    )
+    if collected is None:
+        return None
+    range_groups, criteria_values, length = collected
+
+    total = 0.0
+    count = 0
+    for index in range(length):
+        if all(
+            evaluate_criteria(values.get(refs[index]), criteria)
+            for refs, criteria in zip(range_groups, criteria_values)
+        ):
+            matched = values.get(average_range_refs[index])
+            if _is_numeric_cell_value(matched):
+                total += matched
+                count += 1
+    if count == 0:
+        return None
+    return total / count
+
+
+def _minifs_evaluator(
+    args_text: str, own_tab: str, values: dict, warnings: list[str], own_ref: str
+) -> Optional[float]:
+    """MINIFS(min_range, criteria_range1, criteria1, ...) — returns the
+    minimum of matching values. If no match, returns #NUM! (None here)."""
+    parts = _split_function_args(args_text)
+    if len(parts) < 3:
+        return None
+    min_refs = _references_in(parts[0], own_tab)
+    if not min_refs:
+        return None
+    collected = _collect_criteria_pairs(
+        parts[1:], own_tab, values, expected_length=len(min_refs)
+    )
+    if collected is None:
+        return None
+    range_groups, criteria_values, length = collected
+
+    min_val = None
+    for index in range(length):
+        if all(
+            evaluate_criteria(values.get(refs[index]), criteria)
+            for refs, criteria in zip(range_groups, criteria_values)
+        ):
+            matched = values.get(min_refs[index])
+            if _is_numeric_cell_value(matched):
+                if min_val is None or matched < min_val:
+                    min_val = matched
+    return min_val
+
+
+def _maxifs_evaluator(
+    args_text: str, own_tab: str, values: dict, warnings: list[str], own_ref: str
+) -> Optional[float]:
+    """MAXIFS(max_range, criteria_range1, criteria1, ...) — returns the
+    maximum of matching values. If no match, returns #NUM! (None here)."""
+    parts = _split_function_args(args_text)
+    if len(parts) < 3:
+        return None
+    max_refs = _references_in(parts[0], own_tab)
+    if not max_refs:
+        return None
+    collected = _collect_criteria_pairs(
+        parts[1:], own_tab, values, expected_length=len(max_refs)
+    )
+    if collected is None:
+        return None
+    range_groups, criteria_values, length = collected
+
+    max_val = None
+    for index in range(length):
+        if all(
+            evaluate_criteria(values.get(refs[index]), criteria)
+            for refs, criteria in zip(range_groups, criteria_values)
+        ):
+            matched = values.get(max_refs[index])
+            if _is_numeric_cell_value(matched):
+                if max_val is None or matched > max_val:
+                    max_val = matched
+    return max_val
+
+
+def _evaluate_if_condition(condition_text: str, own_tab: str, values: dict) -> bool:
+    """Evaluate an IF condition to a boolean.
+
+    A condition can be:
+    - A comparison (e.g., "A1>0", "A1>=B1", B1="Motor") — split on operator, evaluate both sides, compare
+    - An arithmetic expression (e.g., "A1+B1") — evaluate and coerce to boolean (0=FALSE)
+    - A cell reference or literal — coerce to boolean
+
+    For equality/inequality (= and <>), use the comparison engine to handle text matching.
+    For numeric comparisons, both sides must be numeric.
+    """
+    condition = condition_text.strip()
+
+    # Try to find a comparison operator at paren depth 0 (outside of parens and quotes)
+    comparison_ops = ("<=", ">=", "<>", "<", ">", "=")
+    paren_depth = 0
+    in_quotes = False
+    operator_pos = -1
+    operator_found = None
+
+    i = 0
+    while i < len(condition):
+        ch = condition[i]
+        if ch == '"':
+            in_quotes = not in_quotes
+            i += 1
+        elif ch == '(' and not in_quotes:
+            paren_depth += 1
+            i += 1
+        elif ch == ')' and not in_quotes:
+            paren_depth -= 1
+            i += 1
+        elif paren_depth == 0 and not in_quotes:
+            for op in comparison_ops:
+                if condition[i:i+len(op)] == op:
+                    operator_pos = i
+                    operator_found = op
+                    i += len(op)
+                    break
+            else:
+                i += 1
+        else:
+            i += 1
+
+    if operator_found:
+        left = condition[:operator_pos].strip()
+        right = condition[operator_pos + len(operator_found):].strip()
+
+        # For = and <>, try using the comparison engine which handles text matching
+        if operator_found in ("=", "<>"):
+            try:
+                # Resolve both sides; if they resolve to values, we can compare them
+                left_val = None
+                right_val = None
+                try:
+                    left_val = _resolve_and_eval_expr(left, own_tab, values)
+                except _UnresolvableReference:
+                    # Try as a cell reference alone
+                    for key in _references_in(left, own_tab):
+                        left_val = values.get(key)
+                        break
+
+                try:
+                    right_val = _resolve_and_eval_expr(right, own_tab, values)
+                except _UnresolvableReference:
+                    # Try as a cell reference alone
+                    for key in _references_in(right, own_tab):
+                        right_val = values.get(key)
+                        break
+
+                # Also handle string literals (quoted text)
+                if right_val is None and right.startswith('"') and right.endswith('"'):
+                    right_val = right[1:-1]
+                if left_val is None and left.startswith('"') and left.endswith('"'):
+                    left_val = left[1:-1]
+
+                # Use evaluate_criteria for text matching
+                if operator_found == "=":
+                    return evaluate_criteria(left_val, right_val)
+                else:
+                    # For <>, negate the result
+                    return not evaluate_criteria(left_val, right_val)
+            except Exception:
+                return False
+        else:
+            # Numeric comparison operators: both sides must be numeric
+            left_val = _resolve_and_eval_expr(left, own_tab, values)
+            right_val = _resolve_and_eval_expr(right, own_tab, values)
+
+            if left_val is None or right_val is None:
+                return False
+
+            if operator_found == ">":
+                return left_val > right_val
+            elif operator_found == "<":
+                return left_val < right_val
+            elif operator_found == ">=":
+                return left_val >= right_val
+            elif operator_found == "<=":
+                return left_val <= right_val
+    else:
+        # No operator found, evaluate as expression and coerce to boolean
+        result = _resolve_and_eval_expr(condition, own_tab, values)
+        if result is None:
+            # Try as a bare cell reference
+            for key in _references_in(condition, own_tab):
+                result = values.get(key)
+                break
+        if result is None:
+            return False
+        # Coerce to boolean
+        if isinstance(result, bool):
+            return result
+        if isinstance(result, (int, float)):
+            return result != 0
+        return True
+
+
+def _if_evaluator(
+    args_text: str, own_tab: str, values: dict, warnings: list[str], own_ref: str
+) -> Optional[float]:
+    """IF(condition, value_if_true, value_if_false) — returns one of two values
+    based on a boolean condition. Both branches are evaluated, but only the
+    matching one is returned."""
+    parts = _split_function_args(args_text)
+    if len(parts) != 3:
+        return None
+
+    condition = parts[0].strip()
+    value_if_true = parts[1].strip()
+    value_if_false = parts[2].strip()
+
+    condition_result = _evaluate_if_condition(condition, own_tab, values)
+
+    chosen_branch = value_if_true if condition_result else value_if_false
+
+    try:
+        return _resolve_and_eval_expr(chosen_branch, own_tab, values)
     except _UnresolvableReference:
         return None
 
-    if re.search(r"[A-Za-z]", substituted):
+
+# Dispatch table. Every key here must also be a key in
+# core/formula_catalogue.py's FUNCTION_ARG_SPECS (and vice versa) — enforced
+# by tests/test_reconciliation.py's catalogue/evaluator parity test, not by
+# convention. Adding a function to one without the other in the same change
+# is exactly the drift this table is designed to make impossible to ship
+# unnoticed.
+_EVALUATORS = {
+    "SUM": _sum_evaluator,
+    "ABS": _abs_evaluator,
+    "INT": _int_evaluator,
+    "ROUND": _round_evaluator,
+    "ROUNDUP": _roundup_evaluator,
+    "ROUNDDOWN": _rounddown_evaluator,
+    "CEILING": _ceiling_evaluator,
+    "FLOOR": _floor_evaluator,
+    "SUMIF": _sumif_evaluator,
+    "SUMIFS": _sumifs_evaluator,
+    "COUNTIF": _countif_evaluator,
+    "COUNTIFS": _countifs_evaluator,
+    "AVERAGEIF": _averageif_evaluator,
+    "AVERAGEIFS": _averageifs_evaluator,
+    "MINIFS": _minifs_evaluator,
+    "MAXIFS": _maxifs_evaluator,
+    "IF": _if_evaluator,
+}
+
+
+def _evaluate(formula: str, own_ref: str, values: dict, warnings: list[str]) -> Optional[float]:
+    """Compute a supported formula from its already-resolved dependencies.
+
+    Function calls are unwrapped innermost-out: `_INNERMOST_CALL_PATTERN`
+    only matches a call whose argument text contains no further parentheses,
+    so `SUM(ABS(C1),C2)` resolves `ABS(C1)` to a literal first, then `SUM(...)`
+    sees only literals and cell references — never nested function syntax.
+    """
+    own_tab = own_ref.split("!", 1)[0]
+    expr = formula[1:] if formula.startswith("=") else formula
+
+    for _ in range(_MAX_FUNCTION_NESTING):
+        match = _INNERMOST_CALL_PATTERN.search(expr)
+        if match is None:
+            break
+        name = match.group(1).upper()
+        evaluator = _EVALUATORS.get(name)
+        if evaluator is None:
+            # _unsupported_reason() should have screened this out already.
+            # Fail closed rather than guess at a function we can't compute.
+            return None
+        try:
+            value = evaluator(match.group(2), own_tab, values, warnings, own_ref)
+        except _UnresolvableReference:
+            return None
+        if value is None:
+            return None
+        expr = f"{expr[:match.start()]}{value!r}{expr[match.end():]}"
+    else:
+        # Nesting ceiling reached without exhausting every call — fail closed
+        # rather than return a partially-unwrapped result.
         return None
 
-    return _safe_eval_arithmetic(substituted)
+    try:
+        return _resolve_and_eval_expr(expr, own_tab, values)
+    except _UnresolvableReference:
+        return None
 
 
 def _references_in(argument: str, own_tab: str) -> list[str]:

@@ -204,12 +204,25 @@ class DerivationStep(BaseModel):
     A list of these, walked from an output cell down to its raw inputs, is the
     lineage. This replaces any notion of locating a source cell by matching a
     value. An unsupported node has resolved_value=None and stops the chain.
+
+    resolved_value is Optional[Union[float, str, bool]], not just float:
+    a leaf cell holding text or a boolean (e.g. a class-of-business label
+    feeding a SUMIF/COUNTIF/IF criteria range) is a perfectly ordinary,
+    fully-supported dependency — it just isn't a number. Widening this
+    field is what lets the derivation chain carry that value through to the
+    function that actually knows what to do with it (a criteria match, not
+    arithmetic) instead of the chain-walker rejecting it before the
+    consuming formula ever gets a chance to say whether it can handle text.
+    An arithmetic-only function (SUM, ABS, ROUND, ...) still fails closed on
+    a non-numeric input at ITS OWN evaluation step — this widening loosens
+    what the chain-walker accepts as a valid leaf, not what any individual
+    function is willing to compute.
     """
 
     cell_ref: str
     formula: Optional[str] = None
     depends_on: list[str]
-    resolved_value: Optional[float] = None
+    resolved_value: Optional[Union[float, str, bool]] = None
     is_supported: bool
 
 

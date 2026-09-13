@@ -364,6 +364,737 @@ def test_a_blank_cell_inside_a_sum_is_zero_and_warned_about():
 
 
 # ---------------------------------------------------------------------------
+# catalogue / evaluator parity guard
+# ---------------------------------------------------------------------------
+
+
+def test_every_supported_function_has_an_evaluator_and_vice_versa():
+    """The drift guard: core/formula_catalogue.py's catalogue and
+    agents/reconciliation.py's dispatch table must name exactly the same
+    functions. A function declared supported without something able to
+    compute it (or an evaluator for a function the catalogue doesn't know
+    about) is exactly the gap this test exists to make impossible to ship."""
+    from agents.reconciliation import _EVALUATORS
+    from core.formula_catalogue import SUPPORTED_FUNCTIONS
+
+    assert set(_EVALUATORS) == SUPPORTED_FUNCTIONS
+
+
+# ---------------------------------------------------------------------------
+# Group A: ABS, INT
+# ---------------------------------------------------------------------------
+
+
+def _single_cell_workbook(formula, cached_value, referenced_value=None):
+    """One formula cell, optionally depending on one plain value cell."""
+    cells = {
+        "Provisions!C1": cell("Provisions!C1", formula=formula, value=cached_value),
+    }
+    graph = {"Provisions!C1": []}
+    if referenced_value is not None:
+        cells["Provisions!B1"] = cell("Provisions!B1", value=referenced_value)
+        graph["Provisions!C1"] = ["Provisions!B1"]
+    return parsed(cells, graph)
+
+
+def test_abs_of_a_positive_literal():
+    line = run_reconciliation(_single_cell_workbook("=ABS(5)", 5.0), ["Provisions!C1"]).lines[0]
+    assert line.target_value == 5.0
+    assert line.completeness == "complete"
+
+
+def test_abs_of_a_negative_literal():
+    line = run_reconciliation(_single_cell_workbook("=ABS(-5)", 5.0), ["Provisions!C1"]).lines[0]
+    assert line.target_value == 5.0
+
+
+def test_abs_of_zero():
+    line = run_reconciliation(_single_cell_workbook("=ABS(0)", 0.0), ["Provisions!C1"]).lines[0]
+    assert line.target_value == 0.0
+
+
+def test_abs_of_a_decimal():
+    line = run_reconciliation(_single_cell_workbook("=ABS(-3.25)", 3.25), ["Provisions!C1"]).lines[0]
+    assert line.target_value == 3.25
+
+
+def test_abs_of_a_cell_reference():
+    line = run_reconciliation(
+        _single_cell_workbook("=ABS(B1)", 5.0, referenced_value=-5.0), ["Provisions!C1"]
+    ).lines[0]
+    assert line.target_value == 5.0
+
+
+def test_int_of_a_positive_decimal_rounds_toward_negative_infinity():
+    line = run_reconciliation(_single_cell_workbook("=INT(8.9)", 8.0), ["Provisions!C1"]).lines[0]
+    assert line.target_value == 8.0
+
+
+def test_int_of_a_negative_decimal_rounds_toward_negative_infinity_not_toward_zero():
+    """The trap: Excel's INT(-8.9) is -9, NOT -8. INT is floor, not truncation —
+    getting this backwards is a sign-dependent bug that only shows up on
+    negative inputs, exactly the kind of asymmetry this catalogue's
+    correctness notes exist to catch."""
+    line = run_reconciliation(_single_cell_workbook("=INT(-8.9)", -9.0), ["Provisions!C1"]).lines[0]
+    assert line.target_value == -9.0
+
+
+def test_int_of_zero():
+    line = run_reconciliation(_single_cell_workbook("=INT(0)", 0.0), ["Provisions!C1"]).lines[0]
+    assert line.target_value == 0.0
+
+
+def test_int_of_an_exact_integer_is_unchanged():
+    line = run_reconciliation(_single_cell_workbook("=INT(4)", 4.0), ["Provisions!C1"]).lines[0]
+    assert line.target_value == 4.0
+
+
+def test_int_of_a_cell_reference():
+    line = run_reconciliation(
+        _single_cell_workbook("=INT(B1)", -9.0, referenced_value=-8.9), ["Provisions!C1"]
+    ).lines[0]
+    assert line.target_value == -9.0
+
+
+def test_abs_nested_inside_sum():
+    """The innermost-out unwrapping is exercised by nesting a Group A function
+    inside the pre-existing SUM support: SUM(ABS(C1), C2)."""
+    cells = {
+        "Provisions!C1": cell("Provisions!C1", value=-10.0),
+        "Provisions!C2": cell("Provisions!C2", value=20.0),
+        "Provisions!C3": cell("Provisions!C3", formula="=SUM(ABS(C1),C2)", value=30.0),
+    }
+    graph = {"Provisions!C3": ["Provisions!C1", "Provisions!C2"], "Provisions!C1": [], "Provisions!C2": []}
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!C3"]).lines[0]
+    assert line.target_value == 30.0
+    assert line.completeness == "complete"
+
+
+# ---------------------------------------------------------------------------
+# Group B: ROUND, ROUNDUP, ROUNDDOWN, CEILING, FLOOR
+# ---------------------------------------------------------------------------
+
+
+def test_round_positive_half_tie_reconstructs():
+    line = run_reconciliation(_single_cell_workbook("=ROUND(2.5,0)", 3.0), ["Provisions!C1"]).lines[0]
+    assert line.target_value == 3.0
+
+
+def test_round_negative_half_tie_reconstructs():
+    line = run_reconciliation(_single_cell_workbook("=ROUND(-2.5,0)", -3.0), ["Provisions!C1"]).lines[0]
+    assert line.target_value == -3.0
+
+
+def test_roundup_mixed_sign_asymmetry_in_one_fixture():
+    """ROUNDUP is always away from zero — the sign of the input changes the
+    sign of the answer but not the direction relative to magnitude."""
+    up_positive = run_reconciliation(
+        _single_cell_workbook("=ROUNDUP(1.1,0)", 2.0), ["Provisions!C1"]
+    ).lines[0]
+    up_negative = run_reconciliation(
+        _single_cell_workbook("=ROUNDUP(-1.1,0)", -2.0), ["Provisions!C1"]
+    ).lines[0]
+    assert up_positive.target_value == 2.0
+    assert up_negative.target_value == -2.0
+
+
+def test_rounddown_mixed_sign_asymmetry_in_one_fixture():
+    """ROUNDDOWN is always toward zero — the direct contrast with ROUNDUP on
+    the same magnitude."""
+    down_positive = run_reconciliation(
+        _single_cell_workbook("=ROUNDDOWN(1.9,0)", 1.0), ["Provisions!C1"]
+    ).lines[0]
+    down_negative = run_reconciliation(
+        _single_cell_workbook("=ROUNDDOWN(-1.9,0)", -1.0), ["Provisions!C1"]
+    ).lines[0]
+    assert down_positive.target_value == 1.0
+    assert down_negative.target_value == -1.0
+
+
+def test_roundup_rounddown_half_ties_both_signs():
+    up_pos = run_reconciliation(_single_cell_workbook("=ROUNDUP(0.5,0)", 1.0), ["Provisions!C1"]).lines[0]
+    up_neg = run_reconciliation(_single_cell_workbook("=ROUNDUP(-0.5,0)", -1.0), ["Provisions!C1"]).lines[0]
+    down_pos = run_reconciliation(
+        _single_cell_workbook("=ROUNDDOWN(0.5,0)", 0.0), ["Provisions!C1"]
+    ).lines[0]
+    down_neg = run_reconciliation(
+        _single_cell_workbook("=ROUNDDOWN(-0.5,0)", 0.0), ["Provisions!C1"]
+    ).lines[0]
+    assert up_pos.target_value == 1.0
+    assert up_neg.target_value == -1.0
+    assert down_pos.target_value == 0.0
+    assert down_neg.target_value == 0.0
+
+
+def test_round_negative_digit_count_rounds_to_hundreds():
+    line = run_reconciliation(_single_cell_workbook("=ROUND(1250,-2)", 1300.0), ["Provisions!C1"]).lines[0]
+    assert line.target_value == 1300.0
+
+
+def test_ceiling_rounds_to_significance_not_digit_count():
+    """The load-bearing case distinguishing significance from digit count:
+    CEILING(1.23, 0.5) is 1.5, not 2 (which a digit-count misreading of the
+    second argument would wrongly produce)."""
+    line = run_reconciliation(
+        _single_cell_workbook("=CEILING(1.23,0.5)", 1.5), ["Provisions!C1"]
+    ).lines[0]
+    assert line.target_value == 1.5
+
+
+def test_floor_rounds_to_significance_not_digit_count():
+    line = run_reconciliation(
+        _single_cell_workbook("=FLOOR(1.23,0.5)", 1.0), ["Provisions!C1"]
+    ).lines[0]
+    assert line.target_value == 1.0
+
+
+def test_ceiling_floor_significance_of_ten():
+    ceiling_line = run_reconciliation(
+        _single_cell_workbook("=CEILING(12,10)", 20.0), ["Provisions!C1"]
+    ).lines[0]
+    floor_line = run_reconciliation(
+        _single_cell_workbook("=FLOOR(12,10)", 10.0), ["Provisions!C1"]
+    ).lines[0]
+    assert ceiling_line.target_value == 20.0
+    assert floor_line.target_value == 10.0
+
+
+def test_ceiling_hand_checked_value_negative_value_positive_significance():
+    """The Step 14 hand-checked case: CEILING(-0.5, 1) == -1 in real Excel —
+    significance's sign need not match value's sign for plain CEILING."""
+    line = run_reconciliation(
+        _single_cell_workbook("=CEILING(-0.5,1)", -1.0), ["Provisions!C1"]
+    ).lines[0]
+    assert line.target_value == -1.0
+
+
+def test_rounding_function_argument_is_a_cell_reference():
+    line = run_reconciliation(
+        _single_cell_workbook("=ROUND(B1,0)", 3.0, referenced_value=2.5), ["Provisions!C1"]
+    ).lines[0]
+    assert line.target_value == 3.0
+
+
+def test_round_nested_inside_sum():
+    cells = {
+        "Provisions!C1": cell("Provisions!C1", value=2.5),
+        "Provisions!C2": cell("Provisions!C2", value=10.0),
+        "Provisions!C3": cell("Provisions!C3", formula="=SUM(ROUND(C1,0),C2)", value=13.0),
+    }
+    graph = {"Provisions!C3": ["Provisions!C1", "Provisions!C2"], "Provisions!C1": [], "Provisions!C2": []}
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!C3"]).lines[0]
+    assert line.target_value == 13.0
+
+
+# ---------------------------------------------------------------------------
+# Group C: SUMIF (reference implementation)
+# ---------------------------------------------------------------------------
+
+
+def test_sumif_numeric_comparison_criteria_no_sum_range():
+    """SUMIF(range, criteria) — sum_range omitted, so range itself is summed."""
+    cells = {
+        "Provisions!A1": cell("Provisions!A1", value=50.0),
+        "Provisions!A2": cell("Provisions!A2", value=150.0),
+        "Provisions!A3": cell("Provisions!A3", value=250.0),
+        "Provisions!B1": cell("Provisions!B1", formula='=SUMIF(A1:A3,">100")', value=400.0),
+    }
+    graph = {
+        "Provisions!B1": ["Provisions!A1", "Provisions!A2", "Provisions!A3"],
+        "Provisions!A1": [],
+        "Provisions!A2": [],
+        "Provisions!A3": [],
+    }
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!B1"]).lines[0]
+    assert line.target_value == 400.0
+    assert line.completeness == "complete"
+
+
+def test_sumif_wildcard_text_criteria_with_separate_sum_range():
+    """Text categories (a class-of-business column) are the whole point of
+    SUMIF — a wildcard criteria matches "Motor Comprehensive" but not
+    "Property"."""
+    cells = {
+        "Provisions!B1": cell("Provisions!B1", value="Motor"),
+        "Provisions!B2": cell("Provisions!B2", value="Property"),
+        "Provisions!B3": cell("Provisions!B3", value="Motor Comprehensive"),
+        "Provisions!C1": cell("Provisions!C1", value=10.0),
+        "Provisions!C2": cell("Provisions!C2", value=20.0),
+        "Provisions!C3": cell("Provisions!C3", value=30.0),
+        "Provisions!D1": cell(
+            "Provisions!D1", formula='=SUMIF(B1:B3,"Motor*",C1:C3)', value=40.0
+        ),
+    }
+    graph = {
+        "Provisions!D1": [
+            "Provisions!B1",
+            "Provisions!B2",
+            "Provisions!B3",
+            "Provisions!C1",
+            "Provisions!C2",
+            "Provisions!C3",
+        ],
+        "Provisions!B1": [],
+        "Provisions!B2": [],
+        "Provisions!B3": [],
+        "Provisions!C1": [],
+        "Provisions!C2": [],
+        "Provisions!C3": [],
+    }
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!D1"]).lines[0]
+    assert line.target_value == 40.0
+    assert line.completeness == "complete"
+    assert line.unsupported_elements == []
+
+
+def test_sumif_comparison_operator_criteria_with_separate_sum_range():
+    cells = {
+        "Provisions!B1": cell("Provisions!B1", value=50.0),
+        "Provisions!B2": cell("Provisions!B2", value=150.0),
+        "Provisions!B3": cell("Provisions!B3", value=250.0),
+        "Provisions!C1": cell("Provisions!C1", value=1.0),
+        "Provisions!C2": cell("Provisions!C2", value=2.0),
+        "Provisions!C3": cell("Provisions!C3", value=3.0),
+        "Provisions!D1": cell("Provisions!D1", formula='=SUMIF(B1:B3,">100",C1:C3)', value=5.0),
+    }
+    graph = {
+        "Provisions!D1": [
+            "Provisions!B1",
+            "Provisions!B2",
+            "Provisions!B3",
+            "Provisions!C1",
+            "Provisions!C2",
+            "Provisions!C3",
+        ],
+        "Provisions!B1": [],
+        "Provisions!B2": [],
+        "Provisions!B3": [],
+        "Provisions!C1": [],
+        "Provisions!C2": [],
+        "Provisions!C3": [],
+    }
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!D1"]).lines[0]
+    assert line.target_value == 5.0
+
+
+def test_sumif_cross_tab_range_and_sum_range():
+    cells = {
+        "Data!B1": cell("Data!B1", value="Motor"),
+        "Data!B2": cell("Data!B2", value="Property"),
+        "Data!C1": cell("Data!C1", value=100.0),
+        "Data!C2": cell("Data!C2", value=200.0),
+        "Provisions!D1": cell(
+            "Provisions!D1", formula='=SUMIF(Data!B1:B2,"Motor",Data!C1:C2)', value=100.0
+        ),
+    }
+    graph = {
+        "Provisions!D1": ["Data!B1", "Data!B2", "Data!C1", "Data!C2"],
+        "Data!B1": [],
+        "Data!B2": [],
+        "Data!C1": [],
+        "Data!C2": [],
+    }
+    line = run_reconciliation(
+        parsed(cells, graph, tabs=("Provisions", "Data")), ["Provisions!D1"]
+    ).lines[0]
+    assert line.target_value == 100.0
+
+
+def test_sumif_criteria_built_from_a_cell_reference():
+    """The trap Step 6 calls out by name: SUMIF(A:A, ">"&B1, C:C). The
+    criteria is a live formula-built string, not a literal — many criteria
+    engines silently fail exactly here."""
+    cells = {
+        "Provisions!A1": cell("Provisions!A1", value=50.0),
+        "Provisions!A2": cell("Provisions!A2", value=150.0),
+        "Provisions!A3": cell("Provisions!A3", value=250.0),
+        "Provisions!E1": cell("Provisions!E1", value=100.0),
+        "Provisions!F1": cell(
+            "Provisions!F1", formula='=SUMIF(A1:A3,">"&E1)', value=400.0
+        ),
+    }
+    graph = {
+        "Provisions!F1": ["Provisions!A1", "Provisions!A2", "Provisions!A3", "Provisions!E1"],
+        "Provisions!A1": [],
+        "Provisions!A2": [],
+        "Provisions!A3": [],
+        "Provisions!E1": [],
+    }
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!F1"]).lines[0]
+    assert line.target_value == 400.0
+    assert line.completeness == "complete"
+
+
+def test_sumif_criteria_string_literal_is_not_flagged_as_text_in_arithmetic():
+    """Regression guard: SUMIF's own criteria literal must not trip the
+    'text literal in arithmetic' check that (correctly) still fires for a
+    string literal genuinely used outside a criteria-consuming function."""
+    cells = {
+        "Provisions!A1": cell("Provisions!A1", value=50.0),
+        "Provisions!B1": cell("Provisions!B1", formula='=SUMIF(A1:A1,">10")', value=50.0),
+    }
+    graph = {"Provisions!B1": ["Provisions!A1"], "Provisions!A1": []}
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!B1"]).lines[0]
+    assert line.unsupported_elements == []
+    assert line.completeness == "complete"
+
+
+def test_text_literal_outside_sumif_is_still_unsupported():
+    """The other half of the guard above: a bare string literal used
+    outside a criteria-consuming function must still be rejected."""
+    cells = {
+        "Provisions!A1": cell("Provisions!A1", formula='=A2&"x"', value=None),
+        "Provisions!A2": cell("Provisions!A2", value=5.0),
+    }
+    graph = {"Provisions!A1": ["Provisions!A2"], "Provisions!A2": []}
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!A1"]).lines[0]
+    assert any("text literal in arithmetic" in element for element in line.unsupported_elements)
+
+
+def test_sumif_no_matches_sums_to_zero():
+    cells = {
+        "Provisions!A1": cell("Provisions!A1", value=10.0),
+        "Provisions!B1": cell("Provisions!B1", formula='=SUMIF(A1:A1,">1000")', value=0.0),
+    }
+    graph = {"Provisions!B1": ["Provisions!A1"], "Provisions!A1": []}
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!B1"]).lines[0]
+    assert line.target_value == 0.0
+
+
+# ---------------------------------------------------------------------------
+# Group C: SUMIFS
+# ---------------------------------------------------------------------------
+
+
+def _sumifs_workbook():
+    """Five rows: class, region, an "included" flag, and an amount —
+    class-of-business, geography, and a boolean inclusion flag are the
+    three criteria ranges, mixing text/wildcard, text/exact, and boolean
+    criteria types in one fixture."""
+    rows = [
+        ("Motor", "North", True, 100.0),
+        ("Motor", "South", True, 200.0),
+        ("Property", "North", True, 300.0),
+        ("Motor", "North", False, 400.0),
+        ("Motor", "North", True, 500.0),
+    ]
+    cells = {}
+    graph_deps = []
+    for i, (klass, region, flag, amount) in enumerate(rows, start=1):
+        cells[f"Provisions!A{i}"] = cell(f"Provisions!A{i}", value=klass)
+        cells[f"Provisions!B{i}"] = cell(f"Provisions!B{i}", value=region)
+        cells[f"Provisions!C{i}"] = cell(f"Provisions!C{i}", value=flag)
+        cells[f"Provisions!D{i}"] = cell(f"Provisions!D{i}", value=amount)
+        graph_deps.extend([f"Provisions!A{i}", f"Provisions!B{i}", f"Provisions!C{i}", f"Provisions!D{i}"])
+    return cells, graph_deps
+
+
+def test_sumifs_three_criteria_ranges_mixed_types():
+    """Class (wildcard-capable text), region (exact text), and a boolean
+    flag — three criteria ranges of genuinely different types must all
+    match (AND) for a row to be included."""
+    cells, deps = _sumifs_workbook()
+    cells["Provisions!E1"] = cell(
+        "Provisions!E1",
+        formula='=SUMIFS(D1:D5,A1:A5,"Motor*",B1:B5,"North",C1:C5,TRUE)',
+        value=600.0,
+    )
+    graph = {"Provisions!E1": deps, **{d: [] for d in deps}}
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!E1"]).lines[0]
+    # Rows 1 and 5 match (Motor, North, TRUE); row 4 is excluded by the flag.
+    assert line.target_value == 600.0
+    assert line.completeness == "complete"
+
+
+def test_sumifs_criteria_built_from_a_cell_reference():
+    cells, deps = _sumifs_workbook()
+    cells["Provisions!F1"] = cell("Provisions!F1", value=150.0)
+    cells["Provisions!E1"] = cell(
+        "Provisions!E1",
+        formula='=SUMIFS(D1:D5,A1:A5,"Motor",D1:D5,">"&F1)',
+        value=1100.0,
+    )
+    graph = {"Provisions!E1": deps + ["Provisions!F1"], **{d: [] for d in deps}, "Provisions!F1": []}
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!E1"]).lines[0]
+    # Motor rows with amount > 150: 200 + 400 + 500 = 1100 (100 excluded).
+    assert line.target_value == 1100.0
+
+
+def test_sumifs_no_matching_row_sums_to_zero():
+    cells, deps = _sumifs_workbook()
+    cells["Provisions!E1"] = cell(
+        "Provisions!E1", formula='=SUMIFS(D1:D5,A1:A5,"Liability")', value=0.0
+    )
+    graph = {"Provisions!E1": deps, **{d: [] for d in deps}}
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!E1"]).lines[0]
+    assert line.target_value == 0.0
+
+
+# ---------------------------------------------------------------------------
+# Group C: COUNTIF
+# ---------------------------------------------------------------------------
+
+
+def test_countif_numeric_comparison_criteria():
+    cells = {
+        "Provisions!A1": cell("Provisions!A1", value=50.0),
+        "Provisions!A2": cell("Provisions!A2", value=150.0),
+        "Provisions!A3": cell("Provisions!A3", value=250.0),
+        "Provisions!B1": cell("Provisions!B1", formula='=COUNTIF(A1:A3,">100")', value=2.0),
+    }
+    graph = {
+        "Provisions!B1": ["Provisions!A1", "Provisions!A2", "Provisions!A3"],
+        "Provisions!A1": [],
+        "Provisions!A2": [],
+        "Provisions!A3": [],
+    }
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!B1"]).lines[0]
+    assert line.target_value == 2.0
+
+
+def test_countif_wildcard_text_criteria():
+    cells = {
+        "Provisions!B1": cell("Provisions!B1", value="Motor"),
+        "Provisions!B2": cell("Provisions!B2", value="Property"),
+        "Provisions!B3": cell("Provisions!B3", value="Motor Comprehensive"),
+        "Provisions!D1": cell("Provisions!D1", formula='=COUNTIF(B1:B3,"Motor*")', value=2.0),
+    }
+    graph = {
+        "Provisions!D1": ["Provisions!B1", "Provisions!B2", "Provisions!B3"],
+        "Provisions!B1": [],
+        "Provisions!B2": [],
+        "Provisions!B3": [],
+    }
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!D1"]).lines[0]
+    assert line.target_value == 2.0
+
+
+def test_countif_cross_tab_range():
+    cells = {
+        "Data!B1": cell("Data!B1", value="Motor"),
+        "Data!B2": cell("Data!B2", value="Property"),
+        "Provisions!D1": cell("Provisions!D1", formula='=COUNTIF(Data!B1:B2,"Motor")', value=1.0),
+    }
+    graph = {"Provisions!D1": ["Data!B1", "Data!B2"], "Data!B1": [], "Data!B2": []}
+    line = run_reconciliation(
+        parsed(cells, graph, tabs=("Provisions", "Data")), ["Provisions!D1"]
+    ).lines[0]
+    assert line.target_value == 1.0
+
+
+def test_countif_criteria_built_from_a_cell_reference():
+    cells = {
+        "Provisions!A1": cell("Provisions!A1", value=50.0),
+        "Provisions!A2": cell("Provisions!A2", value=150.0),
+        "Provisions!A3": cell("Provisions!A3", value=250.0),
+        "Provisions!E1": cell("Provisions!E1", value=100.0),
+        "Provisions!F1": cell("Provisions!F1", formula='=COUNTIF(A1:A3,">"&E1)', value=2.0),
+    }
+    graph = {
+        "Provisions!F1": ["Provisions!A1", "Provisions!A2", "Provisions!A3", "Provisions!E1"],
+        "Provisions!A1": [],
+        "Provisions!A2": [],
+        "Provisions!A3": [],
+        "Provisions!E1": [],
+    }
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!F1"]).lines[0]
+    assert line.target_value == 2.0
+
+
+# ---------------------------------------------------------------------------
+# Group C: COUNTIFS
+# ---------------------------------------------------------------------------
+
+
+def test_countifs_multiple_criteria_pairs():
+    cells, deps = _sumifs_workbook()
+    cells["Provisions!E1"] = cell(
+        "Provisions!E1", formula='=COUNTIFS(A1:A5,"Motor",B1:B5,"North")', value=3.0
+    )
+    graph = {"Provisions!E1": deps, **{d: [] for d in deps}}
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!E1"]).lines[0]
+    # Rows 1, 4, 5 are Motor/North (row 4's flag doesn't matter — COUNTIFS
+    # here only has two criteria pairs, not three).
+    assert line.target_value == 3.0
+
+
+def test_countifs_three_criteria_pairs_matches_sumifs_row_selection():
+    cells, deps = _sumifs_workbook()
+    cells["Provisions!E1"] = cell(
+        "Provisions!E1",
+        formula='=COUNTIFS(A1:A5,"Motor*",B1:B5,"North",C1:C5,TRUE)',
+        value=2.0,
+    )
+    graph = {"Provisions!E1": deps, **{d: [] for d in deps}}
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!E1"]).lines[0]
+    # The same row selection as test_sumifs_three_criteria_ranges_mixed_types
+    # (rows 1 and 5) — counted here instead of summed.
+    assert line.target_value == 2.0
+
+
+def test_countifs_no_matching_row_is_zero():
+    cells, deps = _sumifs_workbook()
+    cells["Provisions!E1"] = cell(
+        "Provisions!E1", formula='=COUNTIFS(A1:A5,"Liability",B1:B5,"East")', value=0.0
+    )
+    graph = {"Provisions!E1": deps, **{d: [] for d in deps}}
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!E1"]).lines[0]
+    assert line.target_value == 0.0
+
+
+# ---------------------------------------------------------------------------
+# Group C: SUMIF vs COUNTIF on the same range — sum vs count made explicit
+# ---------------------------------------------------------------------------
+
+
+def test_sumif_and_countif_on_the_same_range_are_not_the_same_number():
+    """The explicit contrast Step 7 asks for: SUMIF totals the matching
+    amounts, COUNTIF counts the matching cells — same range, same criteria,
+    deliberately different answers."""
+    cells = {
+        "Provisions!A1": cell("Provisions!A1", value="Motor"),
+        "Provisions!A2": cell("Provisions!A2", value="Property"),
+        "Provisions!A3": cell("Provisions!A3", value="Motor"),
+        "Provisions!B1": cell("Provisions!B1", value=100.0),
+        "Provisions!B2": cell("Provisions!B2", value=300.0),
+        "Provisions!B3": cell("Provisions!B3", value=500.0),
+        "Provisions!C1": cell("Provisions!C1", formula='=SUMIF(A1:A3,"Motor",B1:B3)', value=600.0),
+        "Provisions!C2": cell("Provisions!C2", formula='=COUNTIF(A1:A3,"Motor")', value=2.0),
+    }
+    deps = ["Provisions!A1", "Provisions!A2", "Provisions!A3", "Provisions!B1", "Provisions!B2", "Provisions!B3"]
+    graph = {"Provisions!C1": deps, "Provisions!C2": deps[:3], **{d: [] for d in deps}}
+    result = run_reconciliation(parsed(cells, graph), ["Provisions!C1", "Provisions!C2"])
+    sumif_line, countif_line = result.lines
+    assert sumif_line.target_value == 600.0
+    assert countif_line.target_value == 2.0
+    assert sumif_line.target_value != countif_line.target_value
+
+
+# ---------------------------------------------------------------------------
+# Group C: AVERAGEIF, AVERAGEIFS
+# ---------------------------------------------------------------------------
+
+
+def _averageif_workbook():
+    """Five rows by class of business. Row 5 is Motor with a BLANK amount —
+    it matches the criteria but must not count toward the denominator, and
+    "Property" is the only other class, exercising the case where "Motor"
+    matches several rows and "Liability" matches none at all."""
+    rows = [
+        ("Motor", 100.0),
+        ("Motor", 300.0),
+        ("Property", 500.0),
+        ("Motor", 700.0),
+        ("Motor", None),
+    ]
+    cells = {}
+    deps = []
+    for i, (klass, amount) in enumerate(rows, start=1):
+        cells[f"Provisions!A{i}"] = cell(f"Provisions!A{i}", value=klass)
+        cells[f"Provisions!B{i}"] = cell(f"Provisions!B{i}", value=amount)
+        deps.extend([f"Provisions!A{i}", f"Provisions!B{i}"])
+    return cells, deps
+
+
+def test_averageif_denominator_is_matching_cells_not_all_cells():
+    """The Section 3.12 trap: row 5 matches "Motor" but its amount is blank —
+    it must be excluded from the denominator (average of 3 values), not
+    counted as a 4th row averaging in a 0."""
+    cells, deps = _averageif_workbook()
+    cells["Provisions!C1"] = cell(
+        "Provisions!C1", formula='=AVERAGEIF(A1:A5,"Motor",B1:B5)', value=1100.0 / 3
+    )
+    graph = {"Provisions!C1": deps, **{d: [] for d in deps}}
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!C1"]).lines[0]
+    assert line.target_value == pytest.approx(1100.0 / 3)
+    # Explicitly NOT (100+300+700+0)/4 == 275.0 — the off-by-one-denominator
+    # bug this test exists to catch.
+    assert line.target_value != pytest.approx(275.0)
+
+
+def test_averageif_no_matching_class_fails_closed_not_zero():
+    """No row is "Liability" — Excel's own answer here is #DIV/0!, not 0.
+    Without Step 12's error-category verdict work, this reconstructs to
+    None (an honest gap) rather than a false numeric agreement at 0."""
+    cells, deps = _averageif_workbook()
+    cells["Provisions!C1"] = cell(
+        "Provisions!C1", formula='=AVERAGEIF(A1:A5,"Liability",B1:B5)', value="#DIV/0!"
+    )
+    graph = {"Provisions!C1": deps, **{d: [] for d in deps}}
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!C1"]).lines[0]
+    assert line.target_value is None
+    assert line.completeness == "partial"
+
+
+def test_averageif_and_sumif_on_the_same_data_are_not_the_same_number():
+    """The explicit contrast Step 8 asks for: SUMIF totals the matching
+    amounts (including the blank as 0), AVERAGEIF averages only the
+    matching NUMERIC cells — same range, same criteria, different answers
+    for a different reason than SUMIF-vs-COUNTIF's sum-vs-count contrast."""
+    cells, deps = _averageif_workbook()
+    cells["Provisions!C1"] = cell(
+        "Provisions!C1", formula='=SUMIF(A1:A5,"Motor",B1:B5)', value=1100.0
+    )
+    cells["Provisions!C2"] = cell(
+        "Provisions!C2", formula='=AVERAGEIF(A1:A5,"Motor",B1:B5)', value=1100.0 / 3
+    )
+    graph = {"Provisions!C1": deps, "Provisions!C2": deps, **{d: [] for d in deps}}
+    result = run_reconciliation(parsed(cells, graph), ["Provisions!C1", "Provisions!C2"])
+    sumif_line, averageif_line = result.lines
+    assert sumif_line.target_value == 1100.0
+    assert averageif_line.target_value == pytest.approx(1100.0 / 3)
+    assert sumif_line.target_value != averageif_line.target_value
+
+
+def test_averageifs_two_criteria_pairs():
+    cells, deps = _sumifs_workbook()
+    cells["Provisions!E1"] = cell(
+        "Provisions!E1",
+        formula='=AVERAGEIFS(D1:D5,A1:A5,"Motor",B1:B5,"North")',
+        value=1000.0 / 3,
+    )
+    graph = {"Provisions!E1": deps, **{d: [] for d in deps}}
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!E1"]).lines[0]
+    # Rows 1, 4, 5 are Motor/North: amounts 100, 400, 500 -> average 333.33.
+    assert line.target_value == pytest.approx(1000.0 / 3)
+
+
+def test_averageifs_no_match_fails_closed_not_zero():
+    cells, deps = _sumifs_workbook()
+    cells["Provisions!E1"] = cell(
+        "Provisions!E1",
+        formula='=AVERAGEIFS(D1:D5,A1:A5,"Liability",B1:B5,"East")',
+        value="#DIV/0!",
+    )
+    graph = {"Provisions!E1": deps, **{d: [] for d in deps}}
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!E1"]).lines[0]
+    assert line.target_value is None
+    assert line.completeness == "partial"
+
+
+def test_blank_cell_still_reads_as_zero_in_bare_arithmetic_and_abs():
+    """Regression guard for the blank/zero distinction Step 8 introduced:
+    a blank dependency must still read as 0 for arithmetic (SUM, bare
+    arithmetic, ABS/INT/ROUND's argument), NOT become unresolvable just
+    because AVERAGEIF-family evaluators now need to see it as None."""
+    cells = {
+        "Provisions!A1": cell("Provisions!A1", value=None),
+        "Provisions!A2": cell("Provisions!A2", formula="=A1*2", value=0.0),
+        "Provisions!A3": cell("Provisions!A3", formula="=ABS(A1)", value=0.0),
+    }
+    graph = {
+        "Provisions!A2": ["Provisions!A1"],
+        "Provisions!A3": ["Provisions!A1"],
+        "Provisions!A1": [],
+    }
+    lines = run_reconciliation(parsed(cells, graph), ["Provisions!A2", "Provisions!A3"]).lines
+    assert lines[0].target_value == 0.0
+    assert lines[0].completeness == "complete"
+    assert lines[1].target_value == 0.0
+    assert lines[1].completeness == "complete"
+
+
+# ---------------------------------------------------------------------------
 # unsupported elements
 # ---------------------------------------------------------------------------
 
@@ -384,13 +1115,15 @@ def test_vlookup_produces_incomplete_not_a_guess():
 
 
 def test_the_unsupported_formula_appears_verbatim():
+    """VLOOKUP is not yet implemented. Verify that unsupported formulas
+    still get reported verbatim."""
     cells = {
-        "Provisions!C9": cell("Provisions!C9", formula="=IF(A1>0,1,2)", value=1.0),
+        "Provisions!C9": cell("Provisions!C9", formula="=VLOOKUP(A1,B:D,2,0)", value=1.0),
         "Provisions!C5": cell("Provisions!C5", formula="=C9*10", value=10.0),
     }
     graph = {"Provisions!C5": ["Provisions!C9"], "Provisions!C9": []}
     line = run_reconciliation(parsed(cells, graph), ["Provisions!C5"]).lines[0]
-    assert any("=IF(A1>0,1,2)" in element for element in line.unsupported_elements)
+    assert any("=VLOOKUP(A1,B:D,2,0)" in element for element in line.unsupported_elements)
 
 
 def test_coverage_reflects_how_much_of_the_chain_resolved():
@@ -764,3 +1497,89 @@ def test_threshold_is_default_is_false_when_either_was_changed():
     ).lines[0]
     assert line.threshold_is_default is False
     assert line.pct_threshold == 0.05
+
+
+# ---------------------------------------------------------------------------
+# Group C final — IF
+# ---------------------------------------------------------------------------
+
+
+def test_if_numeric_comparison_true_condition():
+    cells = {
+        "Provisions!C1": cell("Provisions!C1", value=100.0),
+        "Provisions!C2": cell("Provisions!C2", formula="=IF(C1>50,C1*2,C1*1)", value=200.0),
+    }
+    line = run_reconciliation(
+        parsed(cells, {"Provisions!C2": ["Provisions!C1"], "Provisions!C1": []}),
+        ["Provisions!C2"],
+    ).lines[0]
+    assert line.target_value == 200.0
+
+
+def test_if_numeric_comparison_false_condition():
+    cells = {
+        "Provisions!C1": cell("Provisions!C1", value=30.0),
+        "Provisions!C2": cell("Provisions!C2", formula="=IF(C1>50,C1*2,C1*1)", value=30.0),
+    }
+    line = run_reconciliation(
+        parsed(cells, {"Provisions!C2": ["Provisions!C1"], "Provisions!C1": []}),
+        ["Provisions!C2"],
+    ).lines[0]
+    assert line.target_value == 30.0
+
+
+def test_if_text_comparison():
+    cells = {
+        "Provisions!B1": cell("Provisions!B1", value="Motor"),
+        "Provisions!C1": cell("Provisions!C1", value=100.0),
+        "Provisions!C2": cell("Provisions!C2", formula='=IF(B1="Motor",C1*1.5,C1*1)', value=150.0),
+    }
+    line = run_reconciliation(
+        parsed(cells, {"Provisions!C2": ["Provisions!B1", "Provisions!C1"], "Provisions!B1": [], "Provisions!C1": []}),
+        ["Provisions!C2"],
+    ).lines[0]
+    assert line.target_value == 150.0
+
+
+def test_if_falsy_condition():
+    cells = {
+        "Provisions!C1": cell("Provisions!C1", value=0.0),
+        "Provisions!C2": cell("Provisions!C2", formula="=IF(C1,100,200)", value=200.0),
+    }
+    line = run_reconciliation(
+        parsed(cells, {"Provisions!C2": ["Provisions!C1"], "Provisions!C1": []}),
+        ["Provisions!C2"],
+    ).lines[0]
+    assert line.target_value == 200.0
+
+
+def test_if_nested_inside_sum():
+    cells = {
+        "Provisions!C1": cell("Provisions!C1", value=100.0),
+        "Provisions!C2": cell("Provisions!C2", value=50.0),
+        "Provisions!C3": cell("Provisions!C3", formula="=SUM(IF(C1>75,C1,0),IF(C2>75,C2,0))", value=100.0),
+    }
+    line = run_reconciliation(
+        parsed(cells, {"Provisions!C3": ["Provisions!C1", "Provisions!C2"], "Provisions!C1": [], "Provisions!C2": []}),
+        ["Provisions!C3"],
+    ).lines[0]
+    assert line.target_value == 100.0
+
+
+def test_if_inequality_operators():
+    cells = {
+        "Provisions!C1": cell("Provisions!C1", value=100.0),
+        "Provisions!C2": cell("Provisions!C2", formula="=IF(C1>=100,1,0)", value=1.0),
+        "Provisions!C3": cell("Provisions!C3", formula="=IF(C1<=100,1,0)", value=1.0),
+        "Provisions!C4": cell("Provisions!C4", formula="=IF(C1<>99,1,0)", value=1.0),
+    }
+    graph = {
+        "Provisions!C2": ["Provisions!C1"],
+        "Provisions!C3": ["Provisions!C1"],
+        "Provisions!C4": ["Provisions!C1"],
+        "Provisions!C1": [],
+    }
+    result = run_reconciliation(parsed(cells, graph), ["Provisions!C2", "Provisions!C3", "Provisions!C4"])
+    assert result.lines[0].target_value == 1.0
+    assert result.lines[1].target_value == 1.0
+    assert result.lines[2].target_value == 1.0

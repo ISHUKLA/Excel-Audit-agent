@@ -16,6 +16,7 @@ from typing import Optional
 
 import networkx as nx
 
+from core.formula_catalogue import FUNCTION_ARG_SPECS
 from core.models import AnomalyFinding, ParsedFile
 
 _SEVERITY_RANK = {"blocker": 0, "warning": 1, "info": 2}
@@ -24,6 +25,19 @@ _SEVERITY_RANK = {"blocker": 0, "warning": 1, "info": 2}
 # preceded by a letter, the "10" in B10 likewise, so neither matches.
 _LITERAL_PATTERN = re.compile(r"(?<![A-Za-z0-9_$])(\d+\.?\d*)(?![A-Za-z0-9_])")
 _ALLOWED_LITERALS = {0.0, 1.0, 100.0}
+
+# Argument roles (from core/formula_catalogue.py's FUNCTION_ARG_SPECS) that
+# describe HOW to compute rather than WHAT business number to use. A digit
+# count or significance is structural to the formula the same way a cell
+# reference is — flagging ROUND(C1, 2)'s "2" as a hardcoded assumption is a
+# false positive of exactly the kind that trains a reviewer to stop reading
+# findings. "value", "criteria", "condition", "flag", and "range" are
+# deliberately NOT in this set: a criteria threshold like SUMIF's ">1000" can
+# itself be a hardcoded business assumption worth surfacing, so only the
+# roles that are unambiguously structural in every function that uses them
+# are excluded here.
+_STRUCTURAL_ARG_ROLES = {"digit_count", "significance", "index"}
+_FUNCTION_CALL_NAME_PATTERN = re.compile(r"[A-Za-z_][A-Za-z0-9_.]*$")
 
 _SUM_PATTERN = re.compile(r"SUM\(([^()]*)\)", re.IGNORECASE)
 _RANGE_PATTERN = re.compile(r"^([A-Za-z]+)(\d+):([A-Za-z]+)(\d+)$")
@@ -64,12 +78,86 @@ def _formulas(parsed_file: ParsedFile):
 # ---------------------------------------------------------------------------
 
 
+def _iter_function_calls(formula: str) -> list[tuple[str, int, int, str]]:
+    """Every function call in `formula`, at every nesting depth, as
+    (NAME, args_start, args_end, args_text) — found by explicit paren
+    matching rather than a regex per nesting level, so ROUND nested inside
+    SUM is found exactly the same way a top-level ROUND would be.
+
+    `args_start`/`args_end` are offsets into the ORIGINAL formula string, so
+    a literal's own match offset can be tested against them directly.
+    """
+    calls: list[tuple[str, int, int, str]] = []
+    stack: list[tuple[int, Optional[str]]] = []
+    for i, ch in enumerate(formula):
+        if ch == "(":
+            name_match = _FUNCTION_CALL_NAME_PATTERN.search(formula[:i])
+            name = name_match.group(0) if name_match else None
+            stack.append((i + 1, name))
+        elif ch == ")" and stack:
+            args_start, name = stack.pop()
+            if name:
+                calls.append((name.upper(), args_start, i, formula[args_start:i]))
+    return calls
+
+
+def _split_top_level_args(args_text: str, offset_base: int) -> list[tuple[int, int]]:
+    """Absolute (start, end) spans for each top-level-comma-separated
+    argument in `args_text`, which begins at `offset_base` in the formula
+    this text was sliced from. A comma inside a nested function call's own
+    arguments is not top-level and does not split anything here."""
+    spans = []
+    depth = 0
+    start = 0
+    for idx, ch in enumerate(args_text):
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+        elif ch == "," and depth == 0:
+            spans.append((offset_base + start, offset_base + idx))
+            start = idx + 1
+    spans.append((offset_base + start, offset_base + len(args_text)))
+    return spans
+
+
+def _structural_literal_spans(formula: str) -> list[tuple[int, int]]:
+    """Offset spans of every literal position that falls inside a
+    structural (not "value") argument of a known function call — the
+    formula-catalogue-driven fix for the false positives a role-blind
+    literal scan would otherwise produce on ROUND's digit count, CEILING's
+    significance, and (once Group E lands) a lookup's column index.
+
+    Calls are processed innermost-first (by argument-text length) so a
+    literal inside a nested call is matched against ITS OWN enclosing
+    call's argument roles, not an outer call's.
+    """
+    calls = sorted(_iter_function_calls(formula), key=lambda c: len(c[3]))
+    structural_spans = []
+    for name, args_start, args_end, args_text in calls:
+        spec = FUNCTION_ARG_SPECS.get(name)
+        if not spec:
+            continue
+        for index, (span_start, span_end) in enumerate(_split_top_level_args(args_text, args_start)):
+            role = spec[index] if index < len(spec) else None
+            if role in _STRUCTURAL_ARG_ROLES:
+                structural_spans.append((span_start, span_end))
+    return structural_spans
+
+
+def _is_within_any_span(position: int, spans: list[tuple[int, int]]) -> bool:
+    return any(start <= position < end for start, end in spans)
+
+
 def _detect_hardcoded_literals(parsed_file: ParsedFile) -> list[AnomalyFinding]:
     findings = []
     for tab, cell_ref, formula in _formulas(parsed_file):
+        structural_spans = _structural_literal_spans(formula)
         for match in _LITERAL_PATTERN.finditer(formula):
             literal = float(match.group(1))
             if literal in _ALLOWED_LITERALS:
+                continue
+            if _is_within_any_span(match.start(), structural_spans):
                 continue
             findings.append(
                 AnomalyFinding(

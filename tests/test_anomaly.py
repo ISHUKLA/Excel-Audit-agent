@@ -69,6 +69,77 @@ def test_row_numbers_in_cell_references_are_not_mistaken_for_literals():
     assert detect_anomalies(parsed) == []
 
 
+def test_group_a_function_with_only_a_cell_reference_is_not_flagged():
+    """Regression guard for Step 3 (ABS, INT): =ABS(C1) has no bare literal at
+    all, so adding these functions to the reconstruction catalogue must not
+    make the detector start seeing a hardcoded assumption where there is
+    none."""
+    parsed = _parsed(
+        {
+            "Provisions!C5": _cell("Provisions!C5", formula="=ABS(C1)", value=5.0),
+            "Provisions!C6": _cell("Provisions!C6", formula="=INT(C1)", value=4.0),
+        }
+    )
+    assert detect_anomalies(parsed) == []
+
+
+def test_group_a_function_with_a_hardcoded_argument_is_still_flagged():
+    """The other half of the guard: ABS/INT's "value" argument role is a
+    business number, not a structural literal like a rounding digit count —
+    a hardcoded number inside one must still be caught."""
+    parsed = _parsed({"Provisions!C5": _cell("Provisions!C5", formula="=ABS(-5)", value=5.0)})
+    findings = detect_anomalies(parsed)
+    assert [f.description for f in findings if "5" in f.description]
+
+
+def test_group_b_digit_count_and_significance_literals_are_not_flagged():
+    """Regression guard for Step 4 (ROUND/ROUNDUP/ROUNDDOWN/CEILING/FLOOR):
+    a rounding function's structural argument (a digit count, a significance)
+    is not a hardcoded business assumption the way a bare multiplier is —
+    ROUND(C1,2)'s "2" and CEILING(C1,0.5)'s "0.5" describe HOW to round, not
+    a number someone typed in and forgot about."""
+    parsed = _parsed(
+        {
+            "Provisions!C5": _cell("Provisions!C5", formula="=ROUND(C1,2)", value=1.23),
+            "Provisions!C6": _cell("Provisions!C6", formula="=CEILING(C1,0.5)", value=1.5),
+            "Provisions!C7": _cell("Provisions!C7", formula="=ROUNDDOWN(C1,-2)", value=1200.0),
+        }
+    )
+    assert detect_anomalies(parsed) == []
+
+
+def test_group_b_value_argument_hardcoded_literal_is_still_flagged():
+    """The other half of the guard: ROUND's first argument (the "value" role)
+    is a business number — a hardcoded one there must still be caught, the
+    structural-role exclusion must not swallow it too."""
+    parsed = _parsed({"Provisions!C5": _cell("Provisions!C5", formula="=ROUND(1.755,2)", value=1.76)})
+    findings = detect_anomalies(parsed)
+    descriptions = [f.description for f in findings]
+    assert any("1.755" in d for d in descriptions)
+    assert "Hardcoded literal 2 embedded in formula" not in descriptions
+
+
+def test_group_b_digit_count_beyond_default_allowed_literals_is_not_flagged():
+    """0, 1, and 100 were already excluded by _ALLOWED_LITERALS before this
+    change. This test is about digit counts OUTSIDE that set — e.g. ROUND's
+    "3" — which only the new argument-role awareness excludes."""
+    parsed = _parsed({"Provisions!C5": _cell("Provisions!C5", formula="=ROUND(C1,3)", value=1.234)})
+    assert detect_anomalies(parsed) == []
+
+
+def test_sumif_criteria_threshold_literal_is_still_flagged():
+    """The deliberate contrast with digit_count/significance: a SUMIF
+    criteria like ">150" is a genuine business assumption (a materiality
+    cutoff, a reserving threshold) hiding inside a formula, not a structural
+    argument — "criteria" is intentionally excluded from
+    _STRUCTURAL_ARG_ROLES, and this must stay true as Group C grows."""
+    parsed = _parsed(
+        {"Provisions!D1": _cell("Provisions!D1", formula='=SUMIF(B1:B3,">150",C1:C3)', value=5.0)}
+    )
+    findings = detect_anomalies(parsed)
+    assert [f.description for f in findings if "150" in f.description]
+
+
 def test_common_constants_are_not_flagged():
     parsed = _parsed(
         {
