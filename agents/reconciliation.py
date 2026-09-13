@@ -29,7 +29,7 @@ from rapidfuzz import fuzz
 # Single source of truth for how a cell reference is parsed. Imported rather
 # than re-declared so the graph the parser built and the substitutions made here
 # can never drift apart.
-from agents.comparison import evaluate_criteria
+from agents.comparison import ComparisonError, coerce_to_boolean, evaluate_criteria
 from agents.parser import _CELL_REF_PATTERN, _expand_range, _normalize
 from core.accounting import signed_reference_amount
 from core.formula_catalogue import SUPPORTED_FUNCTIONS as _SUPPORTED_FUNCTIONS
@@ -579,7 +579,17 @@ def _cycle_nodes(reachable: set[str], graph: dict) -> set[str]:
 # IF is included here because its condition argument can contain text
 # comparisons like IF(B1="Motor", ...). Every other function still has
 # its own string literals rejected by the blanket check below.
-_CRITERIA_CONSUMING_FUNCTIONS = {"SUMIF", "SUMIFS", "COUNTIF", "COUNTIFS", "AVERAGEIF", "AVERAGEIFS", "MINIFS", "MAXIFS", "IF"}
+_CRITERIA_CONSUMING_FUNCTIONS = {
+    "SUMIF", "SUMIFS", "COUNTIF", "COUNTIFS", "AVERAGEIF", "AVERAGEIFS", "MINIFS", "MAXIFS", "IF",
+    # VLOOKUP/MATCH's lookup_value is exactly like a criteria: a text
+    # literal there (VLOOKUP("Motor", ...)) is what the function expects,
+    # not "text used in arithmetic".
+    "VLOOKUP", "MATCH",
+}
+# Bounds the row*column expansion for a lookup function's table_array/array
+# argument, mirroring agents/parser.py's own range-expansion ceiling — a
+# range wider than this is rejected rather than expanded cell by cell.
+_MAX_TABLE_EXPANSION = 5000
 _FUNCTION_CALL_NAME_PATTERN = re.compile(r"[A-Za-z_][A-Za-z0-9_.]*$")
 
 
@@ -1310,6 +1320,231 @@ def _if_evaluator(
         return None
 
 
+# ---------------------------------------------------------------------------
+# Group E — lookup functions (VLOOKUP, MATCH, INDEX)
+# ---------------------------------------------------------------------------
+
+
+_ROW_COL_PATTERN = re.compile(r"([A-Z]{1,3})([0-9]{1,7})")
+
+
+def _split_row_col(ref: str) -> Optional[tuple[str, int]]:
+    match = _ROW_COL_PATTERN.fullmatch(ref)
+    if not match:
+        return None
+    return match.group(1), int(match.group(2))
+
+
+def _expand_table_rows(range_text: str, own_tab: str) -> Optional[list[list[str]]]:
+    """A lookup function's array/table_array argument, expanded ROW-MAJOR:
+    outer list is rows, inner list is that row's cells left to right.
+
+    `_references_in` (used by SUM and the criteria family) flattens a range
+    column-major and throws away which cells shared a row — exactly the
+    information VLOOKUP and INDEX need to find a row by its first column and
+    then read a different column of THAT SAME row. This is a separate
+    helper rather than a reshape of `_references_in`'s output for that
+    reason: reshaping a column-major flat list back into rows correctly
+    requires the same width/height computation this function does directly.
+
+    A single cell (no ":") is a valid 1x1 table — Excel accepts
+    `INDEX(A1,1,1)` — so it is returned as `[[ref]]` rather than rejected.
+    """
+    range_text = range_text.strip()
+    match = _CELL_REF_PATTERN.fullmatch(range_text)
+    if not match:
+        return None
+    quoted, plain, start, end = match.groups()
+    tab = quoted or plain or own_tab
+    start = _normalize(start)
+    if not end:
+        return [[f"{tab}!{start}"]]
+    end = _normalize(end)
+
+    start_rc = _split_row_col(start)
+    end_rc = _split_row_col(end)
+    if start_rc is None or end_rc is None:
+        return None
+    start_col, start_row = start_rc
+    end_col, end_row = end_rc
+
+    col_lo, col_hi = sorted((column_index_from_string(start_col), column_index_from_string(end_col)))
+    row_lo, row_hi = sorted((start_row, end_row))
+    if (col_hi - col_lo + 1) * (row_hi - row_lo + 1) > _MAX_TABLE_EXPANSION:
+        return None
+
+    return [
+        [f"{tab}!{get_column_letter(col)}{row}" for col in range(col_lo, col_hi + 1)]
+        for row in range(row_lo, row_hi + 1)
+    ]
+
+
+def _vlookup_evaluator(
+    args_text: str, own_tab: str, values: dict, warnings: list[str], own_ref: str
+) -> Optional[float]:
+    """VLOOKUP(lookup_value, table_array, col_index_num, [range_lookup]).
+
+    Exact match only. `range_lookup` TRUE — Excel's own default when the
+    argument is omitted — assumes the table's first column is sorted
+    ascending and binary-searches it; this tool has no way to confirm that
+    sort order holds, so an approximate match is reported as unsupported
+    (with a warning explaining why) rather than trusted blindly.
+
+    A matched row whose result column holds text is also unsupported: every
+    evaluator in this catalogue feeds its result back into `_evaluate`'s
+    literal-substitution loop, which is arithmetic-only and cannot carry a
+    text value through to further formula unwrapping.
+    """
+    parts = _split_function_args(args_text)
+    if len(parts) not in (3, 4):
+        return None
+
+    try:
+        lookup_value = _resolve_criteria_arg(parts[0], own_tab, values)
+    except _UnresolvableReference:
+        return None
+
+    table_rows = _expand_table_rows(parts[1], own_tab)
+    if not table_rows or not table_rows[0]:
+        return None
+
+    col_index_raw = _resolve_and_eval_expr(parts[2], own_tab, values)
+    if col_index_raw is None:
+        return None
+    col_index = int(col_index_raw)
+    if col_index < 1 or col_index > len(table_rows[0]):
+        return None
+
+    range_lookup = True
+    if len(parts) == 4:
+        try:
+            range_lookup_value = _resolve_criteria_arg(parts[3], own_tab, values)
+        except _UnresolvableReference:
+            return None
+        try:
+            range_lookup = coerce_to_boolean(range_lookup_value)
+        except ComparisonError:
+            return None
+
+    if range_lookup:
+        warnings.append(
+            f"{own_ref}: VLOOKUP with an approximate match (range_lookup TRUE, "
+            f"or omitted) is not evaluated — this tool does not verify the "
+            f"lookup column is sorted, so an approximate match is reported as "
+            f"unsupported rather than silently computed"
+        )
+        return None
+
+    for row in table_rows:
+        if evaluate_criteria(values.get(row[0]), lookup_value):
+            matched = values.get(row[col_index - 1])
+            return float(matched) if _is_numeric_cell_value(matched) else None
+    return None
+
+
+def _match_evaluator(
+    args_text: str, own_tab: str, values: dict, warnings: list[str], own_ref: str
+) -> Optional[float]:
+    """MATCH(lookup_value, lookup_array, [match_type]) — returns the
+    1-indexed position of the first match, or None (#N/A) if not found.
+
+    Only match_type 0 (exact) is evaluated. match_type 1 (Excel's own
+    default) and -1 both assume the array is sorted and binary-search it —
+    the same stance VLOOKUP's approximate mode takes: surfaced as
+    unsupported rather than trusted without verification.
+    """
+    parts = _split_function_args(args_text)
+    if len(parts) not in (2, 3):
+        return None
+
+    try:
+        lookup_value = _resolve_criteria_arg(parts[0], own_tab, values)
+    except _UnresolvableReference:
+        return None
+
+    array_rows = _expand_table_rows(parts[1], own_tab)
+    if not array_rows or not array_rows[0]:
+        return None
+    if len(array_rows) == 1:
+        flat = array_rows[0]
+    elif len(array_rows[0]) == 1:
+        flat = [row[0] for row in array_rows]
+    else:
+        # MATCH's lookup_array must be a single row or column, not a 2D grid.
+        return None
+
+    match_type = 1
+    if len(parts) == 3:
+        match_type_raw = _resolve_and_eval_expr(parts[2], own_tab, values)
+        if match_type_raw is None:
+            return None
+        match_type = int(match_type_raw)
+
+    if match_type != 0:
+        warnings.append(
+            f"{own_ref}: MATCH with an approximate match_type ({match_type}) is "
+            f"not evaluated — this tool does not verify the lookup array is "
+            f"sorted, so an approximate match is reported as unsupported "
+            f"rather than silently computed"
+        )
+        return None
+
+    for position, key in enumerate(flat, start=1):
+        if evaluate_criteria(values.get(key), lookup_value):
+            return float(position)
+    return None
+
+
+def _index_evaluator(
+    args_text: str, own_tab: str, values: dict, warnings: list[str], own_ref: str
+) -> Optional[float]:
+    """INDEX(array, row_num, [col_num]) — a scalar result only.
+
+    row_num 0 or col_num 0 ("return the whole row/column") produces an
+    array in Excel; that is out of scope alongside every other array
+    formula, and is reported as unresolved here rather than approximated.
+    """
+    parts = _split_function_args(args_text)
+    if len(parts) not in (2, 3):
+        return None
+
+    array_rows = _expand_table_rows(parts[0], own_tab)
+    if not array_rows or not array_rows[0]:
+        return None
+
+    row_raw = _resolve_and_eval_expr(parts[1], own_tab, values)
+    if row_raw is None:
+        return None
+    row_num = int(row_raw)
+
+    col_num = None
+    if len(parts) == 3:
+        col_raw = _resolve_and_eval_expr(parts[2], own_tab, values)
+        if col_raw is None:
+            return None
+        col_num = int(col_raw)
+
+    n_rows = len(array_rows)
+    n_cols = len(array_rows[0])
+
+    if col_num is None:
+        # A 1D array with col_num omitted: row_num addresses a position
+        # along whichever dimension actually varies, matching Excel's own
+        # behavior for INDEX(single_row_or_column, n).
+        if n_rows == 1:
+            col_num, row_num = row_num, 1
+        elif n_cols == 1:
+            col_num = 1
+        else:
+            return None
+
+    if row_num < 1 or row_num > n_rows or col_num < 1 or col_num > n_cols:
+        return None
+
+    matched = values.get(array_rows[row_num - 1][col_num - 1])
+    return float(matched) if _is_numeric_cell_value(matched) else None
+
+
 # Dispatch table. Every key here must also be a key in
 # core/formula_catalogue.py's FUNCTION_ARG_SPECS (and vice versa) — enforced
 # by tests/test_reconciliation.py's catalogue/evaluator parity test, not by
@@ -1334,6 +1569,9 @@ _EVALUATORS = {
     "MINIFS": _minifs_evaluator,
     "MAXIFS": _maxifs_evaluator,
     "IF": _if_evaluator,
+    "VLOOKUP": _vlookup_evaluator,
+    "MATCH": _match_evaluator,
+    "INDEX": _index_evaluator,
 }
 
 

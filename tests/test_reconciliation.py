@@ -1099,10 +1099,10 @@ def test_blank_cell_still_reads_as_zero_in_bare_arithmetic_and_abs():
 # ---------------------------------------------------------------------------
 
 
-def test_vlookup_produces_incomplete_not_a_guess():
+def test_an_unsupported_function_produces_incomplete_not_a_guess():
     cells = {
         "Provisions!A1": cell("Provisions!A1", value=5.0),
-        "Provisions!C9": cell("Provisions!C9", formula="=VLOOKUP(A1,Rates!A:B,2,FALSE)", value=0.05),
+        "Provisions!C9": cell("Provisions!C9", formula="=OFFSET(A1,0,1)", value=0.05),
         "Provisions!C5": cell("Provisions!C5", formula="=C9*1000", value=50.0),
     }
     graph = {"Provisions!C5": ["Provisions!C9"], "Provisions!C9": ["Provisions!A1"], "Provisions!A1": []}
@@ -1111,19 +1111,19 @@ def test_vlookup_produces_incomplete_not_a_guess():
     assert line.verdict == "incomplete"
     assert line.completeness == "partial"
     assert line.target_value is None
-    assert any("VLOOKUP" in element for element in line.unsupported_elements)
+    assert any("OFFSET" in element for element in line.unsupported_elements)
 
 
 def test_the_unsupported_formula_appears_verbatim():
-    """VLOOKUP is not yet implemented. Verify that unsupported formulas
+    """OFFSET is outside the catalogue. Verify that unsupported formulas
     still get reported verbatim."""
     cells = {
-        "Provisions!C9": cell("Provisions!C9", formula="=VLOOKUP(A1,B:D,2,0)", value=1.0),
+        "Provisions!C9": cell("Provisions!C9", formula="=OFFSET(A1,0,1)", value=1.0),
         "Provisions!C5": cell("Provisions!C5", formula="=C9*10", value=10.0),
     }
     graph = {"Provisions!C5": ["Provisions!C9"], "Provisions!C9": []}
     line = run_reconciliation(parsed(cells, graph), ["Provisions!C5"]).lines[0]
-    assert any("=VLOOKUP(A1,B:D,2,0)" in element for element in line.unsupported_elements)
+    assert any("=OFFSET(A1,0,1)" in element for element in line.unsupported_elements)
 
 
 def test_coverage_reflects_how_much_of_the_chain_resolved():
@@ -1131,7 +1131,7 @@ def test_coverage_reflects_how_much_of_the_chain_resolved():
     a total failure."""
     cells = {
         "Provisions!A1": cell("Provisions!A1", value=5.0),
-        "Provisions!C9": cell("Provisions!C9", formula="=VLOOKUP(A1,X,2,FALSE)", value=0.05),
+        "Provisions!C9": cell("Provisions!C9", formula="=OFFSET(A1,0,1)", value=0.05),
         "Provisions!C5": cell("Provisions!C5", formula="=C9+A1", value=5.05),
     }
     graph = {
@@ -1148,7 +1148,7 @@ def test_a_supported_parent_of_an_unsupported_child_is_still_marked_supported():
     """is_supported describes a node's own formula. The parent isn't the
     problem; it just can't produce a number because its child couldn't."""
     cells = {
-        "Provisions!C9": cell("Provisions!C9", formula="=VLOOKUP(A1,X,2,FALSE)", value=1.0),
+        "Provisions!C9": cell("Provisions!C9", formula="=OFFSET(A1,0,1)", value=1.0),
         "Provisions!C5": cell("Provisions!C5", formula="=C9*10", value=10.0),
     }
     graph = {"Provisions!C5": ["Provisions!C9"], "Provisions!C9": []}
@@ -1433,7 +1433,7 @@ def test_incompleteness_propagates_from_pass_1_into_pass_2():
     because a ledger line happens to sit next to it."""
     cells = {
         "Provisions!B5": cell("Provisions!B5", value="Technical provisions"),
-        "Provisions!C9": cell("Provisions!C9", formula="=VLOOKUP(A1,X,2,FALSE)", value=100.0),
+        "Provisions!C9": cell("Provisions!C9", formula="=OFFSET(A1,0,1)", value=100.0),
         "Provisions!C5": cell("Provisions!C5", formula="=C9*1", value=100.0),
     }
     graph = {"Provisions!C5": ["Provisions!C9"], "Provisions!C9": []}
@@ -1592,7 +1592,7 @@ def test_if_inequality_operators():
 
 def test_acceptance_all_supported_functions():
     """Comprehensive test exercising Group A-D functions (16 total).
-    Group E (VLOOKUP/INDEX/MATCH) deferred to Phase 2."""
+    Group E (VLOOKUP/INDEX/MATCH) is covered separately below."""
     cells = {
         # Inputs
         "Provisions!B1": cell("Provisions!B1", value=10.0),
@@ -1668,3 +1668,181 @@ def test_acceptance_all_supported_functions():
     assert result.lines[0].delta == pytest.approx(0.0)
     assert result.lines[0].verdict == "pass"
     assert result.lines[0].completeness == "complete"
+
+
+# ---------------------------------------------------------------------------
+# Group E — VLOOKUP, MATCH, INDEX
+# ---------------------------------------------------------------------------
+
+
+def _lookup_table_cells():
+    return {
+        "Provisions!A1": cell("Provisions!A1", value="Motor"),
+        "Provisions!B1": cell("Provisions!B1", value=1.5),
+        "Provisions!A2": cell("Provisions!A2", value="Property"),
+        "Provisions!B2": cell("Provisions!B2", value=2.0),
+        "Provisions!A3": cell("Provisions!A3", value="Liability"),
+        "Provisions!B3": cell("Provisions!B3", value=1.75),
+    }
+
+
+def test_vlookup_exact_match_returns_the_right_row():
+    cells = dict(_lookup_table_cells())
+    cells["Provisions!D1"] = cell(
+        "Provisions!D1", formula='=VLOOKUP("Property",A1:B3,2,FALSE)', value=2.0
+    )
+    graph = {
+        "Provisions!D1": ["Provisions!A1", "Provisions!B1", "Provisions!A2", "Provisions!B2", "Provisions!A3", "Provisions!B3"],
+        "Provisions!A1": [], "Provisions!B1": [], "Provisions!A2": [], "Provisions!B2": [], "Provisions!A3": [], "Provisions!B3": [],
+    }
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!D1"]).lines[0]
+    assert line.target_value == 2.0
+    assert line.completeness == "complete"
+
+
+def test_vlookup_no_match_is_incomplete_not_a_guess():
+    cells = dict(_lookup_table_cells())
+    cells["Provisions!D1"] = cell(
+        "Provisions!D1", formula='=VLOOKUP("Marine",A1:B3,2,FALSE)', value=0.0
+    )
+    graph = {
+        "Provisions!D1": ["Provisions!A1", "Provisions!B1", "Provisions!A2", "Provisions!B2", "Provisions!A3", "Provisions!B3"],
+        "Provisions!A1": [], "Provisions!B1": [], "Provisions!A2": [], "Provisions!B2": [], "Provisions!A3": [], "Provisions!B3": [],
+    }
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!D1"]).lines[0]
+    assert line.target_value is None
+    assert line.completeness == "partial"
+
+
+def test_vlookup_approximate_match_is_unsupported_not_silently_trusted():
+    """range_lookup omitted defaults to TRUE in Excel — this tool does not
+    verify sort order, so it must not guess at an approximate match."""
+    cells = dict(_lookup_table_cells())
+    cells["Provisions!D1"] = cell(
+        "Provisions!D1", formula='=VLOOKUP("Property",A1:B3,2)', value=2.0
+    )
+    graph = {
+        "Provisions!D1": ["Provisions!A1", "Provisions!B1", "Provisions!A2", "Provisions!B2", "Provisions!A3", "Provisions!B3"],
+        "Provisions!A1": [], "Provisions!B1": [], "Provisions!A2": [], "Provisions!B2": [], "Provisions!A3": [], "Provisions!B3": [],
+    }
+    warnings: list[str] = []
+    result = run_reconciliation(parsed(cells, graph), ["Provisions!D1"], warnings=warnings)
+    line = result.lines[0]
+    assert line.target_value is None
+    assert line.completeness == "partial"
+    assert any("approximate match" in w for w in warnings)
+
+
+def test_vlookup_col_index_out_of_range_is_unsupported():
+    cells = dict(_lookup_table_cells())
+    cells["Provisions!D1"] = cell(
+        "Provisions!D1", formula='=VLOOKUP("Property",A1:B3,5,FALSE)', value=0.0
+    )
+    graph = {
+        "Provisions!D1": ["Provisions!A1", "Provisions!B1", "Provisions!A2", "Provisions!B2", "Provisions!A3", "Provisions!B3"],
+        "Provisions!A1": [], "Provisions!B1": [], "Provisions!A2": [], "Provisions!B2": [], "Provisions!A3": [], "Provisions!B3": [],
+    }
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!D1"]).lines[0]
+    assert line.target_value is None
+    assert line.completeness == "partial"
+
+
+def test_match_exact_returns_one_indexed_position():
+    cells = dict(_lookup_table_cells())
+    cells["Provisions!D1"] = cell(
+        "Provisions!D1", formula='=MATCH("Liability",A1:A3,0)', value=3.0
+    )
+    graph = {
+        "Provisions!D1": ["Provisions!A1", "Provisions!A2", "Provisions!A3"],
+        "Provisions!A1": [], "Provisions!A2": [], "Provisions!A3": [],
+    }
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!D1"]).lines[0]
+    assert line.target_value == 3.0
+    assert line.completeness == "complete"
+
+
+def test_match_default_approximate_match_type_is_unsupported():
+    """match_type omitted defaults to 1 (approximate) in Excel."""
+    cells = dict(_lookup_table_cells())
+    cells["Provisions!D1"] = cell(
+        "Provisions!D1", formula='=MATCH("Liability",A1:A3)', value=3.0
+    )
+    graph = {
+        "Provisions!D1": ["Provisions!A1", "Provisions!A2", "Provisions!A3"],
+        "Provisions!A1": [], "Provisions!A2": [], "Provisions!A3": [],
+    }
+    warnings: list[str] = []
+    result = run_reconciliation(parsed(cells, graph), ["Provisions!D1"], warnings=warnings)
+    line = result.lines[0]
+    assert line.target_value is None
+    assert line.completeness == "partial"
+    assert any("approximate match_type" in w for w in warnings)
+
+
+def test_match_not_found_is_incomplete():
+    cells = dict(_lookup_table_cells())
+    cells["Provisions!D1"] = cell(
+        "Provisions!D1", formula='=MATCH("Marine",A1:A3,0)', value=0.0
+    )
+    graph = {
+        "Provisions!D1": ["Provisions!A1", "Provisions!A2", "Provisions!A3"],
+        "Provisions!A1": [], "Provisions!A2": [], "Provisions!A3": [],
+    }
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!D1"]).lines[0]
+    assert line.target_value is None
+    assert line.completeness == "partial"
+
+
+def test_index_2d_returns_the_right_cell():
+    cells = dict(_lookup_table_cells())
+    cells["Provisions!D1"] = cell(
+        "Provisions!D1", formula="=INDEX(A1:B3,2,2)", value=2.0
+    )
+    graph = {
+        "Provisions!D1": ["Provisions!A1", "Provisions!B1", "Provisions!A2", "Provisions!B2", "Provisions!A3", "Provisions!B3"],
+        "Provisions!A1": [], "Provisions!B1": [], "Provisions!A2": [], "Provisions!B2": [], "Provisions!A3": [], "Provisions!B3": [],
+    }
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!D1"]).lines[0]
+    assert line.target_value == 2.0
+    assert line.completeness == "complete"
+
+
+def test_index_single_column_with_col_num_omitted():
+    cells = dict(_lookup_table_cells())
+    cells["Provisions!D1"] = cell("Provisions!D1", formula="=INDEX(B1:B3,3)", value=1.75)
+    graph = {
+        "Provisions!D1": ["Provisions!B1", "Provisions!B2", "Provisions!B3"],
+        "Provisions!B1": [], "Provisions!B2": [], "Provisions!B3": [],
+    }
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!D1"]).lines[0]
+    assert line.target_value == 1.75
+    assert line.completeness == "complete"
+
+
+def test_index_out_of_bounds_is_unsupported_not_a_crash():
+    cells = dict(_lookup_table_cells())
+    cells["Provisions!D1"] = cell("Provisions!D1", formula="=INDEX(A1:B3,9,1)", value=0.0)
+    graph = {
+        "Provisions!D1": ["Provisions!A1", "Provisions!B1", "Provisions!A2", "Provisions!B2", "Provisions!A3", "Provisions!B3"],
+        "Provisions!A1": [], "Provisions!B1": [], "Provisions!A2": [], "Provisions!B2": [], "Provisions!A3": [], "Provisions!B3": [],
+    }
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!D1"]).lines[0]
+    assert line.target_value is None
+    assert line.completeness == "partial"
+
+
+def test_index_match_type_returns_a_text_result_is_unsupported():
+    """MATCH gives INDEX a numeric row position; INDEX pointing at a text
+    column (rather than the numeric column) cannot be fed back into further
+    arithmetic — reported as unresolved, not guessed at as 0."""
+    cells = dict(_lookup_table_cells())
+    cells["Provisions!D1"] = cell(
+        "Provisions!D1", formula='=INDEX(A1:A3,MATCH("Property",A1:A3,0),1)', value=0.0
+    )
+    graph = {
+        "Provisions!D1": ["Provisions!A1", "Provisions!A2", "Provisions!A3"],
+        "Provisions!A1": [], "Provisions!A2": [], "Provisions!A3": [],
+    }
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!D1"]).lines[0]
+    assert line.target_value is None
+    assert line.completeness == "partial"

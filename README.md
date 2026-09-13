@@ -48,13 +48,13 @@ This tool automates the legwork — parsing the spreadsheet, reconstructing its 
 
 **It does not apply materiality or discount findings.** The threshold for each reconciliation is a human decision, not the tool's choice. A one-penny difference blocks the process just as readily as a major one if that is your threshold.
 
-**It does not handle all formula types.** `VLOOKUP`, `INDEX/MATCH`, array formulas, and other complex constructs are flagged as unsupported. The tool will not guess their value.
+**It does not handle all formula types.** `VLOOKUP`, `INDEX`, and `MATCH` are supported for exact match only (see Group E below); their approximate-match modes, array formulas, and other complex constructs are flagged as unsupported. The tool will not guess their value.
 
 ---
 
 ## Supported Formula Catalogue
 
-The reconstruction engine supports 16 functions across four groups:
+The reconstruction engine supports 19 functions across five groups:
 
 **Group A — Basic arithmetic (2 functions)**
 - `ABS` — absolute value
@@ -81,7 +81,14 @@ The reconstruction engine supports 16 functions across four groups:
 - `MINIFS` — minimum of matching numeric cells
 - `MAXIFS` — maximum of matching numeric cells
 
-**Planned future support:** Group E lookup functions (`VLOOKUP`, `INDEX`, `MATCH`) are in the design phase; array formulas remain out of scope.
+**Group E — Lookup functions, exact match only (3 functions)**
+- `VLOOKUP` — exact-match column lookup (`range_lookup` must be `FALSE`; omitted or `TRUE` is reported as unsupported, since this tool does not verify the lookup column is sorted and will not silently trust an approximate match)
+- `MATCH` — exact-match position lookup (`match_type` must be `0`; the default `1` and `-1` are unsupported for the same reason)
+- `INDEX` — scalar lookup by row/column position within a 1D or 2D range (returning a whole row/column via `row_num`/`col_num` of `0` is an array result and out of scope)
+
+A matched VLOOKUP/INDEX cell that holds text, rather than a number, is also reported as unsupported: every function in this catalogue feeds its result back into further arithmetic, which cannot carry a text value through.
+
+**Out of scope:** array formulas (including CSE array formulas and dynamic-array spill behavior) remain unsupported at every group.
 
 ---
 

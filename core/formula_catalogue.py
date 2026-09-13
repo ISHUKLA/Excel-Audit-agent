@@ -33,6 +33,8 @@ Argument roles (used by the anomaly detector, not by the evaluator):
   - "criteria" / "condition": a comparison string or cell — structural to the
     formula's logic, not itself a hardcoded assumption. Reserved for Group C.
   - "range": one or more cells being aggregated — not a literal at all.
+  - "flag": a mode switch (VLOOKUP's range_lookup, MATCH's match_type) —
+    structural to how the lookup behaves, not a business number.
   - "any": a role too generic to classify further (used sparingly).
 """
 
@@ -102,6 +104,19 @@ FUNCTION_ARG_SPECS: dict[str, list[ArgRole]] = {
     # other two are the values to return. Both branches are evaluated but only
     # one is returned.
     "IF": ["condition", "value", "value"],
+    # Group E — lookup functions. Exact match only: VLOOKUP's range_lookup
+    # (default TRUE) and MATCH's match_type (default 1, and -1) all assume
+    # the lookup column/array is sorted ascending/descending, which this
+    # tool does not verify — those modes surface as unsupported at
+    # evaluation time rather than being silently trusted (see
+    # agents/reconciliation.py's _vlookup_evaluator and _match_evaluator).
+    # Only a numeric matched value is reconstructed: every evaluator in this
+    # catalogue feeds its result back into further arithmetic, which cannot
+    # carry a text value through. Array formulas (e.g. INDEX/MATCH inside a
+    # CSE array context) remain explicitly out of scope.
+    "VLOOKUP": ["value", "range", "index", "flag"],
+    "MATCH": ["value", "range", "flag"],
+    "INDEX": ["range", "index", "index"],
 }
 
 SUPPORTED_FUNCTIONS = frozenset(FUNCTION_ARG_SPECS)
