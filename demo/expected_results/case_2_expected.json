@@ -14,7 +14,7 @@
   "expected_finding_categories": {
     "circular_reference": 1,
     "hardcoded_literal": 1,
-    "unsupported_formula": 1
+    "omitted_sum_rows": 1
   },
   "expected_finding_count": 3,
   "expected_internal_verdict": "incomplete",
@@ -29,6 +29,6 @@
   "material_limitations": [
     "Synthetic demonstration data only; not derived from a real workbook.",
     "No reference figures supplied — the external (accounts) comparison is not performed, not silently skipped.",
-    "VLOOKUP is outside the supported formula catalogue and is never reconstructed."
+    "Exact VLOOKUP is supported, but this case deliberately uses approximate VLOOKUP with TRUE(), which is never reconstructed."
   ]
 }

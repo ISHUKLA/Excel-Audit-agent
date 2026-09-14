@@ -1,0 +1,174 @@
+{
+  "schema_version": 1,
+  "qualified_at": "2026-09-14T13:50:05.959130+00:00",
+  "recalculation_engine": "LibreOffice",
+  "engine_version": "LibreOfficeDev 26.8.0.0.alpha0 2c87e51eeaa2b413ff4ae097b2705eea1995d8e5",
+  "microsoft_excel_tested": false,
+  "workbook": "tests/fixtures/qualification_workbook.xlsx",
+  "sha256": "d6eaaf11c98861ef4218d4a72f453edf86f8cde9c9d7a5c52d049d8d439a7bc0",
+  "generation_command": "python scripts/generate_qualification_workbook.py",
+  "recalculation_command": "bash scripts/recalculate_with_libreoffice.sh",
+  "supported_functions": [
+    "ABS",
+    "AVERAGEIF",
+    "AVERAGEIFS",
+    "CEILING",
+    "COUNTIF",
+    "COUNTIFS",
+    "FLOOR",
+    "IF",
+    "INDEX",
+    "INT",
+    "MATCH",
+    "MAXIFS",
+    "MINIFS",
+    "ROUND",
+    "ROUNDDOWN",
+    "ROUNDUP",
+    "SUM",
+    "SUMIF",
+    "SUMIFS",
+    "VLOOKUP"
+  ],
+  "formula_manifest": {
+    "ABS": [
+      "Qualification!B5"
+    ],
+    "AVERAGEIF": [
+      "Qualification!B17"
+    ],
+    "AVERAGEIFS": [
+      "Qualification!B18"
+    ],
+    "CEILING": [
+      "Qualification!B11"
+    ],
+    "COUNTIF": [
+      "Qualification!B15"
+    ],
+    "COUNTIFS": [
+      "Qualification!B16"
+    ],
+    "FALSE": [
+      "Inputs!D5",
+      "Inputs!D7",
+      "Qualification!B22",
+      "Qualification!B24",
+      "Qualification!B25"
+    ],
+    "FLOOR": [
+      "Qualification!B12"
+    ],
+    "IF": [
+      "Qualification!B21",
+      "Qualification!B22",
+      "Qualification!B23",
+      "Qualification!B24"
+    ],
+    "INDEX": [
+      "Qualification!B27",
+      "Qualification!B28",
+      "Qualification!B34"
+    ],
+    "INT": [
+      "Qualification!B6"
+    ],
+    "MATCH": [
+      "Qualification!B26",
+      "Qualification!B28",
+      "Qualification!B33"
+    ],
+    "MAXIFS": [
+      "Qualification!B20"
+    ],
+    "MINIFS": [
+      "Qualification!B19"
+    ],
+    "NA": [
+      "Errors!B4"
+    ],
+    "OFFSET": [
+      "Qualification!B35"
+    ],
+    "ROUND": [
+      "Qualification!B29",
+      "Qualification!B7",
+      "Qualification!B8"
+    ],
+    "ROUNDDOWN": [
+      "Qualification!B10"
+    ],
+    "ROUNDUP": [
+      "Qualification!B9"
+    ],
+    "SUM": [
+      "Qualification!B30",
+      "Qualification!B4"
+    ],
+    "SUMIF": [
+      "Qualification!B13",
+      "Qualification!B29"
+    ],
+    "SUMIFS": [
+      "Qualification!B14"
+    ],
+    "TRUE": [
+      "Inputs!D4",
+      "Inputs!D6",
+      "Inputs!D8",
+      "Qualification!B16",
+      "Qualification!B21",
+      "Qualification!B23",
+      "Qualification!B32"
+    ],
+    "VLOOKUP": [
+      "Qualification!B25",
+      "Qualification!B32"
+    ]
+  },
+  "all_formula_cells": {
+    "Errors!A4": "=#N/A",
+    "Errors!A5": "=#VALUE!",
+    "Errors!A6": "=#DIV/0!",
+    "Errors!B4": "=NA()",
+    "Errors!B5": "=1+\"text\"",
+    "Errors!B6": "=1/0",
+    "Inputs!D4": "=TRUE()",
+    "Inputs!D5": "=FALSE()",
+    "Inputs!D6": "=TRUE()",
+    "Inputs!D7": "=FALSE()",
+    "Inputs!D8": "=TRUE()",
+    "Qualification!B10": "=ROUNDDOWN(-1.29,1)",
+    "Qualification!B11": "=CEILING(2.1,0.5)",
+    "Qualification!B12": "=FLOOR(2.9,0.5)",
+    "Qualification!B13": "=SUMIF(Inputs!$A$4:$A$8,\"Motor\",Inputs!$B$4:$B$8)",
+    "Qualification!B14": "=SUMIFS(Inputs!$B$4:$B$8,Inputs!$A$4:$A$8,\"Motor\",Inputs!$C$4:$C$8,\"North\")",
+    "Qualification!B15": "=COUNTIF(Inputs!$A$4:$A$8,\"Motor\")",
+    "Qualification!B16": "=COUNTIFS(Inputs!$A$4:$A$8,\"Motor\",Inputs!$D$4:$D$8,TRUE())",
+    "Qualification!B17": "=AVERAGEIF(Inputs!$A$4:$A$8,\"Motor\",Inputs!$B$4:$B$8)",
+    "Qualification!B18": "=AVERAGEIFS(Inputs!$B$4:$B$8,Inputs!$A$4:$A$8,\"Motor\",Inputs!$C$4:$C$8,\"North\")",
+    "Qualification!B19": "=_xlfn.MINIFS(Inputs!$B$4:$B$8,Inputs!$A$4:$A$8,\"Motor\")",
+    "Qualification!B20": "=_xlfn.MAXIFS(Inputs!$B$4:$B$8,Inputs!$A$4:$A$8,\"Motor\")",
+    "Qualification!B21": "=IF(TRUE(),11,22)",
+    "Qualification!B22": "=IF(FALSE(),11,22)",
+    "Qualification!B23": "=IF(TRUE(),11,22)",
+    "Qualification!B24": "=IF(FALSE(),11,22)",
+    "Qualification!B25": "=VLOOKUP(\"Property\",Inputs!$E$4:$F$6,2,FALSE())",
+    "Qualification!B26": "=MATCH(\"Liability\",Inputs!$E$4:$E$6,0)",
+    "Qualification!B27": "=INDEX(Inputs!$F$4:$F$6,2)",
+    "Qualification!B28": "=INDEX(Inputs!$F$4:$F$6,MATCH(\"Liability\",Inputs!$E$4:$E$6,0))",
+    "Qualification!B29": "=ROUND(SUMIF(Inputs!$A$4:$A$8,\"Motor\",Inputs!$B$4:$B$8),2)",
+    "Qualification!B30": "=SUM('Cross Tab'!$B$3:$B$5)",
+    "Qualification!B31": "=(Inputs!$B$4+Inputs!$B$5)*2/3",
+    "Qualification!B32": "=VLOOKUP(\"Property\",Inputs!$E$4:$F$6,2,TRUE())",
+    "Qualification!B33": "=MATCH(\"Property\",Inputs!$E$4:$E$6,1)",
+    "Qualification!B34": "=INDEX(Inputs!$B$4:$B$8,0)",
+    "Qualification!B35": "=OFFSET(Inputs!$B$4,1,0)",
+    "Qualification!B4": "=SUM(Inputs!$B$4:$B$8)",
+    "Qualification!B5": "=ABS(Inputs!$B$6)",
+    "Qualification!B6": "=INT(-1.2)",
+    "Qualification!B7": "=ROUND(2.5,0)",
+    "Qualification!B8": "=ROUND(-2.5,0)",
+    "Qualification!B9": "=ROUNDUP(-1.21,1)"
+  }
+}

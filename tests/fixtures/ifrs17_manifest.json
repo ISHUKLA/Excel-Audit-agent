@@ -1,0 +1,218 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-09-14T14:20:13.800952+00:00",
+  "seed": 42,
+  "synthetic_data": true,
+  "workbook": "tests/fixtures/ifrs17_workbook_clean.xlsx",
+  "sha256": "d5f5db316247e49b7ab7f191fd3d19b6f824de3c7667f0ccfe3402492dd0413c",
+  "recalculation_engine": "LibreOffice",
+  "engine_version": "LibreOfficeDev 26.8.0.0.alpha0 2c87e51eeaa2b413ff4ae097b2705eea1995d8e5",
+  "microsoft_excel_tested": false,
+  "python_version": "3.13.5",
+  "formula_cell_count": 10847,
+  "supported_functions": [
+    "ABS",
+    "AVERAGEIF",
+    "AVERAGEIFS",
+    "CEILING",
+    "COUNTIF",
+    "COUNTIFS",
+    "FLOOR",
+    "IF",
+    "INDEX",
+    "INT",
+    "MATCH",
+    "MAXIFS",
+    "MINIFS",
+    "ROUND",
+    "ROUNDDOWN",
+    "ROUNDUP",
+    "SUM",
+    "SUMIF",
+    "SUMIFS",
+    "VLOOKUP"
+  ],
+  "formula_count_by_function": {
+    "ABS": 601,
+    "AVERAGEIF": 3,
+    "AVERAGEIFS": 3,
+    "CEILING": 600,
+    "COUNTIF": 3,
+    "COUNTIFS": 3,
+    "FLOOR": 600,
+    "IF": 600,
+    "INDEX": 600,
+    "INT": 600,
+    "MATCH": 600,
+    "MAXIFS": 3,
+    "MINIFS": 3,
+    "ROUND": 4201,
+    "ROUNDDOWN": 600,
+    "ROUNDUP": 600,
+    "SUM": 619,
+    "SUMIF": 6,
+    "SUMIFS": 3,
+    "VLOOKUP": 600
+  },
+  "representative_cells_by_function": {
+    "ABS": [
+      "CohortData!M4",
+      "CohortData!M5",
+      "CohortData!M6",
+      "CohortData!M7",
+      "CohortData!M8"
+    ],
+    "AVERAGEIF": [
+      "Aggregation!F4",
+      "Aggregation!F5",
+      "Aggregation!F6"
+    ],
+    "AVERAGEIFS": [
+      "Aggregation!G4",
+      "Aggregation!G5",
+      "Aggregation!G6"
+    ],
+    "CEILING": [
+      "ReserveRollforward!I4",
+      "ReserveRollforward!I5",
+      "ReserveRollforward!I6",
+      "ReserveRollforward!I7",
+      "ReserveRollforward!I8"
+    ],
+    "COUNTIF": [
+      "Aggregation!B4",
+      "Aggregation!B5",
+      "Aggregation!B6"
+    ],
+    "COUNTIFS": [
+      "Aggregation!C4",
+      "Aggregation!C5",
+      "Aggregation!C6"
+    ],
+    "FLOOR": [
+      "ReserveRollforward!J4",
+      "ReserveRollforward!J5",
+      "ReserveRollforward!J6",
+      "ReserveRollforward!J7",
+      "ReserveRollforward!J8"
+    ],
+    "IF": [
+      "CohortData!L4",
+      "CohortData!L5",
+      "CohortData!L6",
+      "CohortData!L7",
+      "CohortData!L8"
+    ],
+    "INDEX": [
+      "CohortData!K4",
+      "CohortData!K5",
+      "CohortData!K6",
+      "CohortData!K7",
+      "CohortData!K8"
+    ],
+    "INT": [
+      "CohortData!N4",
+      "CohortData!N5",
+      "CohortData!N6",
+      "CohortData!N7",
+      "CohortData!N8"
+    ],
+    "MATCH": [
+      "CohortData!J4",
+      "CohortData!J5",
+      "CohortData!J6",
+      "CohortData!J7",
+      "CohortData!J8"
+    ],
+    "MAXIFS": [
+      "Aggregation!I4",
+      "Aggregation!I5",
+      "Aggregation!I6"
+    ],
+    "MINIFS": [
+      "Aggregation!H4",
+      "Aggregation!H5",
+      "Aggregation!H6"
+    ],
+    "ROUND": [
+      "CohortData!L4",
+      "CohortData!L5",
+      "CohortData!L6",
+      "CohortData!L7",
+      "CohortData!L8"
+    ],
+    "ROUNDDOWN": [
+      "ReserveRollforward!L4",
+      "ReserveRollforward!L5",
+      "ReserveRollforward!L6",
+      "ReserveRollforward!L7",
+      "ReserveRollforward!L8"
+    ],
+    "ROUNDUP": [
+      "ReserveRollforward!K4",
+      "ReserveRollforward!K5",
+      "ReserveRollforward!K6",
+      "ReserveRollforward!K7",
+      "ReserveRollforward!K8"
+    ],
+    "SUM": [
+      "ReserveRollforward!H4",
+      "ReserveRollforward!H5",
+      "ReserveRollforward!H6",
+      "ReserveRollforward!H7",
+      "ReserveRollforward!H8"
+    ],
+    "SUMIF": [
+      "Aggregation!D4",
+      "Aggregation!J4",
+      "Aggregation!D5",
+      "Aggregation!J5",
+      "Aggregation!D6"
+    ],
+    "SUMIFS": [
+      "Aggregation!E4",
+      "Aggregation!E5",
+      "Aggregation!E6"
+    ],
+    "VLOOKUP": [
+      "CohortData!I4",
+      "CohortData!I5",
+      "CohortData!I6",
+      "CohortData!I7",
+      "CohortData!I8"
+    ]
+  },
+  "authoritative_outputs": [
+    {
+      "cell": "AccountingBridge!C4",
+      "label": "Opening reserve",
+      "expected_value": -68698614.3
+    },
+    {
+      "cell": "AccountingBridge!C5",
+      "label": "Claims and service movements",
+      "expected_value": -8615833.16
+    },
+    {
+      "cell": "AccountingBridge!C6",
+      "label": "Assumption strengthening amount",
+      "expected_value": -1030479.41
+    },
+    {
+      "cell": "AccountingBridge!C7",
+      "label": "FX movement",
+      "expected_value": -2433696.3
+    },
+    {
+      "cell": "AccountingBridge!C8",
+      "label": "Closing reserve",
+      "expected_value": -86856817.91
+    },
+    {
+      "cell": "AccountingBridge!C9",
+      "label": "Signed accounting balance",
+      "expected_value": -167635441.08
+    }
+  ],
+  "generation_command": "python scripts/generate_ifrs17_workbook.py"
+}

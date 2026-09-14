@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "synthetic_data": true,
+  "seed": 42,
+  "entity": "Aurora Mutual Life SE (synthetic)",
+  "period": "2025-Q4",
+  "currency": "EUR",
+  "basis": "IFRS 17-related synthetic reserve roll-forward",
+  "cohort_count": 600,
+  "authoritative_outputs": [
+    "AccountingBridge!C9"
+  ],
+  "hand_checkable_outputs": [
+    {
+      "cell": "AccountingBridge!C4",
+      "label": "Opening reserve",
+      "expected_value": -68698614.3
+    },
+    {
+      "cell": "AccountingBridge!C5",
+      "label": "Claims and service movements",
+      "expected_value": -8615833.16
+    },
+    {
+      "cell": "AccountingBridge!C6",
+      "label": "Assumption strengthening amount",
+      "expected_value": -1030479.41
+    },
+    {
+      "cell": "AccountingBridge!C7",
+      "label": "FX movement",
+      "expected_value": -2433696.3
+    },
+    {
+      "cell": "AccountingBridge!C8",
+      "label": "Closing reserve",
+      "expected_value": -86856817.91
+    },
+    {
+      "cell": "AccountingBridge!C9",
+      "label": "Signed accounting balance",
+      "expected_value": -167635441.08
+    }
+  ],
+  "reference_control_total": -167635441.08,
+  "expected_findings": [],
+  "expected_internal_verdict": "pass",
+  "expected_external_verdict": "pass",
+  "required_gate_order": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "pdf_available_after_gate4": true
+}

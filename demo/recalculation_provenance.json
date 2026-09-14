@@ -62,10 +62,10 @@
     {
       "relative_path": "demo/workbooks/case_2_spreadsheet_control_failures.xlsx",
       "pre_recalculation_sha256": "6a78f9a7056b665a15dfcc588068e5a2714622d0594af07e3221957ab5ea678a",
-      "post_recalculation_sha256": "f628a43d457670daf98089fa1248003bcf92c49bf9ab46b914f587529a5d202e",
+      "post_recalculation_sha256": "24208159a1c50f9a320e039a28544ea64569f2f3e910358903e606544830549c",
       "formula_manifest_sha256_before": "98f603c240a51ae4f6341159a0e772fc00912e886ab7d232f8940f730dbd3fdb",
-      "formula_manifest_sha256_after": "d12cbf9f63ea6680e741396166a578b650dc4ffddfef1445529d38be60dc054d",
-      "formula_manifest_note": "formula-manifest hash changed due to three semantically-neutral LibreOffice writer normalizations: (1) dropping unnecessary single quotes around unquoted-safe sheet names (e.g. 'Assumptions'!B7 -> Assumptions!B7); (2) collapsing a single-cell range to a bare reference (B11:B11 -> B11, identical SUM operand); (3) writing the FALSE literal as FALSE() rather than bare FALSE (identical boolean value in both Excel and LibreOffice formula grammar). No formula target cell, operator, or computed value changed; every cached numeric value is identical before and after; the intentional circular-reference and hardcoded-literal anomalies, and the VLOOKUP-unsupported formula, are all still present and detected.",
+      "formula_manifest_sha256_after": "081b591e24a6ca597762bd7608013df9e3777f475837ad854e69617307d94ab0",
+      "formula_manifest_note": "The original recalculation evidence is retained in original_post_recalculation_sha256. On 2026-09-14 the synthetic case was deliberately refreshed after exact VLOOKUP became supported: B13 now uses deliberately unsupported approximate VLOOKUP (TRUE), and Circular Control!C6 contains two SUM ranges that visibly omit C3 so the existing detector surfaces the omitted-row condition. LibreOffice recalculated the changed workbook; cached numeric values remained unchanged.",
       "calculation_mode_after": "automatic",
       "formula_count_before": 10,
       "formula_count_after": 10,
@@ -74,7 +74,18 @@
       "has_vba_unchanged": true,
       "external_links_unchanged": true,
       "cached_numeric_values_unchanged": true,
-      "verification_result": "pass"
+      "verification_result": "pass",
+      "original_post_recalculation_sha256": "f628a43d457670daf98089fa1248003bcf92c49bf9ab46b914f587529a5d202e",
+      "validation_refresh": {
+        "refreshed_at": "2026-09-14T14:19:40.044696+00:00",
+        "engine_version": "LibreOfficeDev 26.8.0.0.alpha0 2c87e51eeaa2b413ff4ae097b2705eea1995d8e5",
+        "formula_changes": {
+          "Reserve Calculation!B12": "=SUM(B8:B9,B11:B11)",
+          "Reserve Calculation!B13": "deliberately unsupported approximate VLOOKUP using TRUE()",
+          "Circular Control!C6": "=SUM(C1:C2,C4:C5), deliberately omitting C3"
+        },
+        "microsoft_excel_tested": false
+      }
     },
     {
       "relative_path": "demo/workbooks/case_3_accounting_reconciliation_failure.xlsx",
@@ -128,8 +139,8 @@
     {
       "canonical_path": "demo/workbooks/case_2_spreadsheet_control_failures.xlsx",
       "output_pack_path": "outputs/ai2_2026_demo_pack_20260824/case_2_spreadsheet_control_failures.xlsx",
-      "canonical_sha256": "f628a43d457670daf98089fa1248003bcf92c49bf9ab46b914f587529a5d202e",
-      "output_pack_sha256": "f628a43d457670daf98089fa1248003bcf92c49bf9ab46b914f587529a5d202e",
+      "canonical_sha256": "24208159a1c50f9a320e039a28544ea64569f2f3e910358903e606544830549c",
+      "output_pack_sha256": "24208159a1c50f9a320e039a28544ea64569f2f3e910358903e606544830549c",
       "hashes_match": true
     },
     {

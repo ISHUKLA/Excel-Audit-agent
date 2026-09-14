@@ -9,7 +9,13 @@ from datetime import datetime, timezone
 
 import pytest
 
-from agents.reconciliation import run_reconciliation
+from agents.reconciliation import (
+    _evaluate,
+    _normalize_boolean_tokens,
+    _normalize_compatibility_prefixes,
+    _unsupported_reason,
+    run_reconciliation,
+)
 from core.models import CellRecord, ParsedFile, ReferenceFigureLine, ReferenceFigures, WorkbookMeta
 
 NOW = datetime(2026, 8, 10, tzinfo=timezone.utc)
@@ -173,6 +179,27 @@ def test_arithmetic_operators_and_parentheses_are_supported():
     graph = {"Provisions!A3": ["Provisions!A1", "Provisions!A2"], "Provisions!A1": [], "Provisions!A2": []}
     line = run_reconciliation(parsed(cells, graph), ["Provisions!A3"]).lines[0]
     assert line.target_value == pytest.approx(4.0)
+
+
+def test_round_receives_decimal_intermediate_not_binary_float_noise():
+    """228459 * 0.015 is exactly 3426.885 and Excel rounds it to 3426.89."""
+    cells = {
+        "Provisions!A1": cell("Provisions!A1", value=228459.0),
+        "Provisions!A2": cell("Provisions!A2", value=0.015),
+        "Provisions!A3": cell(
+            "Provisions!A3", formula="=ROUND(A1*A2,2)", value=3426.89
+        ),
+    }
+    graph = {
+        "Provisions!A3": ["Provisions!A1", "Provisions!A2"],
+        "Provisions!A1": [],
+        "Provisions!A2": [],
+    }
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!A3"]).lines[0]
+
+    assert line.target_value == 3426.89
+    assert line.delta == 0.0
+    assert line.verdict == "pass"
 
 
 def test_unary_minus_is_supported():
@@ -1551,6 +1578,64 @@ def test_if_falsy_condition():
         ["Provisions!C2"],
     ).lines[0]
     assert line.target_value == 200.0
+
+
+@pytest.mark.parametrize(("flag", "expected"), [(True, 100.0), (False, 200.0)])
+def test_if_accepts_a_boolean_cell_condition(flag, expected):
+    cells = {
+        "Provisions!B1": cell("Provisions!B1", value=flag),
+        "Provisions!C1": cell("Provisions!C1", formula="=IF(B1,100,200)", value=expected),
+    }
+    graph = {"Provisions!C1": ["Provisions!B1"], "Provisions!B1": []}
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!C1"]).lines[0]
+
+    assert line.target_value == expected
+    assert line.completeness == "complete"
+
+
+def test_boolean_call_tokens_normalise_like_boolean_literals():
+    formula_with_calls = "=IF(TRUE(),1,0)+IF(FALSE(),0,1)"
+    formula_with_literals = "=IF(TRUE,1,0)+IF(FALSE,0,1)"
+
+    assert _normalize_boolean_tokens(formula_with_calls) == formula_with_literals
+    assert _normalize_boolean_tokens("=IF(true( ),1,0)") == "=IF(TRUE,1,0)"
+    assert _unsupported_reason(formula_with_calls) is None
+    assert _unsupported_reason(formula_with_literals) is None
+
+
+def test_xlfn_prefix_is_not_treated_as_part_of_a_supported_function_name():
+    formula = '=_xlfn.MINIFS(B1:B3,A1:A3,"Motor")'
+
+    assert _normalize_compatibility_prefixes(formula) == '=MINIFS(B1:B3,A1:A3,"Motor")'
+    assert _unsupported_reason(formula) is None
+
+
+@pytest.mark.parametrize(
+    ("formula", "expected"),
+    [("=TRUE()", True), ("=FALSE()", False), ("=TRUE", True), ("=FALSE", False)],
+)
+def test_boolean_formula_cells_resolve_for_downstream_criteria(formula, expected):
+    assert _evaluate(formula, "Provisions!A1", {}, []) is expected
+
+
+@pytest.mark.parametrize(
+    ("formula", "expected"),
+    [
+        ("=IF(TRUE(),10,20)", 10.0),
+        ("=IF(FALSE(),10,20)", 20.0),
+        ("=IF(TRUE,10,20)", 10.0),
+        ("=IF(FALSE,10,20)", 20.0),
+    ],
+)
+def test_if_accepts_boolean_calls_and_literals(formula, expected):
+    cells = {
+        "Provisions!C1": cell("Provisions!C1", formula=formula, value=expected),
+    }
+    line = run_reconciliation(parsed(cells, {"Provisions!C1": []}), ["Provisions!C1"]).lines[0]
+
+    assert line.target_value == expected
+    assert line.completeness == "complete"
+    assert line.unsupported_elements == []
 
 
 def test_if_nested_inside_sum():

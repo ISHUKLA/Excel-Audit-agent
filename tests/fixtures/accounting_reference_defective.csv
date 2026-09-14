@@ -1,0 +1,3 @@
+account_number,label,amount,debit_credit,entity,period,currency,ledger_source,basis,evidence_reference,control_total
+SYN-2199,Signed accounting balance,167635441.08,credit,Aurora Mutual Life SE (synthetic),2025-Q4,GBP,Synthetic Q4 2025 trial balance,IFRS 17-related synthetic reserve roll-forward,Synthetic reference extract row 2,-167510441.08
+SYN-2998,Policyholder tax payable,125000.0,debit,Aurora Mutual Life SE (synthetic),2025-Q4,GBP,Synthetic Q4 2025 trial balance,IFRS 17-related synthetic reserve roll-forward,Synthetic defective reference extract row 3,-167510441.08

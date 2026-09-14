@@ -276,4 +276,5 @@ Running note, per the Diligence rules. Update it when you change a file.
 | [tests/test_app.py](tests/test_app.py) | AI-written | Step 11 per-screen shell, export guard, vocabulary, and retry-message coverage, 2026-08-11 |
 | [tests/test_ui_inputs.py](tests/test_ui_inputs.py) | AI-written | Step 11 clean, duplicate, missing-column, and malformed reference-input coverage, 2026-08-11 |
 | `outputs/ai2_2026_demo_pack_20260824/` | AI-written | Three synthetic demonstration workbooks, two matching reference-figure CSVs, and a case guide covering the clean, spreadsheet-control-failure, and accounting-reconciliation-failure journeys, 2026-08-24 |
+| Validation and qualification work package (`agents/reconciliation.py`, `scripts/`, qualification and IFRS 17 fixtures, acceptance/evidence tests, `benchmark/`, `validation/VALIDATION_REPORT.md`, and refreshed Case 2 evidence) | AI-written | Real-workbook coverage for all declared functions, a 10,847-formula synthetic IFRS 17-related workflow, six controlled defects, five-run benchmark evidence, documentation drift checks, and fail-closed evaluator fixes, 2026-09-14 |
 | AGENTS.md | AI-written | This file, 2026-08-10 |

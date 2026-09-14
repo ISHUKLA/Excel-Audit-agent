@@ -1,0 +1,427 @@
+{
+  "schema_version": 1,
+  "synthetic_data": true,
+  "supported_functions": [
+    "ABS",
+    "AVERAGEIF",
+    "AVERAGEIFS",
+    "CEILING",
+    "COUNTIF",
+    "COUNTIFS",
+    "FLOOR",
+    "IF",
+    "INDEX",
+    "INT",
+    "MATCH",
+    "MAXIFS",
+    "MINIFS",
+    "ROUND",
+    "ROUNDDOWN",
+    "ROUNDUP",
+    "SUM",
+    "SUMIF",
+    "SUMIFS",
+    "VLOOKUP"
+  ],
+  "cases": [
+    {
+      "case_id": "sum_mixed_range",
+      "formula": "=SUM(Inputs!$B$4:$B$8)",
+      "expected_value": 25.0,
+      "expected_status": "complete",
+      "expected_verdict": "pass",
+      "functions": [
+        "SUM"
+      ],
+      "purpose": "Blank/text ignored; zero retained",
+      "cell": "Qualification!B4"
+    },
+    {
+      "case_id": "abs_negative",
+      "formula": "=ABS(Inputs!$B$6)",
+      "expected_value": 5.0,
+      "expected_status": "complete",
+      "expected_verdict": "pass",
+      "functions": [
+        "ABS"
+      ],
+      "purpose": "",
+      "cell": "Qualification!B5"
+    },
+    {
+      "case_id": "int_negative",
+      "formula": "=INT(-1.2)",
+      "expected_value": -2.0,
+      "expected_status": "complete",
+      "expected_verdict": "pass",
+      "functions": [
+        "INT"
+      ],
+      "purpose": "",
+      "cell": "Qualification!B6"
+    },
+    {
+      "case_id": "round_positive_half",
+      "formula": "=ROUND(2.5,0)",
+      "expected_value": 3.0,
+      "expected_status": "complete",
+      "expected_verdict": "pass",
+      "functions": [
+        "ROUND"
+      ],
+      "purpose": "Excel half away from zero",
+      "cell": "Qualification!B7"
+    },
+    {
+      "case_id": "round_negative_half",
+      "formula": "=ROUND(-2.5,0)",
+      "expected_value": -3.0,
+      "expected_status": "complete",
+      "expected_verdict": "pass",
+      "functions": [
+        "ROUND"
+      ],
+      "purpose": "Excel half away from zero",
+      "cell": "Qualification!B8"
+    },
+    {
+      "case_id": "roundup_negative",
+      "formula": "=ROUNDUP(-1.21,1)",
+      "expected_value": -1.3,
+      "expected_status": "complete",
+      "expected_verdict": "pass",
+      "functions": [
+        "ROUNDUP"
+      ],
+      "purpose": "",
+      "cell": "Qualification!B9"
+    },
+    {
+      "case_id": "rounddown_negative",
+      "formula": "=ROUNDDOWN(-1.29,1)",
+      "expected_value": -1.2,
+      "expected_status": "complete",
+      "expected_verdict": "pass",
+      "functions": [
+        "ROUNDDOWN"
+      ],
+      "purpose": "",
+      "cell": "Qualification!B10"
+    },
+    {
+      "case_id": "ceiling_positive",
+      "formula": "=CEILING(2.1,0.5)",
+      "expected_value": 2.5,
+      "expected_status": "complete",
+      "expected_verdict": "pass",
+      "functions": [
+        "CEILING"
+      ],
+      "purpose": "",
+      "cell": "Qualification!B11"
+    },
+    {
+      "case_id": "floor_positive",
+      "formula": "=FLOOR(2.9,0.5)",
+      "expected_value": 2.5,
+      "expected_status": "complete",
+      "expected_verdict": "pass",
+      "functions": [
+        "FLOOR"
+      ],
+      "purpose": "",
+      "cell": "Qualification!B12"
+    },
+    {
+      "case_id": "sumif_text",
+      "formula": "=SUMIF(Inputs!$A$4:$A$8,\"Motor\",Inputs!$B$4:$B$8)",
+      "expected_value": 5.0,
+      "expected_status": "complete",
+      "expected_verdict": "pass",
+      "functions": [
+        "SUMIF"
+      ],
+      "purpose": "",
+      "cell": "Qualification!B13"
+    },
+    {
+      "case_id": "sumifs_text_region",
+      "formula": "=SUMIFS(Inputs!$B$4:$B$8,Inputs!$A$4:$A$8,\"Motor\",Inputs!$C$4:$C$8,\"North\")",
+      "expected_value": 5.0,
+      "expected_status": "complete",
+      "expected_verdict": "pass",
+      "functions": [
+        "SUMIFS"
+      ],
+      "purpose": "",
+      "cell": "Qualification!B14"
+    },
+    {
+      "case_id": "countif_text",
+      "formula": "=COUNTIF(Inputs!$A$4:$A$8,\"Motor\")",
+      "expected_value": 3.0,
+      "expected_status": "complete",
+      "expected_verdict": "pass",
+      "functions": [
+        "COUNTIF"
+      ],
+      "purpose": "",
+      "cell": "Qualification!B15"
+    },
+    {
+      "case_id": "countifs_boolean",
+      "formula": "=COUNTIFS(Inputs!$A$4:$A$8,\"Motor\",Inputs!$D$4:$D$8,TRUE())",
+      "expected_value": 3.0,
+      "expected_status": "complete",
+      "expected_verdict": "pass",
+      "functions": [
+        "COUNTIFS"
+      ],
+      "purpose": "TRUE() boolean call in a criteria function",
+      "cell": "Qualification!B16"
+    },
+    {
+      "case_id": "averageif_blank_zero",
+      "formula": "=AVERAGEIF(Inputs!$A$4:$A$8,\"Motor\",Inputs!$B$4:$B$8)",
+      "expected_value": 1.6666666666666667,
+      "expected_status": "complete",
+      "expected_verdict": "pass",
+      "functions": [
+        "AVERAGEIF"
+      ],
+      "purpose": "A literal zero contributes to the denominator",
+      "cell": "Qualification!B17"
+    },
+    {
+      "case_id": "averageifs_text_region",
+      "formula": "=AVERAGEIFS(Inputs!$B$4:$B$8,Inputs!$A$4:$A$8,\"Motor\",Inputs!$C$4:$C$8,\"North\")",
+      "expected_value": 2.5,
+      "expected_status": "complete",
+      "expected_verdict": "pass",
+      "functions": [
+        "AVERAGEIFS"
+      ],
+      "purpose": "",
+      "cell": "Qualification!B18"
+    },
+    {
+      "case_id": "minifs_text",
+      "formula": "=_xlfn.MINIFS(Inputs!$B$4:$B$8,Inputs!$A$4:$A$8,\"Motor\")",
+      "expected_value": -5.0,
+      "expected_status": "complete",
+      "expected_verdict": "pass",
+      "functions": [
+        "MINIFS"
+      ],
+      "purpose": "",
+      "cell": "Qualification!B19"
+    },
+    {
+      "case_id": "maxifs_text",
+      "formula": "=_xlfn.MAXIFS(Inputs!$B$4:$B$8,Inputs!$A$4:$A$8,\"Motor\")",
+      "expected_value": 10.0,
+      "expected_status": "complete",
+      "expected_verdict": "pass",
+      "functions": [
+        "MAXIFS"
+      ],
+      "purpose": "",
+      "cell": "Qualification!B20"
+    },
+    {
+      "case_id": "if_true_literal",
+      "formula": "=IF(TRUE,11,22)",
+      "expected_value": 11.0,
+      "expected_status": "complete",
+      "expected_verdict": "pass",
+      "functions": [
+        "IF"
+      ],
+      "purpose": "",
+      "cell": "Qualification!B21"
+    },
+    {
+      "case_id": "if_false_literal",
+      "formula": "=IF(FALSE,11,22)",
+      "expected_value": 22.0,
+      "expected_status": "complete",
+      "expected_verdict": "pass",
+      "functions": [
+        "IF"
+      ],
+      "purpose": "",
+      "cell": "Qualification!B22"
+    },
+    {
+      "case_id": "if_true_call",
+      "formula": "=IF(TRUE(),11,22)",
+      "expected_value": 11.0,
+      "expected_status": "complete",
+      "expected_verdict": "pass",
+      "functions": [
+        "IF"
+      ],
+      "purpose": "",
+      "cell": "Qualification!B23"
+    },
+    {
+      "case_id": "if_false_call",
+      "formula": "=IF(FALSE(),11,22)",
+      "expected_value": 22.0,
+      "expected_status": "complete",
+      "expected_verdict": "pass",
+      "functions": [
+        "IF"
+      ],
+      "purpose": "",
+      "cell": "Qualification!B24"
+    },
+    {
+      "case_id": "vlookup_exact",
+      "formula": "=VLOOKUP(\"Property\",Inputs!$E$4:$F$6,2,FALSE())",
+      "expected_value": 1.2,
+      "expected_status": "complete",
+      "expected_verdict": "pass",
+      "functions": [
+        "VLOOKUP"
+      ],
+      "purpose": "",
+      "cell": "Qualification!B25"
+    },
+    {
+      "case_id": "match_exact",
+      "formula": "=MATCH(\"Liability\",Inputs!$E$4:$E$6,0)",
+      "expected_value": 3.0,
+      "expected_status": "complete",
+      "expected_verdict": "pass",
+      "functions": [
+        "MATCH"
+      ],
+      "purpose": "",
+      "cell": "Qualification!B26"
+    },
+    {
+      "case_id": "index_scalar",
+      "formula": "=INDEX(Inputs!$F$4:$F$6,2)",
+      "expected_value": 1.2,
+      "expected_status": "complete",
+      "expected_verdict": "pass",
+      "functions": [
+        "INDEX"
+      ],
+      "purpose": "",
+      "cell": "Qualification!B27"
+    },
+    {
+      "case_id": "index_match_nested",
+      "formula": "=INDEX(Inputs!$F$4:$F$6,MATCH(\"Liability\",Inputs!$E$4:$E$6,0))",
+      "expected_value": 1.3,
+      "expected_status": "complete",
+      "expected_verdict": "pass",
+      "functions": [
+        "INDEX",
+        "MATCH"
+      ],
+      "purpose": "",
+      "cell": "Qualification!B28"
+    },
+    {
+      "case_id": "nested_round_sumif",
+      "formula": "=ROUND(SUMIF(Inputs!$A$4:$A$8,\"Motor\",Inputs!$B$4:$B$8),2)",
+      "expected_value": 5.0,
+      "expected_status": "complete",
+      "expected_verdict": "pass",
+      "functions": [
+        "ROUND",
+        "SUMIF"
+      ],
+      "purpose": "",
+      "cell": "Qualification!B29"
+    },
+    {
+      "case_id": "cross_tab_range",
+      "formula": "=SUM('Cross Tab'!$B$3:$B$5)",
+      "expected_value": 20.0,
+      "expected_status": "complete",
+      "expected_verdict": "pass",
+      "functions": [
+        "SUM"
+      ],
+      "purpose": "",
+      "cell": "Qualification!B30"
+    },
+    {
+      "case_id": "ordinary_arithmetic",
+      "formula": "=(Inputs!$B$4+Inputs!$B$5)*2/3",
+      "expected_value": 20.0,
+      "expected_status": "complete",
+      "expected_verdict": "pass",
+      "functions": [],
+      "purpose": "",
+      "cell": "Qualification!B31"
+    },
+    {
+      "case_id": "vlookup_approximate_unsupported",
+      "formula": "=VLOOKUP(\"Property\",Inputs!$E$4:$F$6,2,TRUE())",
+      "expected_value": null,
+      "expected_status": "partial",
+      "expected_verdict": "incomplete",
+      "functions": [
+        "VLOOKUP"
+      ],
+      "purpose": "Approximate lookup must fail closed",
+      "cell": "Qualification!B32"
+    },
+    {
+      "case_id": "match_approximate_unsupported",
+      "formula": "=MATCH(\"Property\",Inputs!$E$4:$E$6,1)",
+      "expected_value": null,
+      "expected_status": "partial",
+      "expected_verdict": "incomplete",
+      "functions": [
+        "MATCH"
+      ],
+      "purpose": "Approximate MATCH must fail closed",
+      "cell": "Qualification!B33"
+    },
+    {
+      "case_id": "index_array_unsupported",
+      "formula": "=INDEX(Inputs!$B$4:$B$8,0)",
+      "expected_value": null,
+      "expected_status": "partial",
+      "expected_verdict": "incomplete",
+      "functions": [
+        "INDEX"
+      ],
+      "purpose": "Array result must not be silently reduced to a scalar",
+      "cell": "Qualification!B34"
+    },
+    {
+      "case_id": "offset_unsupported",
+      "formula": "=OFFSET(Inputs!$B$4,1,0)",
+      "expected_value": null,
+      "expected_status": "partial",
+      "expected_verdict": "incomplete",
+      "functions": [],
+      "purpose": "Function outside the catalogue",
+      "cell": "Qualification!B35"
+    }
+  ],
+  "error_evidence": [
+    {
+      "cell": "Errors!B4",
+      "formula": "=NA()",
+      "expected_error": "#N/A"
+    },
+    {
+      "cell": "Errors!B5",
+      "formula": "=1+\"text\"",
+      "expected_error": "#VALUE!"
+    },
+    {
+      "cell": "Errors!B6",
+      "formula": "=1/0",
+      "expected_error": "#DIV/0!"
+    }
+  ]
+}

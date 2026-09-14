@@ -20,6 +20,7 @@ import ast
 import math
 import operator
 import re
+from decimal import Decimal
 from typing import Optional
 
 from openpyxl.utils import column_index_from_string, get_column_letter
@@ -66,6 +67,8 @@ _FUNCTION_PATTERN = re.compile(r"([A-Za-z_][A-Za-z0-9_.]*)\s*\(")
 _SUM_PATTERN = re.compile(r"SUM\(([^()]*)\)", re.IGNORECASE)
 _INNERMOST_CALL_PATTERN = re.compile(r"([A-Za-z_][A-Za-z0-9_.]*)\(([^()]*)\)")
 _STRING_LITERAL_PATTERN = re.compile(r'"[^"]*"')
+_BOOLEAN_CALL_PATTERN = re.compile(r"\b(TRUE|FALSE)\s*\(\s*\)", re.IGNORECASE)
+_XLFN_PREFIX_PATTERN = re.compile(r"\b_xlfn\.([A-Za-z_][A-Za-z0-9_.]*)", re.IGNORECASE)
 
 # Bounds the innermost-out function-unwrapping loop in _evaluate. Not a
 # correctness limit — no formula in scope for this catalogue nests anywhere
@@ -94,6 +97,35 @@ _AGGREGATION_NOTE = (
 
 class _UnresolvableReference(Exception):
     """A reference that cannot become a number: text, a date, or a missing chain."""
+
+
+def _normalize_boolean_tokens(formula: str) -> str:
+    """Treat Excel/LibreOffice boolean calls as boolean literals.
+
+    Both spreadsheet engines may serialise the same flag as ``FALSE`` or
+    ``FALSE()`` (and likewise for TRUE).  TRUE/FALSE are literals rather than
+    formula families in this reconstruction catalogue, so normalise only the
+    empty-call spellings before function discovery and evaluation.  Calls with
+    arguments remain untouched and therefore fail closed as unsupported.
+    """
+
+    return _BOOLEAN_CALL_PATTERN.sub(lambda match: match.group(1).upper(), formula)
+
+
+def _normalize_compatibility_prefixes(formula: str) -> str:
+    """Remove Excel's `_xlfn.` compatibility marker before catalogue lookup.
+
+    The marker says the file writer considers a function newer than the base
+    file format; it is not part of the function's name.  The underlying name
+    still has to be present in ``SUPPORTED_FUNCTIONS`` or it remains
+    unsupported after this normalisation.
+    """
+
+    return _XLFN_PREFIX_PATTERN.sub(lambda match: match.group(1), formula)
+
+
+def _normalize_formula_tokens(formula: str) -> str:
+    return _normalize_compatibility_prefixes(_normalize_boolean_tokens(formula))
 
 
 # ---------------------------------------------------------------------------
@@ -613,6 +645,7 @@ def _criteria_call_spans(formula: str) -> list[tuple[int, int]]:
 
 def _unsupported_reason(formula: str) -> Optional[str]:
     """Why this formula is outside the catalogue, or None if it is inside it."""
+    formula = _normalize_formula_tokens(formula)
     if formula.startswith("{="):
         return "an array formula (unsupported)"
     if "[" in formula and ".xls" in formula:
@@ -1190,6 +1223,10 @@ def _evaluate_if_condition(condition_text: str, own_tab: str, values: dict) -> b
     For numeric comparisons, both sides must be numeric.
     """
     condition = condition_text.strip()
+    if condition.upper() == "TRUE":
+        return True
+    if condition.upper() == "FALSE":
+        return False
 
     # Try to find a comparison operator at paren depth 0 (outside of parens and quotes)
     comparison_ops = ("<=", ">=", "<>", "<", ">", "=")
@@ -1280,7 +1317,14 @@ def _evaluate_if_condition(condition_text: str, own_tab: str, values: dict) -> b
                 return left_val <= right_val
     else:
         # No operator found, evaluate as expression and coerce to boolean
-        result = _resolve_and_eval_expr(condition, own_tab, values)
+        try:
+            result = _resolve_and_eval_expr(condition, own_tab, values)
+        except _UnresolvableReference:
+            # A boolean cell is a valid IF condition but deliberately cannot
+            # be substituted into arithmetic. Resolve the bare reference as
+            # its native bool instead of treating that arithmetic guard as a
+            # failed IF condition.
+            result = None
         if result is None:
             # Try as a bare cell reference
             for key in _references_in(condition, own_tab):
@@ -1575,7 +1619,9 @@ _EVALUATORS = {
 }
 
 
-def _evaluate(formula: str, own_ref: str, values: dict, warnings: list[str]) -> Optional[float]:
+def _evaluate(
+    formula: str, own_ref: str, values: dict, warnings: list[str]
+) -> Optional[float | bool]:
     """Compute a supported formula from its already-resolved dependencies.
 
     Function calls are unwrapped innermost-out: `_INNERMOST_CALL_PATTERN`
@@ -1584,7 +1630,8 @@ def _evaluate(formula: str, own_ref: str, values: dict, warnings: list[str]) -> 
     sees only literals and cell references — never nested function syntax.
     """
     own_tab = own_ref.split("!", 1)[0]
-    expr = formula[1:] if formula.startswith("=") else formula
+    normalized_formula = _normalize_formula_tokens(formula)
+    expr = normalized_formula[1:] if normalized_formula.startswith("=") else normalized_formula
 
     for _ in range(_MAX_FUNCTION_NESTING):
         match = _INNERMOST_CALL_PATTERN.search(expr)
@@ -1608,6 +1655,11 @@ def _evaluate(formula: str, own_ref: str, values: dict, warnings: list[str]) -> 
         # rather than return a partially-unwrapped result.
         return None
 
+    if expr.strip().upper() == "TRUE":
+        return True
+    if expr.strip().upper() == "FALSE":
+        return False
+
     try:
         return _resolve_and_eval_expr(expr, own_tab, values)
     except _UnresolvableReference:
@@ -1628,17 +1680,28 @@ def _references_in(argument: str, own_tab: str) -> list[str]:
 
 
 def _safe_eval_arithmetic(expr: str) -> Optional[float]:
-    """Evaluate arithmetic only — no names, no calls, no attribute access."""
+    """Evaluate arithmetic only, using decimal operations throughout.
+
+    Excel-style rounding cannot repair binary-float noise introduced before a
+    ROUND call.  Converting each resolved scalar to Decimal before applying
+    operators preserves the workbook's displayed decimal inputs through the
+    whole arithmetic expression, then converts only the final result to float
+    for the existing model contract.
+    """
     try:
         tree = ast.parse(expr, mode="eval")
     except SyntaxError:
         return None
 
-    def _eval(node: ast.AST) -> float:
+    def _eval(node: ast.AST) -> Decimal:
         if isinstance(node, ast.Expression):
             return _eval(node.body)
-        if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
-            return float(node.value)
+        if (
+            isinstance(node, ast.Constant)
+            and isinstance(node.value, (int, float))
+            and not isinstance(node.value, bool)
+        ):
+            return Decimal(str(node.value))
         if isinstance(node, ast.BinOp) and type(node.op) in _ALLOWED_OPERATORS:
             return _ALLOWED_OPERATORS[type(node.op)](_eval(node.left), _eval(node.right))
         if isinstance(node, ast.UnaryOp) and type(node.op) in _ALLOWED_OPERATORS:
@@ -1646,8 +1709,8 @@ def _safe_eval_arithmetic(expr: str) -> Optional[float]:
         raise ValueError("unsupported expression")
 
     try:
-        return _eval(tree)
-    except (ValueError, ZeroDivisionError, TypeError):
+        return float(_eval(tree))
+    except (ValueError, ArithmeticError, TypeError):
         return None
 
 

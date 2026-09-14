@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "synthetic_data": true,
+  "clean_workbook_sha256": "d5f5db316247e49b7ab7f191fd3d19b6f824de3c7667f0ccfe3402492dd0413c",
+  "defective_workbook_sha256": "5ae34fac91157d94f966decf0ddbc6fda61fea250b2fbe198ded1aaef659f9b5",
+  "defective_reference_sha256": "b8895ef21382ed89e53a57af848bf49d66766f5139fd6290aefae73998e619cc",
+  "workbook_context": {
+    "entity": "Aurora Mutual Life SE (synthetic)",
+    "period": "2025-Q4",
+    "currency": "EUR"
+  },
+  "reference_context": {
+    "entity": "Aurora Mutual Life SE (synthetic)",
+    "period": "2025-Q4",
+    "currency": "GBP"
+  },
+  "authoritative_outputs": [
+    "AccountingBridge!C9",
+    "AccountingBridge!C10"
+  ],
+  "defects": {
+    "D1": {
+      "defect_type": "hardcoded_assumption",
+      "evidence_kind": "anomaly_finding",
+      "expected_finding_type": "hardcoded_literal",
+      "cell_address": "ReserveRollforward!E4",
+      "expected_severity": "warning",
+      "expected_description_contains": "Hardcoded literal 0.035"
+    },
+    "D2": {
+      "defect_type": "omitted_rows",
+      "evidence_kind": "anomaly_finding",
+      "expected_finding_type": "omitted_sum_rows",
+      "cell_address": "Aggregation!J8",
+      "expected_severity": "warning",
+      "expected_description_contains": "SUM formula skips rows: J5"
+    },
+    "D3": {
+      "defect_type": "unsupported_formula",
+      "evidence_kind": "internal_reconciliation",
+      "cell_address": "AccountingBridge!C9",
+      "expected_completeness": "partial",
+      "expected_verdict": "incomplete",
+      "expected_unsupported_contains": "OFFSET"
+    },
+    "D4": {
+      "defect_type": "unmatched_accounting_line",
+      "evidence_kind": "external_completeness",
+      "reference_line_id": "REF-0002",
+      "reference_label": "Policyholder tax payable",
+      "expected_status": "unmatched_reference_item"
+    },
+    "D5": {
+      "defect_type": "unmapped_python_output",
+      "evidence_kind": "external_completeness",
+      "cell_address": "AccountingBridge!C10",
+      "expected_status": "unmapped_python_output"
+    },
+    "D6": {
+      "defect_type": "context_mismatch",
+      "evidence_kind": "context_match",
+      "workbook_currency": "EUR",
+      "reference_currency": "GBP",
+      "expected_status": "mismatch"
+    }
+  }
+}

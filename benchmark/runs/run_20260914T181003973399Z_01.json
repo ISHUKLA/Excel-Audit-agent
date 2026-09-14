@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "run_group": "20260914T181003973399Z",
+  "run": 1,
+  "measured_at": "2026-09-14T18:10:15.207673+00:00",
+  "metrics": {
+    "parse_seconds": 4.863648718921468,
+    "anomaly_detection_seconds": 2.166008163942024,
+    "reconstruction_seconds": 4.036353102186695,
+    "total_seconds": 11.06602510693483,
+    "peak_memory_mb": 56.577043533325195
+  },
+  "environment": {
+    "python_version": "3.12.11",
+    "operating_system": "macOS-26.6.2-x86_64-i386-64bit",
+    "cpu_model": "Intel(R) Core(TM) i5-1038NG7 CPU @ 2.00GHz",
+    "cpu_core_count": 8,
+    "available_ram_gb": 16.0
+  }
+}

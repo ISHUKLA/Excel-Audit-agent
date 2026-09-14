@@ -62,8 +62,8 @@ Expected findings and reconstruction behaviour:
 |---|---|---|
 | `Circular Control!B7:B8` | Two-cell circular reference | blocker finding |
 | `Reserve Calculation!B7` | Formula contains the hardcoded factor `1.075` | warning finding |
-| `Reserve Calculation!B12` | `SUM(B8:B9,B11:B11)` skips populated cell `B10` | warning finding |
-| `Reserve Calculation!B13` | Uses `VLOOKUP`, outside the supported formula catalogue | output reconstruction is partial |
+| `Circular Control!C6` | `SUM(C1:C2,C4:C5)` visibly skips populated cell `C3` | warning finding |
+| `Reserve Calculation!B13` | Uses approximate `VLOOKUP` with `TRUE()`; only exact match is supported | output reconstruction is partial |
 | `Reserve Calculation!B14` | Depends on the unsupported lookup | verdict `incomplete`, not pass |
 
 The workbook's cached value for `Reserve Calculation!B14` is 2,641,600. The audit agent must still leave the reconstructed target blank and report the output as incomplete; displaying a cached number is not evidence that the Python reconstruction was complete.

@@ -28,7 +28,7 @@ This tool automates the legwork — parsing the spreadsheet, reconstructing its 
 
 **Detect anomalies.** Flags hardcoded literals embedded in formulas, rows mysteriously excluded from `SUM` ranges, cross-tab inconsistencies, and circular references. All detection is rule-based; no LLM is involved.
 
-**Reconstruct.** For supported formulas, independently recalculates the cell's value in Python and compares it to the spreadsheet's cached number. Records the delta. Marks cells with unsupported formulas (e.g., `VLOOKUP`) as partial reconstructions.
+**Reconstruct.** For supported formulas, independently recalculates the cell's value in Python and compares it to the spreadsheet's cached number. Records the delta. Marks unsupported constructs, such as approximate lookups and array results, as partial reconstructions.
 
 **Reconcile.** Compares designated outputs against accounting figures you supply, using a consistent signed-net convention (debit positive, credit negative). Handles duplicate labels, near-misses, and incomplete mappings as separate evidence, not silent failures.
 
@@ -54,20 +54,20 @@ This tool automates the legwork — parsing the spreadsheet, reconstructing its 
 
 ## Supported Formula Catalogue
 
-The reconstruction engine supports 19 functions across five groups:
+The reconstruction engine supports 20 functions across five groups:
 
 **Group A — Basic arithmetic (2 functions)**
 - `ABS` — absolute value
 - `INT` — integer (floor towards negative infinity)
 
 **Group B — Rounding (5 functions)**
-- `ROUND` — round to nearest (banker's rounding on .5)
+- `ROUND` — round to nearest, with exact halves rounded away from zero as Excel does
 - `ROUNDUP` — round away from zero
 - `ROUNDDOWN` — round towards zero
 - `CEILING` — round up to significance multiple
 - `FLOOR` — round down to significance multiple
 
-**Group C — Conditional aggregation (7 functions)**
+**Group C — Conditional aggregation (8 functions)**
 - `SUM` — sum a range (blank cells treated as zero)
 - `SUMIF` — conditional sum with criteria
 - `SUMIFS` — sum with multiple criteria
@@ -143,7 +143,7 @@ All demonstration workbooks are entirely synthetic. No real client, policyholder
 **Case 2: Spreadsheet control failures**
 - File: `demo/workbooks/case_2_spreadsheet_control_failures.xlsx`
 - Reference figures: None (intentional).
-- What it shows: Circular references, hardcoded assumptions, an unsupported formula (`VLOOKUP`), and a row mysteriously excluded from a `SUM` range. Internal verdict: incomplete (due to unsupported formula). External verdict: not performed (no reference figures). Expected outcome: Gate 3 blocks until you explicitly acknowledge the incomplete reconstruction.
+- What it shows: Circular references, hardcoded assumptions, a deliberately unsupported approximate `VLOOKUP`, and a row visibly excluded from a `SUM` range. Internal verdict: incomplete (due to the unsupported lookup mode). External verdict: not performed (no reference figures). Expected outcome: Gate 3 blocks until you explicitly acknowledge the incomplete reconstruction.
 
 **Case 3: Accounting reconciliation failure**
 - File: `demo/workbooks/case_3_accounting_reconciliation_failure.xlsx`
@@ -249,18 +249,31 @@ This table makes explicit where the AI is involved and where the decisions are e
 
 ## Synthetic Demonstration Scope
 
-**Status:** Synthetic test cases only; no timing benchmark, production or otherwise, has been measured.
+**Status:** Synthetic test cases and a reproducible large-workbook benchmark are included. No result in this repository is evidence about real customer workbooks or multi-user production load.
 
 The four demonstration cases (Cases 1–4, see above) are small, well-understood workbooks designed to exercise the full pipeline's distinct paths:
 
-- **Case 1 (clean):** 3 tabs, 8 cells, 0 findings.
-- **Case 2 (control failures):** 2 tabs, 14 cells, 3 findings.
-- **Case 3 (accounts mismatch):** 2 tabs, 3 outputs, currency mismatch.
-- **Case 4 (reserve roll-forward):** 4 tabs, 9 formula cells, signed GL bridge.
+- **Case 1 (clean):** no findings; internal and external reconciliation pass after mapping approval.
+- **Case 2 (control failures):** three findings and an incomplete reconstruction caused by an unsupported approximate lookup.
+- **Case 3 (accounts mismatch):** internal reconstruction passes while a currency mismatch blocks external reconciliation.
+- **Case 4 (reserve roll-forward):** a signed general-ledger bridge that passes after mapping approval.
 
-No run-time figures are published here because none have been measured and recorded; this is scope and structure, not a performance claim.
+The formula qualification workbook under `tests/fixtures/` exercises all 20 supported functions against independently specified expected values. A separate synthetic IFRS 17-related fixture contains 10,847 formula cells and uses every supported function within its calculation flow. Reproduce the measured parser, detector and reconstruction timings with `python scripts/benchmark.py`; the recorded environment and limitations are in `benchmark/BENCHMARK_REPORT.md`.
 
-**Production scale:** Not yet exercised. The tool has not been tested on real workbooks of varying size and complexity. Behaviour on large files (>10 MB, >10,000 cells) is unknown.
+**Production scale:** Not established. One synthetic workbook with more than 10,000 formula cells has been measured, but real workbooks of varying size and complexity, concurrent users and hosted workloads remain untested.
+
+---
+
+## Validation and Qualification Evidence
+
+The [validation report](validation/VALIDATION_REPORT.md) brings together the acceptance matrix, large-workbook control totals, six-defect detection matrix, benchmark results, implementation defects found, remaining limitations and exact reproduction commands.
+
+- `tests/fixtures/qualification_manifest.json` binds the recalculated formula fixture to its LibreOffice version, SHA-256 and cell-level formula manifest.
+- `tests/fixtures/ifrs17_manifest.json` records the large fixture's seed, scale, function inventory, authoritative outputs and recalculation provenance.
+- `benchmark/BENCHMARK_REPORT.md`, `benchmark/summary.csv` and the five raw JSON files under `benchmark/runs/` preserve the measured evidence without imposing timing thresholds on CI.
+- `tests/test_evidence_integrity.py` blocks function-catalogue, README, demo-contract and acceptance-coverage drift.
+
+All files contain synthetic data. This evidence qualifies the declared reconstruction scope only. It does not establish Microsoft Excel equivalence, production readiness, IFRS 17 methodology validation or an audit opinion.
 
 ---
 
@@ -319,7 +332,7 @@ pytest tests/           # Full suite
 pytest tests/test_parser.py -v
 ```
 
-**Current status (verified 28 August 2026, commit `4332d95`):** 494 tests passed, locally and in GitHub CI on Python 3.11 and 3.13 (`python3 -m pytest tests/ -v -rsx -p no:cacheprovider`, zero failures, zero errors, zero skips).
+The current pass count is deliberately not hardcoded here. Run `python3 -m pytest tests/ -v -rsx -p no:cacheprovider`, or inspect the linked CI run for the exact result associated with a commit.
 
 [![CI](https://github.com/ISHUKLA/Excel-Audit-agent/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ISHUKLA/Excel-Audit-agent/actions/workflows/ci.yml)
 
@@ -332,7 +345,7 @@ The test suite covers:
 - Restart recovery and chain verification.
 - Boundary cases: exact matching, materiality thresholds, incomplete reconstructions, context mismatch.
 
-**Not covered:** Live Anthropic API calls (mocked in tests) and production-scale workbooks (fixtures are synthetic).
+**Not covered:** Live Anthropic API calls (mocked in tests), Microsoft Excel equivalence, real customer workbooks, concurrent load and hosted production operation.
 
 ---
 
@@ -402,7 +415,7 @@ Backups are an operational necessity, not merely good practice.
 
 **What "not flagged stale" means, and does not mean.** A cell's calculation evidence is `stale` when its cached value is missing, or the workbook's calculation mode is manual; it is `unknown` when the calculation mode cannot be determined at all — an absent `calcPr` element is read as `unknown`, never assumed to be `automatic`. Only when a formula cell has a cached value under a *confirmed* automatic calculation mode does this tool describe it as **not flagged stale**. That phrase is deliberate: it states that no known staleness indicator was detected under this prototype's rules. It does **not** mean "verified fresh" or "freshly recalculated," and it does not prove when, how, or with which engine the workbook was last calculated, or that it was saved after that calculation. Any formula cell that is stale or freshness-unknown — including one buried in the derivation chain beneath an output that looks fine on its own — prevents that comparison from reading as a pass, regardless of how closely the numbers agree and however loose the materiality threshold is; a reviewer can acknowledge the resulting incomplete result to continue to a report, but that acknowledgement does not and cannot make the evidence fresh.
 
-**Synthetic fixture recalculation.** Two test fixtures (`tests/fixtures/clean.xlsx`, `tests/fixtures/reserves.xlsx`) and the three competition demonstration workbooks under `demo/workbooks/` were recalculated once, at build time, using LibreOffice 26.2.5.2, specifically so their own calculation mode could be genuinely and accurately declared `automatic` rather than left `unknown`. This is a one-time, manual, build-time step recorded in [`demo/recalculation_provenance.json`](demo/recalculation_provenance.json) — engine version, executable path, and every file's before/after SHA-256 and formula-manifest hash are on record there. **It is not a capability of the running application.** The application itself never invokes LibreOffice, Microsoft Excel, or any other recalculation engine, at runtime or otherwise, and a workbook a reviewer uploads is never recalculated by it — its `automatic`/`manual`/`unknown` calc mode and its cells' cached values are read exactly as the uploaded file states them, and nothing more can be inferred about that file's opening or saving history from those values alone.
+**Synthetic fixture recalculation.** The original parser fixtures and competition demonstration workbooks were recalculated once at build time; their evidence is recorded in [`demo/recalculation_provenance.json`](demo/recalculation_provenance.json). The formula qualification and large IFRS 17-related fixtures have separate manifests at `tests/fixtures/qualification_manifest.json` and `tests/fixtures/ifrs17_manifest.json`, including their LibreOffice version, exact SHA-256 and formula inventory. **This is not a capability of the running application.** The application itself never invokes LibreOffice, Microsoft Excel, or any other recalculation engine at runtime. It never recalculates an uploaded workbook. It reads that workbook's calculation mode and cached values exactly as supplied, and nothing more can be inferred about when, how or with which engine the workbook was last calculated.
 
 ---
 
@@ -431,7 +444,7 @@ This tool was built with assistance from Claude (Anthropic's language model). Th
 
 **Reconciliation logic:** The two-pass reconciliation (Excel vs. Python, Python vs. accounts), mapping proposal flow, and verdict computation were AI-written and thoroughly tested.
 
-**Test suite:** 494 tests covering clean cases, messy input, boundary conditions, and end-to-end flows were AI-written. All tests pass — see "Test Status and CI" above for the current verified count.
+**Test suite:** Tests covering clean cases, messy input, boundary conditions, qualified real-workbook formulas, a large synthetic workbook and end-to-end flows were AI-written. See "Test Status and CI" above for the commit-specific result.
 
 **Streamlit interface and PDF report:** The five-screen UI, gate enforcement, and PDF report generation via Jinja2 + WeasyPrint were AI-written.
 
@@ -474,7 +487,7 @@ The current release (v1.0.0) ships the four-gate pipeline, local-first deploymen
 
 - **Hosted operation with real authentication.** Application-level access control for multi-user deployments.
 - **Performance benchmarks on real workbooks.** Testing against production files of varying size and formula complexity.
-- **Extended formula support.** `VLOOKUP`, `INDEX/MATCH`, array formulas, and other constructs currently marked unsupported.
+- **Extended formula support.** Approximate lookups, array formulas, dynamic arrays and other constructs currently marked unsupported.
 - **Configurable data minimization.** Allow administrators to set their own policies for what is sent to the LLM.
 - **Batch mode.** Process multiple workbooks in a single run without the Streamlit UI.
 
