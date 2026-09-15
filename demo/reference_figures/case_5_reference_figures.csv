@@ -1,0 +1,21 @@
+account_number,label,amount,debit_credit,ledger_source,evidence_reference
+FML-001,Portfolio claim estimate total,740000,debit,Synthetic formula control extract,Case 5 formula row 1
+FML-002,Absolute net portfolio adjustment,2900,debit,Synthetic formula control extract,Case 5 formula row 2
+FML-003,Whole premium exposure units,12,debit,Synthetic formula control extract,Case 5 formula row 3
+FML-004,Rounded positive reserve adjustment,2501,debit,Synthetic formula control extract,Case 5 formula row 4
+FML-005,Conservative negative adjustment,2500.6,credit,Synthetic formula control extract,Case 5 formula row 5
+FML-006,Truncated negative adjustment,2500.5,credit,Synthetic formula control extract,Case 5 formula row 6
+FML-007,Upper reserve reporting band,2600,debit,Synthetic formula control extract,Case 5 formula row 7
+FML-008,Lower reserve reporting band,2500,debit,Synthetic formula control extract,Case 5 formula row 8
+FML-009,SUMIF product reserve total,310000,debit,Synthetic formula control extract,Case 5 formula row 9
+FML-010,SUMIFS product-region reserve total,200000,debit,Synthetic formula control extract,Case 5 formula row 10
+FML-011,COUNTIF selected product population,3,debit,Synthetic formula control extract,Case 5 formula row 11
+FML-012,COUNTIFS active North population,4,debit,Synthetic formula control extract,Case 5 formula row 12
+FML-013,AVERAGEIF optional Property mean,2500,debit,Synthetic formula control extract,Case 5 formula row 13
+FML-014,AVERAGEIFS active North mean,87500,debit,Synthetic formula control extract,Case 5 formula row 14
+FML-015,MINIFS active claims minimum,70000,debit,Synthetic formula control extract,Case 5 formula row 15
+FML-016,MAXIFS active claims maximum,125000,debit,Synthetic formula control extract,Case 5 formula row 16
+FML-017,IF first active claim,80000,debit,Synthetic formula control extract,Case 5 formula row 17
+FML-018,Exact product risk factor,1.08,debit,Synthetic formula control extract,Case 5 formula row 18
+FML-019,Exact product table position,2,debit,Synthetic formula control extract,Case 5 formula row 19
+FML-020,Nested product risk factor,1.08,debit,Synthetic formula control extract,Case 5 formula row 20

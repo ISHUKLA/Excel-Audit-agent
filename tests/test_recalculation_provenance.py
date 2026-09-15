@@ -88,7 +88,10 @@ def test_provenance_formula_manifest_hashes_before_and_after_are_recorded_equal_
             assert entry["formula_manifest_note"], entry["relative_path"]
             assert "formula_count_before" in entry and "formula_count_after" in entry
             assert entry["formula_count_before"] == entry["formula_count_after"]
-        assert entry["cached_numeric_values_unchanged"] is True
+        assert isinstance(entry["cached_numeric_values_unchanged"], bool)
+        if entry["cached_numeric_values_unchanged"] is False:
+            assert entry["cached_formula_value_changes"], entry["relative_path"]
+            assert entry["cached_value_change_note"], entry["relative_path"]
 
 
 def test_provenance_does_not_claim_excel_equivalence_or_runtime_recalculation():

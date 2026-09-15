@@ -158,9 +158,9 @@ def _run_case4_to_gate3_preview(orchestrator):
 # ---------------------------------------------------------------------------
 
 
-def test_list_cases_returns_four_cases():
+def test_list_cases_returns_six_cases():
     cases = demo_cases.list_cases()
-    assert [c["number"] for c in cases] == [1, 2, 3, 4]
+    assert [c["number"] for c in cases] == [1, 2, 3, 4, 5, 6]
 
 
 def test_every_listed_case_loads():
@@ -176,17 +176,29 @@ def test_every_documented_asset_exists():
         DEMO_DIR / "workbooks" / "case_2_spreadsheet_control_failures.xlsx",
         DEMO_DIR / "workbooks" / "case_3_accounting_reconciliation_failure.xlsx",
         DEMO_DIR / "workbooks" / "case_4_claims_reserve_roll_forward.xlsx",
+        DEMO_DIR / "workbooks" / "case_5_supported_formula_demonstration.xlsx",
+        DEMO_DIR / "workbooks" / "case_6_reserve_stress_business_impact.xlsx",
         DEMO_DIR / "reference_figures" / "case_1_reference_figures.csv",
         DEMO_DIR / "reference_figures" / "case_3_reference_figures.csv",
         DEMO_DIR / "reference_figures" / "case_4_reference_figures.csv",
+        DEMO_DIR / "reference_figures" / "case_5_reference_figures.csv",
+        DEMO_DIR / "reference_figures" / "case_6_reference_figures.csv",
         DEMO_DIR / "recalculation_provenance.json",
         OUTPUT_PACK_DIR / "case_4_claims_reserve_roll_forward.xlsx",
         OUTPUT_PACK_DIR / "case_4_reference_figures.csv",
+        OUTPUT_PACK_DIR / "case_5_supported_formula_demonstration.xlsx",
+        OUTPUT_PACK_DIR / "case_5_reference_figures.csv",
+        OUTPUT_PACK_DIR / "case_6_reserve_stress_business_impact.xlsx",
+        OUTPUT_PACK_DIR / "case_6_reference_figures.csv",
+        OUTPUT_PACK_DIR / "CASE_6_BENCHMARK_REPORT.md",
+        OUTPUT_PACK_DIR / "case_6_summary.json",
         OUTPUT_PACK_DIR / "recalculation_provenance.json",
         EXPECTED_RESULTS_DIR / "case_1_expected.json",
         EXPECTED_RESULTS_DIR / "case_2_expected.json",
         EXPECTED_RESULTS_DIR / "case_3_expected.json",
         EXPECTED_RESULTS_DIR / "case_4_expected.json",
+        EXPECTED_RESULTS_DIR / "case_5_expected.json",
+        EXPECTED_RESULTS_DIR / "case_6_expected.json",
     ):
         assert path.exists(), path
 

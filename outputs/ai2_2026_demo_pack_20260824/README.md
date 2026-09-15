@@ -1,6 +1,6 @@
 # AI² 2026 demonstration workbook guide
 
-This pack contains four entirely synthetic Excel workbooks designed to exercise the Excel Audit Agent's successful, incomplete, externally blocked, and actuarial-to-finance reconciliation paths. No workbook or reference file contains client, policyholder, insurer, ledger, or production data.
+This pack contains six entirely synthetic Excel workbooks designed to exercise the Excel Audit Agent's successful, incomplete, externally blocked, formula-coverage, and actuarial-to-finance reconciliation paths. No workbook or reference file contains client, policyholder, insurer, ledger, or production data.
 
 ## Common application settings
 
@@ -139,6 +139,65 @@ Expected outcomes:
 
 This case is a synthetic workflow demonstration, not IFRS 17 methodology validation.
 
+## Case 5 — Supported formula demonstration
+
+Files:
+
+- `case_5_supported_formula_demonstration.xlsx`
+- `case_5_reference_figures.csv`
+- `case_5_expected.json`
+
+Gate 1 context: Aurora Formula Assurance SA, 2025-Q4, EUR, Synthetic formula control demonstration. Enter and confirm the signed reference control total `1,620,523.06`.
+
+At Gate 2, select every cell in `Outputs!C4:C23`. The 20 rows demonstrate the entire live supported catalogue: `SUM`, `ABS`, `INT`, `ROUND`, `ROUNDUP`, `ROUNDDOWN`, `CEILING`, `FLOOR`, `SUMIF`, `SUMIFS`, `COUNTIF`, `COUNTIFS`, `AVERAGEIF`, `AVERAGEIFS`, `MINIFS`, `MAXIFS`, `IF`, exact `VLOOKUP`, exact `MATCH`, and `INDEX` including nested `INDEX/MATCH`.
+
+Expected outcomes:
+
+- No anomaly findings; all 20 designated outputs reconstruct completely with zero deltas.
+- Every proposed mapping remains unapproved until a human reviews it.
+- Internal verdict `pass`; external verdict `pass` after the 20 mapping approvals.
+- `Scope Boundary!B4:B5` contains unsupported approximate lookup and `OFFSET` examples. If selected separately, they are explicitly `partial` and `incomplete`.
+- PDF available only after the Gate 4 named approval record.
+
+Presentation script: “Case 5 turns the declared formula scope into something a reviewer can see and challenge. Each supported function has a named financial control, an exact expected value and a selectable output cell. The two formulas outside scope remain visibly incomplete, proving that the agent does not turn partial reconstruction into false assurance.”
+
+## Case 6 — Reserve stress and solvency impact
+
+Files:
+
+- `case_6_reserve_stress_business_impact.xlsx`
+- `case_6_reference_figures.csv`
+- `case_6_expected.json`
+- `CASE_6_BENCHMARK_REPORT.md`
+- `case_6_summary.json`
+
+Gate 1 context: Aurora General Insurance SA, 2025-Q4, EUR, Synthetic reserve stress demonstration. Enter and confirm the signed reference control total `52,177,824.82`. At Gate 2, select `Accounting Bridge!C4` and `Accounting Bridge!C5`.
+
+Expected business result:
+
+| Measure | Expected value |
+|---|---:|
+| Formula cells | 8,453 |
+| Baseline technical provisions | EUR 11,411,087.59 |
+| Adverse technical provisions | EUR 13,741,241.69 |
+| Increase in technical provisions | EUR 2,330,154.10 |
+| Reduction in available own funds | EUR 2,330,154.10 |
+| Baseline solvency ratio | 181.68% |
+| Adverse solvency ratio | 175.03% |
+| Deterioration | 6.65 percentage points |
+
+Expected workflow outcomes:
+
+- No anomaly findings; both designated outputs reconstruct completely with zero deltas.
+- Both mappings remain proposals until a human approves them.
+- Internal verdict `pass`; external verdict `pass` after approval.
+- PDF available only after the Gate 4 named approval record.
+- The benchmark's median deterministic runtime was 6.990 seconds with 41.634 MB median peak traced Python memory on the documented machine. It does not establish production scalability.
+
+This is a synthetic, illustrative reserve stress workflow. It is not a full actuarial model, does not implement or validate certified Solvency II or IFRS 17 methodology, and is not production-certified.
+
+Presentation script: “Case 6 is a 300-cohort synthetic working model with 8,453 formulas, not a repeated test grid. Under the adverse assumptions, technical provisions rise by EUR 2.33 million, available own funds fall by the same amount, and the illustrative solvency ratio deteriorates by 6.65 percentage points. Glass Box reconstructs the booked baseline outputs, keeps the accounting comparison separate, and still requires a human to approve both mappings and all four gates.”
+
 ## Expected-result summary
 
 | Case | Findings | Internal result | External result | Intended endpoint |
@@ -147,11 +206,13 @@ This case is a synthetic workflow demonstration, not IFRS 17 methodology validat
 | 2 — Controls | blocker + warnings | incomplete | not performed | explicit incomplete acknowledgement; findings remain recorded |
 | 3 — Accounts | none | pass | block | Gate 3 stops the pipeline |
 | 4 — Reserve roll-forward | none | pass | pass after mapping approval | PDF after Gate 4 |
+| 5 — Formula catalogue | none | pass | pass after mapping approval | PDF after Gate 4 |
+| 6 — Reserve stress | none | pass | pass after mapping approval | PDF after Gate 4 |
 
 These are demonstration expectations for known synthetic inputs, not evidence that the tool validates an actuarial methodology or is production-certified.
 
 ## Calculation-freshness provenance
 
-The four workbooks in this pack were recalculated once, at build time, using LibreOffice 26.2.5.2 (build cd7284b4cbbfeb507e630c1aac019f4157393acb), so their workbook calc mode is genuinely declared `automatic` rather than left as `unknown`. Every cached numeric value and the set of formula-bearing cells are identical before and after; the only textual changes were LibreOffice's own writer normalizing formula syntax (dropping unnecessary quotes around unquoted-safe sheet names, collapsing a single-cell range to a bare reference, and writing `FALSE()` instead of bare `FALSE`) — none of which change any computed value or the intentional defects in Case 2 or Case 3. Full before/after hashes are recorded in [`recalculation_provenance.json`](recalculation_provenance.json), byte-identical to `demo/recalculation_provenance.json` in the source repository, and each workbook here is byte-identical to its canonical counterpart under `demo/workbooks/`.
+All six workbooks in this pack were recalculated once at build time using the LibreOffice engine recorded per file in [`recalculation_provenance.json`](recalculation_provenance.json). Cases 5 and 6 were recalculated with LibreOfficeDev 26.8.0.0.alpha0; Microsoft Excel compatibility was not tested. The provenance file records before-and-after workbook hashes, formula-manifest hashes, formula counts, verified values and byte-equality checks against the canonical copies under `demo/workbooks/`.
 
 This was a one-time, manual, build-time fixture-generation step, not a capability of the running application: the application never invokes LibreOffice, Microsoft Excel, or any recalculation engine, and an arbitrary workbook a reviewer uploads is never recalculated by it. A cell not flagged stale in this prototype means only that no known staleness indicator was detected under these rules — it is not proof that the workbook was freshly recalculated in Excel, or by any particular engine, at any particular time.

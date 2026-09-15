@@ -1,0 +1,125 @@
+{
+  "schema_version": 1,
+  "case_number": 6,
+  "case_title": "Reserve stress and solvency impact",
+  "synthetic_data": true,
+  "seed": 20260924,
+  "cohort_count": 300,
+  "gate1_context": {
+    "entity": "Aurora General Insurance SA",
+    "period": "2025-Q4",
+    "currency": "EUR",
+    "basis": "Synthetic reserve stress demonstration"
+  },
+  "authoritative_output_cells": [
+    "Accounting Bridge!C4",
+    "Accounting Bridge!C5"
+  ],
+  "business_impact": {
+    "baseline_technical_provisions": {
+      "cell": "Impact Summary!B5",
+      "expected_value": 11411087.59
+    },
+    "adverse_technical_provisions": {
+      "cell": "Impact Summary!B6",
+      "expected_value": 13741241.69
+    },
+    "technical_provisions_increase": {
+      "cell": "Impact Summary!B7",
+      "expected_value": 2330154.1
+    },
+    "baseline_available_own_funds": {
+      "cell": "Impact Summary!B8",
+      "expected_value": 63588912.41
+    },
+    "adverse_available_own_funds": {
+      "cell": "Impact Summary!B9",
+      "expected_value": 61258758.31
+    },
+    "available_own_funds_reduction": {
+      "cell": "Impact Summary!B10",
+      "expected_value": 2330154.1
+    },
+    "solvency_capital_requirement": {
+      "cell": "Impact Summary!B11",
+      "expected_value": 35000000
+    },
+    "baseline_solvency_ratio": {
+      "cell": "Impact Summary!B12",
+      "expected_value": 1.8168
+    },
+    "adverse_solvency_ratio": {
+      "cell": "Impact Summary!B13",
+      "expected_value": 1.7503
+    },
+    "solvency_ratio_deterioration": {
+      "cell": "Impact Summary!B14",
+      "expected_value": 0.0665
+    }
+  },
+  "expected_finding_count": 0,
+  "minimum_formula_cell_count": 3000,
+  "expected_internal_verdict": "pass",
+  "expected_external_verdict": "pass",
+  "required_gate_order": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "pdf_available_after_gate4": true,
+  "limitation": "Synthetic workflow demonstration only; not certified Solvency II or IFRS 17 methodology.",
+  "reference_control_total": 52177824.82,
+  "workbook_path": "demo/workbooks/case_6_reserve_stress_business_impact.xlsx",
+  "reference_csv_path": "demo/reference_figures/case_6_reference_figures.csv",
+  "sha256": "a5b61367e136d5eddeff2eedd766845636406f54a4c9c696fc05145baa84a58c",
+  "recalculation_engine": "LibreOffice",
+  "engine_version": "LibreOfficeDev 26.8.0.0.alpha0 2c87e51eeaa2b413ff4ae097b2705eea1995d8e5",
+  "microsoft_excel_tested": false,
+  "formula_cell_count": 8453,
+  "formula_count_by_function": {
+    "ABS": 300,
+    "AVERAGEIF": 3,
+    "AVERAGEIFS": 3,
+    "CEILING": 600,
+    "COUNTIF": 3,
+    "COUNTIFS": 3,
+    "FLOOR": 600,
+    "IF": 1200,
+    "INDEX": 300,
+    "INT": 600,
+    "MATCH": 300,
+    "MAXIFS": 3,
+    "MINIFS": 3,
+    "ROUND": 3011,
+    "ROUNDDOWN": 600,
+    "ROUNDUP": 600,
+    "SUM": 1208,
+    "SUMIF": 3,
+    "SUMIFS": 3,
+    "VLOOKUP": 300
+  },
+  "supported_functions": [
+    "ABS",
+    "AVERAGEIF",
+    "AVERAGEIFS",
+    "CEILING",
+    "COUNTIF",
+    "COUNTIFS",
+    "FLOOR",
+    "IF",
+    "INDEX",
+    "INT",
+    "MATCH",
+    "MAXIFS",
+    "MINIFS",
+    "ROUND",
+    "ROUNDDOWN",
+    "ROUNDUP",
+    "SUM",
+    "SUMIF",
+    "SUMIFS",
+    "VLOOKUP"
+  ],
+  "generated_at": "2026-09-15T04:59:50.103358+00:00"
+}

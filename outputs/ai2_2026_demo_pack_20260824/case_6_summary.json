@@ -1,0 +1,114 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-09-15T05:03:34.911850+00:00",
+  "warm_up_runs": 1,
+  "measured_runs": 5,
+  "workbook": {
+    "path": "demo/workbooks/case_6_reserve_stress_business_impact.xlsx",
+    "file_size_bytes": 141179,
+    "tab_count": 9,
+    "populated_cell_count": 11792,
+    "formula_cell_count": 8453,
+    "dependency_edges": 45402
+  },
+  "metrics": {
+    "parse_seconds": {
+      "median": 2.9248184610623866,
+      "highest": 3.0104876048862934
+    },
+    "anomaly_detection_seconds": {
+      "median": 1.2694643288850784,
+      "highest": 1.389870161889121
+    },
+    "reconciliation_seconds": {
+      "median": 2.8143993811681867,
+      "highest": 2.923192271962762
+    },
+    "total_seconds": {
+      "median": 6.989842723822221,
+      "highest": 7.157660343917087
+    },
+    "peak_traced_memory_mb": {
+      "median": 41.634100914001465,
+      "highest": 46.07724094390869
+    }
+  },
+  "observed": {
+    "finding_count": 0,
+    "internal_lines": 2,
+    "external_lines": 2,
+    "internal_complete": true,
+    "internal_preview_verdicts": [
+      "pass",
+      "pass"
+    ],
+    "external_preview_verdicts": [
+      "pass",
+      "pass"
+    ],
+    "mappings_all_unapproved": true,
+    "unmatched_reference_items": [],
+    "unmapped_python_outputs": [],
+    "signed_reference_values": [
+      -11411087.59,
+      63588912.41
+    ]
+  },
+  "business_impact": {
+    "baseline_technical_provisions": {
+      "cell": "Impact Summary!B5",
+      "expected_value": 11411087.59
+    },
+    "adverse_technical_provisions": {
+      "cell": "Impact Summary!B6",
+      "expected_value": 13741241.69
+    },
+    "technical_provisions_increase": {
+      "cell": "Impact Summary!B7",
+      "expected_value": 2330154.1
+    },
+    "baseline_available_own_funds": {
+      "cell": "Impact Summary!B8",
+      "expected_value": 63588912.41
+    },
+    "adverse_available_own_funds": {
+      "cell": "Impact Summary!B9",
+      "expected_value": 61258758.31
+    },
+    "available_own_funds_reduction": {
+      "cell": "Impact Summary!B10",
+      "expected_value": 2330154.1
+    },
+    "solvency_capital_requirement": {
+      "cell": "Impact Summary!B11",
+      "expected_value": 35000000
+    },
+    "baseline_solvency_ratio": {
+      "cell": "Impact Summary!B12",
+      "expected_value": 1.8168
+    },
+    "adverse_solvency_ratio": {
+      "cell": "Impact Summary!B13",
+      "expected_value": 1.7503
+    },
+    "solvency_ratio_deterioration": {
+      "cell": "Impact Summary!B14",
+      "expected_value": 0.0665
+    }
+  },
+  "environment": {
+    "python_version": "3.12.11",
+    "operating_system": "macOS-26.6.2-x86_64-i386-64bit",
+    "cpu_model": "Intel(R) Core(TM) i5-1038NG7 CPU @ 2.00GHz",
+    "cpu_core_count": 8,
+    "available_ram_gb": 16.0
+  },
+  "limitations": [
+    "The workbook and accounting extract are entirely synthetic.",
+    "The calculation is an illustrative reserve stress, not certified Solvency II or IFRS 17 methodology.",
+    "Only this workbook size and structure were measured; production scalability is not established.",
+    "Microsoft Excel compatibility was not tested; the committed file was recalculated with LibreOffice.",
+    "Peak memory is Python tracemalloc output, not total process resident memory.",
+    "Streamlit, PDF rendering, durable gate snapshots, concurrent users and LLM latency are excluded."
+  ]
+}

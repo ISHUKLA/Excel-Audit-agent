@@ -112,7 +112,7 @@ A matched VLOOKUP/INDEX cell that holds text, rather than a number, is also repo
    Open `http://localhost:8501`. Setting `ANTHROPIC_API_KEY` is **optional** — only needed if you choose Agent 4's AI documentation at Gate 3; the full deterministic pipeline runs without it.
 
 2. **Load a demonstration case (optional).**
-   On Screen 1, expand "📚 Load a demonstration case" and select **Case 4** (claims reserve roll-forward — the principal competition demonstration; see "Four Demonstration Cases" below). The UI fills with synthetic data — entity, period, currency, and reference figures. If you had already uploaded a file before loading the case, the upload stays active; the "Workbook identity" panel's **Active source** line always tells you which one (upload or demo case) is actually about to be audited.
+   On Screen 1, expand "📚 Load a demonstration case" and select **Case 4** (claims reserve roll-forward — the principal competition demonstration; see "Six Demonstration Cases" below). The UI fills with synthetic data — entity, period, currency, and reference figures. If you had already uploaded a file before loading the case, the upload stays active; the "Workbook identity" panel's **Active source** line always tells you which one (upload or demo case) is actually about to be audited.
 
 3. **Confirm context (Gate 1).**
    Review the displayed context summary and the workbook identity panel (filename, size, SHA-256, active source). Under "Add reference figures", if you're following Case 4, set the **"Signed net control total"** to `-1400000` and check "I confirm this extract ties to the control total above" — this field has no default and, left unset or wrong, blocks Gate 3 with a discrepancy even when every individual line reconciles. Check the checkbox "I confirm that the workbook and reference-figure context shown above is accurate." Click "Start audit". The parser runs; findings appear on the next screen.
@@ -131,7 +131,7 @@ A matched VLOOKUP/INDEX cell that holds text, rather than a number, is also repo
 
 ---
 
-## Four Demonstration Cases
+## Six Demonstration Cases
 
 All demonstration workbooks are entirely synthetic. No real client, policyholder, insurer, ledger, or production data is included.
 
@@ -154,6 +154,17 @@ All demonstration workbooks are entirely synthetic. No real client, policyholder
 - File: `demo/workbooks/case_4_claims_reserve_roll_forward.xlsx`
 - Reference figures: `demo/reference_figures/case_4_reference_figures.csv`
 - What it shows: An actuarial claims-reserve movement (opening reserve, incurred claims, paid claims, assumption strengthening, FX) rolled forward to a closing reserve, then bridged to a signed general-ledger credit balance at `Controls!B4`. The reserve magnitude is always non-negative; the credit orientation carries the sign, so `Controls!B4` is `-1,400,000` against a workbook closing reserve of `+1,400,000`. Internal verdict: pass. Proposed mapping requires explicit human approval before the external verdict can be `pass`. AI documentation is optional here, not mandatory. This is a synthetic workflow demonstration, not IFRS 17 methodology validation, and reproducing this result is not a claim of actuarial methodology validation.
+
+**Case 5: Supported formula demonstration**
+- File: `demo/workbooks/case_5_supported_formula_demonstration.xlsx`
+- Reference figures: `demo/reference_figures/case_5_reference_figures.csv`
+- What it shows: A user-facing workbook with one designated output for every function in the live 20-function catalogue. All 20 supported outputs reconstruct completely and reconcile after the human approves each proposed mapping. A separate scope-boundary tab proves that approximate lookup and `OFFSET` remain explicitly partial and incomplete.
+
+**Case 6: Reserve stress and solvency impact**
+- File: `demo/workbooks/case_6_reserve_stress_business_impact.xlsx`
+- Reference figures: `demo/reference_figures/case_6_reference_figures.csv`
+- Benchmark: `benchmark/CASE_6_BENCHMARK_REPORT.md`
+- What it shows: A 300-cohort, 8,453-formula baseline-versus-adverse reserve stress. Technical provisions increase by EUR 2,330,154.10, synthetic available own funds fall by the same amount, and the illustrative solvency ratio falls from 181.68% to 175.03%. The workbook is not a full actuarial model and does not implement or validate certified Solvency II or IFRS 17 methodology.
 
 ---
 
@@ -251,14 +262,16 @@ This table makes explicit where the AI is involved and where the decisions are e
 
 **Status:** Synthetic test cases and a reproducible large-workbook benchmark are included. No result in this repository is evidence about real customer workbooks or multi-user production load.
 
-The four demonstration cases (Cases 1–4, see above) are small, well-understood workbooks designed to exercise the full pipeline's distinct paths:
+The six demonstration cases above are well-understood synthetic workbooks designed to exercise the full pipeline's distinct paths:
 
 - **Case 1 (clean):** no findings; internal and external reconciliation pass after mapping approval.
 - **Case 2 (control failures):** three findings and an incomplete reconstruction caused by an unsupported approximate lookup.
 - **Case 3 (accounts mismatch):** internal reconstruction passes while a currency mismatch blocks external reconciliation.
 - **Case 4 (reserve roll-forward):** a signed general-ledger bridge that passes after mapping approval.
+- **Case 5 (formula catalogue):** all 20 supported functions in a user-facing, fully reconciled workbook, plus explicit unsupported boundaries.
+- **Case 6 (reserve stress):** a realistically sized synthetic calculation that quantifies reserve, own-funds and solvency-ratio impact.
 
-The formula qualification workbook under `tests/fixtures/` exercises all 20 supported functions against independently specified expected values. A separate synthetic IFRS 17-related fixture contains 10,847 formula cells and uses every supported function within its calculation flow. Reproduce the measured parser, detector and reconstruction timings with `python scripts/benchmark.py`; the recorded environment and limitations are in `benchmark/BENCHMARK_REPORT.md`.
+The formula qualification workbook under `tests/fixtures/` remains the test-only acceptance fixture. Case 5 makes the same declared function scope understandable and runnable through the actual user journey. A separate synthetic IFRS 17-related test fixture contains 10,847 formula cells, while the user-facing Case 6 contains 8,453 formula cells and an explicit business-impact bridge. Reproduce the established fixture benchmark with `python scripts/benchmark.py`; reproduce the Case 6 benchmark with `python scripts/benchmark_demo_case_6.py --runs 5`. The recorded environments and limitations are in `benchmark/BENCHMARK_REPORT.md` and `benchmark/CASE_6_BENCHMARK_REPORT.md`.
 
 **Production scale:** Not established. One synthetic workbook with more than 10,000 formula cells has been measured, but real workbooks of varying size and complexity, concurrent users and hosted workloads remain untested.
 
@@ -271,6 +284,7 @@ The [validation report](validation/VALIDATION_REPORT.md) brings together the acc
 - `tests/fixtures/qualification_manifest.json` binds the recalculated formula fixture to its LibreOffice version, SHA-256 and cell-level formula manifest.
 - `tests/fixtures/ifrs17_manifest.json` records the large fixture's seed, scale, function inventory, authoritative outputs and recalculation provenance.
 - `benchmark/BENCHMARK_REPORT.md`, `benchmark/summary.csv` and the five raw JSON files under `benchmark/runs/` preserve the measured evidence without imposing timing thresholds on CI.
+- `benchmark/CASE_6_BENCHMARK_REPORT.md` and `benchmark/case_6_summary.json` record the separate user-facing Case 6 timing, memory, formula-volume and business-impact evidence.
 - `tests/test_evidence_integrity.py` blocks function-catalogue, README, demo-contract and acceptance-coverage drift.
 
 All files contain synthetic data. This evidence qualifies the declared reconstruction scope only. It does not establish Microsoft Excel equivalence, production readiness, IFRS 17 methodology validation or an audit opinion.
@@ -390,7 +404,7 @@ the full disclosure text shown at Gate 3.
 
 **Competition demonstrations use synthetic data only.** Real or sensitive company data is outside
 this prototype's approved use unless separately authorised and governed — the demo cases shipped
-with this repo are entirely fictional (see "Four Demonstration Cases" above).
+with this repo are entirely fictional (see "Six Demonstration Cases" above).
 
 ### What Stays Local
 

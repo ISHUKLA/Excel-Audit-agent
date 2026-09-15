@@ -1,10 +1,10 @@
 {
-  "generated_at": "2026-08-27T20:10:25Z",
+  "generated_at": "2026-09-15T05:24:05.099484+00:00",
   "purpose": "One-time, build-time recalculation of synthetic test fixtures and competition demonstration workbooks, so their workbook calc mode can be genuinely and accurately declared 'automatic' (with fullCalcOnLoad set) rather than left as 'unknown'. This is a fixture-generation activity performed on repository-controlled synthetic files; it is not part of the running application and is not invoked by the automated test suite.",
   "engine_family": "libreoffice",
-  "engine_version": "26.2.5.2 (build cd7284b4cbbfeb507e630c1aac019f4157393acb)",
-  "executable_path": "/usr/local/bin/soffice",
-  "operating_system": "Darwin 25.6.0 (macOS)",
+  "engine_version": "LibreOfficeDev 26.8.0.0.alpha0 2c87e51eeaa2b413ff4ae097b2705eea1995d8e5",
+  "executable_path": "/Users/coralieroland/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override/soffice",
+  "operating_system": "macOS-26.6.2-x86_64-i386-64bit",
   "architecture": "x86_64",
   "all_files_synthetic": true,
   "workbooks": [
@@ -126,6 +126,94 @@
         "Controls!B5": 150000.0
       },
       "verification_result": "pass"
+    },
+    {
+      "relative_path": "demo/workbooks/case_6_reserve_stress_business_impact.xlsx",
+      "pre_recalculation_sha256": "1dac5df04f9ccac0f641ca7d31bd179271840256735667841bc0770720985844",
+      "post_recalculation_sha256": "a5b61367e136d5eddeff2eedd766845636406f54a4c9c696fc05145baa84a58c",
+      "formula_manifest_sha256_before": "9837676336d9f09d12d7b2383df2d2cabba31011c36fd975ffcbddf91abac224",
+      "formula_manifest_sha256_after": "9837676336d9f09d12d7b2383df2d2cabba31011c36fd975ffcbddf91abac224",
+      "formula_manifest_note": "LibreOffice may normalize formula syntax while preserving the formula targets and independently verified cached numeric results.",
+      "calculation_mode_after": "automatic",
+      "formula_count_before": 8453,
+      "formula_count_after": 8453,
+      "tab_names_unchanged": true,
+      "named_ranges_unchanged": true,
+      "has_vba_unchanged": true,
+      "external_links_unchanged": true,
+      "cached_numeric_values_unchanged": true,
+      "cached_value_comparison_tolerance": 1e-08,
+      "cached_formula_value_changes": [],
+      "cached_value_change_note": null,
+      "expected_values_verified": {
+        "Impact Summary!B5": 11411087.59,
+        "Impact Summary!B6": 13741241.69,
+        "Impact Summary!B7": 2330154.1,
+        "Impact Summary!B8": 63588912.41,
+        "Impact Summary!B9": 61258758.31,
+        "Impact Summary!B10": 2330154.1,
+        "Impact Summary!B11": 35000000,
+        "Impact Summary!B12": 1.8168,
+        "Impact Summary!B13": 1.7503,
+        "Impact Summary!B14": 0.0665
+      },
+      "authoring_tool": "@oai/artifact-tool 2.8.59",
+      "recalculation_engine": "LibreOffice",
+      "engine_version": "LibreOfficeDev 26.8.0.0.alpha0 2c87e51eeaa2b413ff4ae097b2705eea1995d8e5",
+      "microsoft_excel_tested": false,
+      "verification_result": "pass"
+    },
+    {
+      "relative_path": "demo/workbooks/case_5_supported_formula_demonstration.xlsx",
+      "pre_recalculation_sha256": "a5866007117a7acf77fa944a9a16ace20ee97ae68336b3e80da25755054d45cc",
+      "post_recalculation_sha256": "7e8dcb557a69a433aad2c601b67bfc8a7470a7878c11ec2b24d4abfed174a32c",
+      "formula_manifest_sha256_before": "658705720c6e8675c51a9eb53750787748df42a9bcc7ebc76f512ffd9721122f",
+      "formula_manifest_sha256_after": "658705720c6e8675c51a9eb53750787748df42a9bcc7ebc76f512ffd9721122f",
+      "formula_manifest_note": "LibreOffice may normalize formula syntax while preserving the formula targets and independently verified cached numeric results.",
+      "calculation_mode_after": "automatic",
+      "formula_count_before": 44,
+      "formula_count_after": 44,
+      "tab_names_unchanged": true,
+      "named_ranges_unchanged": true,
+      "has_vba_unchanged": true,
+      "external_links_unchanged": true,
+      "cached_numeric_values_unchanged": false,
+      "cached_value_comparison_tolerance": 1e-08,
+      "cached_formula_value_changes": [
+        {
+          "cell_ref": "Scope Boundary!B5",
+          "before": "OFFSET is not implemented. reference=80000, rows=1, cols=0, height=undefined, width=undefined",
+          "after": 110000
+        }
+      ],
+      "cached_value_change_note": "Artifact Tool could not evaluate the deliberately unsupported OFFSET formula before native recalculation and stored diagnostic text; LibreOffice supplied its numeric cache. The production reconstruction still classifies that formula as partial and incomplete. Every supported designated output was unchanged.",
+      "expected_values_verified": {
+        "Outputs!C4": 740000,
+        "Outputs!C5": 2900,
+        "Outputs!C6": 12,
+        "Outputs!C7": 2501,
+        "Outputs!C8": -2500.6,
+        "Outputs!C9": -2500.5,
+        "Outputs!C10": 2600,
+        "Outputs!C11": 2500,
+        "Outputs!C12": 310000,
+        "Outputs!C13": 200000,
+        "Outputs!C14": 3,
+        "Outputs!C15": 4,
+        "Outputs!C16": 2500,
+        "Outputs!C17": 87500,
+        "Outputs!C18": 70000,
+        "Outputs!C19": 125000,
+        "Outputs!C20": 80000,
+        "Outputs!C21": 1.08,
+        "Outputs!C22": 2,
+        "Outputs!C23": 1.08
+      },
+      "authoring_tool": "@oai/artifact-tool 2.8.59",
+      "recalculation_engine": "LibreOffice",
+      "engine_version": "LibreOfficeDev 26.8.0.0.alpha0 2c87e51eeaa2b413ff4ae097b2705eea1995d8e5",
+      "microsoft_excel_tested": false,
+      "verification_result": "pass"
     }
   ],
   "output_pack_copy_verification": [
@@ -156,11 +244,25 @@
       "canonical_sha256": "8275e543b83874d6efa5cfad2cbefe90415a7279ddc96b5ea158cd1be2513c21",
       "output_pack_sha256": "8275e543b83874d6efa5cfad2cbefe90415a7279ddc96b5ea158cd1be2513c21",
       "hashes_match": true
+    },
+    {
+      "canonical_path": "demo/workbooks/case_6_reserve_stress_business_impact.xlsx",
+      "output_pack_path": "outputs/ai2_2026_demo_pack_20260824/case_6_reserve_stress_business_impact.xlsx",
+      "canonical_sha256": "a5b61367e136d5eddeff2eedd766845636406f54a4c9c696fc05145baa84a58c",
+      "output_pack_sha256": "a5b61367e136d5eddeff2eedd766845636406f54a4c9c696fc05145baa84a58c",
+      "hashes_match": true
+    },
+    {
+      "canonical_path": "demo/workbooks/case_5_supported_formula_demonstration.xlsx",
+      "output_pack_path": "outputs/ai2_2026_demo_pack_20260824/case_5_supported_formula_demonstration.xlsx",
+      "canonical_sha256": "7e8dcb557a69a433aad2c601b67bfc8a7470a7878c11ec2b24d4abfed174a32c",
+      "output_pack_sha256": "7e8dcb557a69a433aad2c601b67bfc8a7470a7878c11ec2b24d4abfed174a32c",
+      "hashes_match": true
     }
   ],
   "limitations": [
     "Build-time fixture generation only \u2014 the running application never invokes LibreOffice, Microsoft Excel, or any recalculation engine at runtime.",
-    "Not proof of Microsoft Excel-semantic equivalence \u2014 LibreOffice's formula engine and writer are not guaranteed byte-identical to Excel's; equivalence here is evidenced by identical cached numeric values before and after, not by an Excel comparison.",
+    "Not proof of Microsoft Excel-semantic equivalence \u2014 LibreOffice's formula engine and writer are not guaranteed byte-identical to Excel's; per-file cache changes and independently verified expected outputs are recorded above, not presented as an Excel comparison.",
     "Not approval for real or sensitive data \u2014 this process was authorised only for the synthetic, repository-controlled files listed above.",
     "Arbitrary workbooks uploaded to the running application are never recalculated by it; automatic calc mode on an uploaded workbook means only that the workbook's own cached values are not flagged stale under this prototype's rules \u2014 it does not prove when, how, or with which engine that workbook was actually last calculated."
   ]
