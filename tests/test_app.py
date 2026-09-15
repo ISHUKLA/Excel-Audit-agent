@@ -572,6 +572,62 @@ def test_loading_case_4_displays_its_identity_and_correct_hash():
     assert expected_hash in code_values
 
 
+def test_demo_selector_lists_cases_7a_through_11_in_order():
+    app = _initial_app()
+    selector = next(s for s in app.selectbox if s.key == "demo_case_selector")
+
+    competition_labels = [
+        label
+        for label in selector.options
+        if label.startswith(("Case 7", "Case 8", "Case 9", "Case 10", "Case 11"))
+    ]
+    assert competition_labels == [
+        "Case 7a: Clean IFRS 17 Cohort (pass)",
+        "Case 7b: Missing IFRS 17 Cohort (block)",
+        "Case 8: Solvency II Capital Decision (block)",
+        "Case 9: Life Pricing Incomplete Reconstruction (incomplete)",
+        "Case 10: Wrong Accounting Context (block)",
+        "Case 11: Independent Challenge (protocol only)",
+    ]
+
+
+def test_loading_case_10_seeds_distinct_workbook_and_reference_contexts():
+    from demo_cases import load_case
+
+    expected = load_case(10)
+    app = _initial_app()
+    selector = next(s for s in app.selectbox if s.key == "demo_case_selector")
+    case10_index = next(
+        i for i, label in enumerate(selector.options) if label.startswith("Case 10:")
+    )
+    app = selector.set_value(case10_index).run(timeout=20)
+    load_button = next(b for b in app.button if b.label == "Load case")
+    app = load_button.click().run(timeout=20)
+
+    assert not app.exception
+    assert app.session_state["demo_workbook_bytes"] == expected["workbook_bytes"]
+    assert app.session_state["file_entity"] == "Glass Box Life Belgium SA"
+    assert app.session_state["file_currency"] == "EUR"
+    assert app.session_state["ref_entity"] == "Glass Box Life UK Ltd"
+    assert app.session_state["ref_period"] == "30 September 2025"
+    assert app.session_state["ref_currency"] == "GBP"
+
+
+def test_selecting_case_11_explains_protocol_only_state_without_load_button():
+    app = _initial_app()
+    selector = next(s for s in app.selectbox if s.key == "demo_case_selector")
+    case11_index = next(
+        i for i, label in enumerate(selector.options) if label.startswith("Case 11:")
+    )
+    app = selector.set_value(case11_index).run(timeout=20)
+
+    assert not app.exception
+    assert not any(button.label == "Load case" for button in app.button)
+    messages = " ".join(message.value for message in app.info)
+    assert "protocol" in messages.lower()
+    assert "does not replace or load an active source" in messages
+
+
 def test_displayed_hash_equals_hash_passed_to_file_context():
     """Requirement 2: the hash bound into FileContext must be the exact
     value returned by _workbook_identity_panel, never recomputed later."""

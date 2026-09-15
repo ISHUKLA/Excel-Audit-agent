@@ -1,0 +1,67 @@
+[
+  {
+    "cell_ref": "Reserve Calculation!D4",
+    "formula": "=B4+C4",
+    "functions": [],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Reserve Calculation!D5",
+    "formula": "=B5+C5",
+    "functions": [],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Reserve Calculation!D6",
+    "formula": "=B6+C6",
+    "functions": [],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Reserve Calculation!D7",
+    "formula": "=B7+C7",
+    "functions": [],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Reserve Calculation!D9",
+    "formula": "=SUM(D4:D7)",
+    "functions": [
+      "SUM"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Accounting Bridge!B4",
+    "formula": "='Reserve Calculation'!D4",
+    "functions": [],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Accounting Bridge!B5",
+    "formula": "='Reserve Calculation'!D5",
+    "functions": [],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Accounting Bridge!B6",
+    "formula": "='Reserve Calculation'!D6",
+    "functions": [],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Accounting Bridge!B7",
+    "formula": "='Reserve Calculation'!D7",
+    "functions": [],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  }
+]

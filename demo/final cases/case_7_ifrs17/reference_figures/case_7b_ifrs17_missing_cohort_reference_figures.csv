@@ -1,0 +1,2 @@
+account_number,label,amount,debit_credit,ledger_source,evidence_reference
+LRC-IFRS17,Closing liability,128400000,credit,Synthetic IFRS 17 accounting extract,Case 7b authoritative accounting row

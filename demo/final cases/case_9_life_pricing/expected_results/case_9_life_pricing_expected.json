@@ -1,0 +1,106 @@
+{
+  "gate1_context": {
+    "entity": "Glass Box Life Belgium SA",
+    "period": "31 December 2025",
+    "currency": "EUR",
+    "basis": "Synthetic life-pricing demonstration"
+  },
+  "authoritative_output_cells": [
+    "Profitability Summary!B8"
+  ],
+  "summary_outputs": {
+    "opening_premium_volume": {
+      "cell": "Policy Projection!B4",
+      "expected_value": 120000000
+    },
+    "included_projected_premium": {
+      "cell": "Profitability Summary!B9",
+      "expected_value": 565063897
+    },
+    "included_projection_periods": {
+      "cell": "Profitability Summary!B10",
+      "expected_value": 5
+    },
+    "present_value_margin": {
+      "cell": "Profitability Summary!B5",
+      "expected_value": 4600000,
+      "tolerance": 0.01,
+      "expected_completeness": "partial",
+      "unsupported_functions": [
+        "SUMPRODUCT"
+      ]
+    },
+    "internal_rate_of_return": {
+      "cell": "Profitability Summary!B6",
+      "expected_value": 0.097825786,
+      "tolerance": 1e-08,
+      "expected_completeness": "partial",
+      "unsupported_functions": [
+        "IRR"
+      ]
+    },
+    "designated_profitability_result": {
+      "cell": "Profitability Summary!B8",
+      "expected_value": 4600000,
+      "tolerance": 0.01,
+      "expected_completeness": "partial",
+      "unsupported_functions": [
+        "IRR",
+        "SUMPRODUCT"
+      ]
+    },
+    "independent_pricing_result": {
+      "cell": "Independent Pricing Reference!B4",
+      "expected_value": -4800000
+    },
+    "illustrative_economic_swing": {
+      "cell": "Independent Pricing Reference!B5",
+      "expected_value": 9400000,
+      "tolerance": 0.01,
+      "expected_completeness": "partial",
+      "unsupported_functions": [
+        "SUMPRODUCT"
+      ]
+    }
+  },
+  "expected_finding": {
+    "category": "hardcoded_numeric_assumption",
+    "formula_cell": "Policy Projection!C4",
+    "literal": "0.03"
+  },
+  "unsupported_formulas": [
+    "SUMPRODUCT",
+    "IRR"
+  ],
+  "approved_lapse": 0.06,
+  "embedded_lapse": 0.03,
+  "independent_result_is_context_only": true,
+  "expected_internal_verdict": "incomplete",
+  "expected_external_verdict": "not_performed",
+  "expected_gate_block": 3,
+  "pdf_available_after_gate4": false,
+  "schema_version": 1,
+  "case_id": "case_9_life_pricing",
+  "case_version": "1.0.0",
+  "synthetic_data": true,
+  "workbook_file": "demo/final cases/case_9_life_pricing/workbooks/case_9_life_pricing_incomplete.xlsx",
+  "workbook_sha256": "0340226f517ebf39abffa94250f778ba61e8c70735236af5845d68d776ada217",
+  "reference_file": null,
+  "reference_sha256": null,
+  "reference_control_total": null,
+  "formula_inventory_file": "demo/final cases/case_9_life_pricing/formula_inventories/case_9_life_pricing_formula_inventory.json",
+  "formula_cell_count": 53,
+  "supported_formula_count": 51,
+  "unsupported_formula_count": 2,
+  "observed_findings": [
+    {
+      "finding_id": "F0001",
+      "severity": "warning",
+      "cell_ref": "Policy Projection!C4",
+      "description": "Hardcoded literal 0.03 embedded in formula",
+      "raw_value": "=IF(B4>0,0.03,0)"
+    }
+  ],
+  "tool_git_commit": "e6c7f1f9387a4e882f433615c31ca9fc4aa00927",
+  "tool_worktree_dirty_at_generation": true
+}

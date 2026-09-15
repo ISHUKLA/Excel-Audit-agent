@@ -1,0 +1,98 @@
+schema_version: 1
+challenge:
+  challenge_id: FILL_ME
+  created_at_utc: "YYYY-MM-DDTHH:MM:SSZ"
+  author:
+    role: "actuary | accountant | model reviewer"
+    organisation_or_independent_capacity: FILL_ME
+    independence_statement: "Describe why the author is independent of the developer."
+  data_status: "synthetic | carefully anonymised and authorised"
+  business_process: FILL_ME
+
+workbook_context:
+  entity: FILL_ME
+  period: FILL_ME
+  currency: FILL_ME
+  basis: FILL_ME
+
+sealed_identity:
+  workbook_sha256: FILL_AFTER_CUSTODIAN_HASHES_EXACT_BYTES
+  expected_results_sha256: COMPANION_SEAL_MANIFEST
+  expected_results_hash_note: >-
+    The actual SHA-256 is stored in the immutable companion seal. It cannot be
+    embedded here because changing this file to insert its own hash would change
+    the hash.
+  companion_seal_file: challenge_seal.json
+
+frozen_tool:
+  git_commit: FILL_ME
+  release_tag: FILL_ME
+  tool_version_record: tool_version.json
+
+authoritative_outputs:
+  # Repeat for two to five genuine monetary outputs.
+  - cell: "Sheet Name!B10"
+    label: FILL_ME
+    expected_cached_value: 0.0
+    expected_python_value: 0.0  # null when reconstruction is expected to be partial
+    expected_completeness: "complete | partial"
+  - cell: "Sheet Name!B11"
+    label: FILL_ME
+    expected_cached_value: 0.0
+    expected_python_value: 0.0
+    expected_completeness: "complete | partial"
+
+planted_issues:
+  - issue_id: ISSUE-001
+    description: FILL_ME
+    location: "Sheet Name!A1"
+    inside_published_scope: true
+    expected_severity: "blocker | warning | info"
+    expected_behaviour: "finding | incomplete reconstruction | context block | population gap"
+    quantified_consequence:
+      amount: 0.0
+      currency_or_unit: FILL_ME
+      management_effect: FILL_ME
+
+unsupported_formulas:
+  - location: "Sheet Name!A1"
+    function_or_construct: FILL_ME
+    expected_behaviour: "retained verbatim; dependent chain partial; no Python target invented"
+
+legitimate_unusual_patterns:
+  - pattern_id: LEGIT-001
+    description: FILL_ME
+    location: "Sheet Name!A1"
+    expected_behaviour: "no finding"
+
+accounting_context:
+  performed: true
+  source_label: FILL_ME
+  entity: FILL_ME
+  period: FILL_ME
+  currency: FILL_ME
+  basis: FILL_ME
+  human_confirmed_control_total: 0.0
+
+expected_mappings:
+  - reference_line_id: REF-0001
+    python_output_cell: "Sheet Name!B10"
+    proposal_expected: true
+    human_approval_required: true
+    expected_numeric_delta_after_approval: 0.0
+
+expected_unmatched_reference_ids:
+  - REF-9999
+
+expected_unmapped_output_cells:
+  - "Sheet Name!B11"
+
+expected_verdicts:
+  internal: "pass | warn | block | incomplete"
+  external: "pass | warn | block | incomplete | not_performed"
+  context_match: "match | mismatch | not_checked"
+  expected_gate_block: "null | 1 | 2 | 3 | 4"
+  pdf_available: false
+  threshold_dependency_note: >-
+    If an expected verdict depends on materiality, state the condition using a
+    human-entered threshold. Do not place a recommended threshold here.

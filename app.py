@@ -220,9 +220,19 @@ def screen_1_upload() -> None:
             format_func=lambda i: case_names[i],
             key="demo_case_selector",
         )
-        if st.button("Load case"):
+        selected_case = demo_cases[selected_idx]
+        if selected_case.get("protocol_only", False):
+            st.info(
+                "Case 11 is an independent-challenge protocol, not a bundled "
+                "workbook. Selecting it does not replace or load an active source."
+            )
+            st.caption(
+                "Protocol: demo/"
+                f"{selected_case['protocol_path']}"
+            )
+        elif st.button("Load case"):
             try:
-                case_data = load_case(demo_cases[selected_idx]["number"])
+                case_data = load_case(selected_case["number"])
                 # Seed input fields (don't auto-confirm Gate 1)
                 st.session_state.demo_workbook_bytes = case_data["workbook_bytes"]
                 st.session_state.demo_workbook_label = case_names[selected_idx]
@@ -241,10 +251,10 @@ def screen_1_upload() -> None:
                 if case_data["reference_csv_path"]:
                     st.session_state.include_reference = True
                     st.session_state.ref_source_label = case_data["description"]
-                    st.session_state.ref_entity = case_data["entity"]
-                    st.session_state.ref_period = case_data["period"]
-                    st.session_state.ref_currency = case_data["currency"]
-                    st.session_state.ref_basis = case_data["basis"]
+                    st.session_state.ref_entity = case_data["reference_entity"]
+                    st.session_state.ref_period = case_data["reference_period"]
+                    st.session_state.ref_currency = case_data["reference_currency"]
+                    st.session_state.ref_basis = case_data["reference_basis"]
                 else:
                     st.session_state.include_reference = False
                 if st.session_state.get("workbook_upload") is not None:

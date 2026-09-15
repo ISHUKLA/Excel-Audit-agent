@@ -1,0 +1,67 @@
+{
+  "gate1_context": {
+    "entity": "Glass Box Life Belgium SA",
+    "period": "31 December 2025",
+    "currency": "EUR",
+    "basis": "Synthetic IFRS 17 reporting demonstration"
+  },
+  "authoritative_output_cells": [
+    "Accounting Bridge!B4"
+  ],
+  "summary_outputs": {
+    "present_value_claims": {
+      "cell": "Reserve Summary!B5",
+      "expected_value": 104200000
+    },
+    "present_value_expenses": {
+      "cell": "Reserve Summary!B6",
+      "expected_value": 12600000
+    },
+    "present_value_premiums": {
+      "cell": "Reserve Summary!B7",
+      "expected_value": -18400000
+    },
+    "fulfilment_cash_flows": {
+      "cell": "Reserve Summary!B8",
+      "expected_value": 98400000
+    },
+    "risk_adjustment": {
+      "cell": "Reserve Summary!B9",
+      "expected_value": 7800000
+    },
+    "contractual_service_margin": {
+      "cell": "Reserve Summary!B10",
+      "expected_value": 22200000
+    },
+    "closing_liability": {
+      "cell": "Reserve Summary!B11",
+      "expected_value": 128400000
+    },
+    "signed_closing_liability": {
+      "cell": "Accounting Bridge!B4",
+      "expected_value": -128400000
+    }
+  },
+  "expected_finding": null,
+  "omitted_cohort_amount": 0,
+  "expected_internal_verdict": "pass",
+  "expected_external_verdict": "pass",
+  "expected_gate_block": null,
+  "pdf_available_after_gate4": true,
+  "schema_version": 1,
+  "case_id": "case_7a_ifrs17_clean",
+  "case_version": "1.0.0",
+  "synthetic_data": true,
+  "workbook_file": "demo/final cases/case_7_ifrs17/workbooks/case_7a_ifrs17_clean.xlsx",
+  "workbook_sha256": "2e34e89766d0bf4daf562a5c4c5b7ac6f962502ff8c7bd6a0a9fb02a465a8205",
+  "reference_file": "demo/final cases/case_7_ifrs17/reference_figures/case_7a_ifrs17_clean_reference_figures.csv",
+  "reference_sha256": "a311b6f1035e04f59053d589bc1914a820eb2a22fb32066db709a0d667289a1a",
+  "reference_control_total": -128400000,
+  "formula_inventory_file": "demo/final cases/case_7_ifrs17/formula_inventories/case_7a_ifrs17_clean_formula_inventory.json",
+  "formula_cell_count": 33,
+  "supported_formula_count": 33,
+  "unsupported_formula_count": 0,
+  "observed_findings": [],
+  "tool_git_commit": "e6c7f1f9387a4e882f433615c31ca9fc4aa00927",
+  "tool_worktree_dirty_at_generation": true
+}

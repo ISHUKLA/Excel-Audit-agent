@@ -1,0 +1,6 @@
+account_number,label,amount,debit_credit,ledger_source,evidence_reference
+UK-TP-001,Claims provisions,78400000,debit,Synthetic wrong-ledger extract,UK ledger row 1
+UK-TP-002,Expense reserve,9600000,debit,Synthetic wrong-ledger extract,UK ledger row 2
+UK-TP-003,Risk adjustment,7500000,debit,Synthetic wrong-ledger extract,UK ledger row 3
+UK-TP-004,Other technical provisions,500000,debit,Synthetic wrong-ledger extract,UK ledger row 4
+UK-TP-005,Other technical provisions,750000,debit,Synthetic wrong-ledger extract,UK ledger row 5

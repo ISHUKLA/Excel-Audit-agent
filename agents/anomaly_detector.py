@@ -16,6 +16,7 @@ from typing import Optional
 
 import networkx as nx
 
+from agents.parser import _CELL_REF_PATTERN, _expand_range, _normalize
 from core.formula_catalogue import FUNCTION_ARG_SPECS
 from core.models import AnomalyFinding, ParsedFile
 
@@ -43,6 +44,25 @@ _SUM_PATTERN = re.compile(r"SUM\(([^()]*)\)", re.IGNORECASE)
 _RANGE_PATTERN = re.compile(r"^([A-Za-z]+)(\d+):([A-Za-z]+)(\d+)$")
 
 _DEFINITION_PATTERN = re.compile(r"^'?([^'!]+)'?!(.+)$")
+
+
+def _references_cell(
+    formula: str, *, own_tab: str, target_tab: str, target_cell: str
+) -> bool:
+    """Whether ``formula`` refers to one exact cell, directly or in a range."""
+    normalized_target = _normalize(target_cell)
+    for quoted, plain, start, end in _CELL_REF_PATTERN.findall(formula):
+        referenced_tab = quoted or plain or own_tab
+        if referenced_tab != target_tab:
+            continue
+        normalized_start = _normalize(start)
+        if not end and normalized_start == normalized_target:
+            return True
+        if end:
+            expanded = _expand_range(normalized_start, _normalize(end)) or []
+            if normalized_target in expanded:
+                return True
+    return False
 
 
 def detect_anomalies(parsed_file: ParsedFile) -> list[AnomalyFinding]:
@@ -256,20 +276,36 @@ def _detect_excluded_sum_rows(parsed_file: ParsedFile) -> list[AnomalyFinding]:
 
     =SUM(A1:A5,A7:A10) omits A6. That may be deliberate, but it is invisible on
     the face of the spreadsheet, which is what makes it worth surfacing.
+
+    A second, deliberately narrow check covers a common end-of-range defect:
+    a single SUM range whose next cell is a populated numeric row on the same
+    source column. The ordinary total-below-detail pattern is excluded when
+    that next cell is the formula cell itself. This is still a review finding,
+    not a claim that the row must be included.
     """
     findings = []
     for tab, cell_ref, formula in _formulas(parsed_file):
         for sum_match in _SUM_PATTERN.finditer(formula):
-            by_col: dict[str, list[tuple[int, int]]] = defaultdict(list)
-            for arg in sum_match.group(1).split(","):
-                range_match = _RANGE_PATTERN.match(arg.strip().replace("$", ""))
+            by_col: dict[tuple[str, str], list[tuple[int, int]]] = defaultdict(list)
+            parsed_ranges: list[tuple[str, str, int, int]] = []
+            sum_arguments = sum_match.group(1).split(",")
+            for arg in sum_arguments:
+                cleaned = arg.strip().replace("$", "")
+                source_tab = tab
+                if "!" in cleaned:
+                    sheet_part, cleaned = cleaned.rsplit("!", 1)
+                    source_tab = sheet_part.strip("'").replace("''", "'")
+                range_match = _RANGE_PATTERN.match(cleaned)
                 if not range_match:
                     continue
                 col_start, row_start, col_end, row_end = range_match.groups()
                 if col_start.upper() == col_end.upper():
-                    by_col[col_start.upper()].append((int(row_start), int(row_end)))
+                    start, end = sorted((int(row_start), int(row_end)))
+                    key = (source_tab, col_start.upper())
+                    by_col[key].append((start, end))
+                    parsed_ranges.append((source_tab, col_start.upper(), start, end))
 
-            for col, spans in by_col.items():
+            for (_, col), spans in by_col.items():
                 if len(spans) < 2:
                     continue
                 spans.sort()
@@ -285,6 +321,47 @@ def _detect_excluded_sum_rows(parsed_file: ParsedFile) -> list[AnomalyFinding]:
                             tab=tab,
                             cell_ref=cell_ref,
                             description=f"SUM formula skips rows: {', '.join(skipped)}",
+                            raw_value=formula,
+                        )
+                    )
+
+            # Exactly one argument and that argument is one contiguous range.
+            # ``SUM(B8:B9,B11)`` is an explicit multi-argument selection, not
+            # the silent single-range end-point pattern this rule covers.
+            if len(sum_arguments) == 1 and len(parsed_ranges) == 1:
+                source_tab, col, _, end = parsed_ranges[0]
+                adjacent_cell = f"{col}{end + 1}"
+                adjacent_ref = f"{source_tab}!{adjacent_cell}"
+                if adjacent_ref == f"{tab}!{cell_ref}":
+                    continue
+                # A row outside this particular SUM is not omitted when the
+                # surrounding formula uses it explicitly, e.g.
+                # ``=control_total-SUM(detail_rows)``. Remove only the SUM
+                # currently being assessed, then check the remaining formula.
+                # This preserves the end-of-range finding for a genuinely
+                # silent adjacent row without flagging an explicit control.
+                outside_sum = formula[: sum_match.start()] + formula[sum_match.end() :]
+                if _references_cell(
+                    outside_sum,
+                    own_tab=tab,
+                    target_tab=source_tab,
+                    target_cell=adjacent_cell,
+                ):
+                    continue
+                record = parsed_file.cells.get(adjacent_ref)
+                value = record.cached_value if record is not None else None
+                is_numeric = isinstance(value, (int, float)) and not isinstance(value, bool)
+                if record is not None and (is_numeric or record.formula is not None):
+                    findings.append(
+                        AnomalyFinding(
+                            finding_id="",
+                            severity="warning",
+                            tab=tab,
+                            cell_ref=cell_ref,
+                            description=(
+                                f"SUM range ends before adjacent populated row: "
+                                f"{adjacent_ref} is not included"
+                            ),
                             raw_value=formula,
                         )
                     )

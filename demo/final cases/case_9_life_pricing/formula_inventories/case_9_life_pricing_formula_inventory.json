@@ -1,0 +1,454 @@
+[
+  {
+    "cell_ref": "Policy Projection!B4",
+    "formula": "='Product Assumptions'!$B$4",
+    "functions": [],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Policy Projection!C4",
+    "formula": "=IF(B4>0,0.03,0)",
+    "functions": [
+      "IF"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Policy Projection!D4",
+    "formula": "=IF(B4>0,1,0)",
+    "functions": [
+      "IF"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Policy Projection!B5",
+    "formula": "=ROUND(B4-B4*C4,0)",
+    "functions": [
+      "ROUND"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Policy Projection!C5",
+    "formula": "=C4",
+    "functions": [],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Policy Projection!D5",
+    "formula": "=IF(B5>0,1,0)",
+    "functions": [
+      "IF"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Policy Projection!B6",
+    "formula": "=ROUND(B5-B5*C5,0)",
+    "functions": [
+      "ROUND"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Policy Projection!C6",
+    "formula": "=C4",
+    "functions": [],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Policy Projection!D6",
+    "formula": "=IF(B6>0,1,0)",
+    "functions": [
+      "IF"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Policy Projection!B7",
+    "formula": "=ROUND(B6-B6*C6,0)",
+    "functions": [
+      "ROUND"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Policy Projection!C7",
+    "formula": "=C4",
+    "functions": [],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Policy Projection!D7",
+    "formula": "=IF(B7>0,1,0)",
+    "functions": [
+      "IF"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Policy Projection!B8",
+    "formula": "=ROUND(B7-B7*C7,0)",
+    "functions": [
+      "ROUND"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Policy Projection!C8",
+    "formula": "=C4",
+    "functions": [],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Policy Projection!D8",
+    "formula": "=IF(B8>0,1,0)",
+    "functions": [
+      "IF"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flows!F4",
+    "formula": "=-'Product Assumptions'!$B$10",
+    "functions": [],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flows!B5",
+    "formula": "='Policy Projection'!B4",
+    "functions": [],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flows!C5",
+    "formula": "=-ROUND(B5*VLOOKUP('Policy Projection'!E4,'Product Assumptions'!$E$4:$F$4,2,FALSE()),0)",
+    "functions": [
+      "ROUND",
+      "VLOOKUP"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flows!D5",
+    "formula": "=-ROUND(B5*'Product Assumptions'!$B$8,0)",
+    "functions": [
+      "ROUND"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flows!E5",
+    "formula": "=-ROUND(B5*'Product Assumptions'!$B$9,0)",
+    "functions": [
+      "ROUND"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flows!F5",
+    "formula": "=SUM(B5:E5)",
+    "functions": [
+      "SUM"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flows!G5",
+    "formula": "=G4/(1+'Product Assumptions'!$B$6)",
+    "functions": [],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flows!B6",
+    "formula": "='Policy Projection'!B5",
+    "functions": [],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flows!C6",
+    "formula": "=-ROUND(B6*VLOOKUP('Policy Projection'!E5,'Product Assumptions'!$E$4:$F$4,2,FALSE()),0)",
+    "functions": [
+      "ROUND",
+      "VLOOKUP"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flows!D6",
+    "formula": "=-ROUND(B6*'Product Assumptions'!$B$8,0)",
+    "functions": [
+      "ROUND"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flows!E6",
+    "formula": "=-ROUND(B6*'Product Assumptions'!$B$9,0)",
+    "functions": [
+      "ROUND"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flows!F6",
+    "formula": "=SUM(B6:E6)",
+    "functions": [
+      "SUM"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flows!G6",
+    "formula": "=G5/(1+'Product Assumptions'!$B$6)",
+    "functions": [],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flows!B7",
+    "formula": "='Policy Projection'!B6",
+    "functions": [],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flows!C7",
+    "formula": "=-ROUND(B7*VLOOKUP('Policy Projection'!E6,'Product Assumptions'!$E$4:$F$4,2,FALSE()),0)",
+    "functions": [
+      "ROUND",
+      "VLOOKUP"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flows!D7",
+    "formula": "=-ROUND(B7*'Product Assumptions'!$B$8,0)",
+    "functions": [
+      "ROUND"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flows!E7",
+    "formula": "=-ROUND(B7*'Product Assumptions'!$B$9,0)",
+    "functions": [
+      "ROUND"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flows!F7",
+    "formula": "=SUM(B7:E7)",
+    "functions": [
+      "SUM"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flows!G7",
+    "formula": "=G6/(1+'Product Assumptions'!$B$6)",
+    "functions": [],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flows!B8",
+    "formula": "='Policy Projection'!B7",
+    "functions": [],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flows!C8",
+    "formula": "=-ROUND(B8*VLOOKUP('Policy Projection'!E7,'Product Assumptions'!$E$4:$F$4,2,FALSE()),0)",
+    "functions": [
+      "ROUND",
+      "VLOOKUP"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flows!D8",
+    "formula": "=-ROUND(B8*'Product Assumptions'!$B$8,0)",
+    "functions": [
+      "ROUND"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flows!E8",
+    "formula": "=-ROUND(B8*'Product Assumptions'!$B$9,0)",
+    "functions": [
+      "ROUND"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flows!F8",
+    "formula": "=SUM(B8:E8)",
+    "functions": [
+      "SUM"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flows!G8",
+    "formula": "=G7/(1+'Product Assumptions'!$B$6)",
+    "functions": [],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flows!B9",
+    "formula": "='Policy Projection'!B8",
+    "functions": [],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flows!C9",
+    "formula": "=-ROUND(B9*VLOOKUP('Policy Projection'!E8,'Product Assumptions'!$E$4:$F$4,2,FALSE()),0)",
+    "functions": [
+      "ROUND",
+      "VLOOKUP"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flows!D9",
+    "formula": "=-ROUND(B9*'Product Assumptions'!$B$8,0)",
+    "functions": [
+      "ROUND"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flows!E9",
+    "formula": "=-ROUND(B9*'Product Assumptions'!$B$9,0)",
+    "functions": [
+      "ROUND"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flows!F9",
+    "formula": "=SUM(B9:E9)",
+    "functions": [
+      "SUM"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flows!G9",
+    "formula": "=G8/(1+'Product Assumptions'!$B$6)",
+    "functions": [],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Profitability Summary!B5",
+    "formula": "=SUMPRODUCT(NetCashFlows,DiscountFactors)",
+    "functions": [
+      "SUMPRODUCT"
+    ],
+    "supported_by_catalogue": false,
+    "unsupported_functions": [
+      "SUMPRODUCT"
+    ]
+  },
+  {
+    "cell_ref": "Profitability Summary!B6",
+    "formula": "=IRR(NetCashFlows)",
+    "functions": [
+      "IRR"
+    ],
+    "supported_by_catalogue": false,
+    "unsupported_functions": [
+      "IRR"
+    ]
+  },
+  {
+    "cell_ref": "Profitability Summary!B7",
+    "formula": "=ROUND(B5/'Product Assumptions'!B4,3)",
+    "functions": [
+      "ROUND"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Profitability Summary!B8",
+    "formula": "=IF(B6>0,B5,0)",
+    "functions": [
+      "IF"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Profitability Summary!B9",
+    "formula": "=SUMIFS('Cash Flows'!B5:B9,'Cash Flows'!H5:H9,\"Included\")",
+    "functions": [
+      "SUMIFS"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Profitability Summary!B10",
+    "formula": "=COUNTIFS('Cash Flows'!H5:H9,\"Included\")",
+    "functions": [
+      "COUNTIFS"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Independent Pricing Reference!B5",
+    "formula": "='Profitability Summary'!B5-B4",
+    "functions": [],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  }
+]

@@ -1,0 +1,31 @@
+{
+  "case_id": "case_8_solvency_capital",
+  "case_version": "1.0.0",
+  "workbook_file": "demo/final cases/case_8_solvency_capital/workbooks/case_8_solvency_capital_decision.xlsx",
+  "workbook_sha256": "2ee3cbed08fe3fcd88eba6fa0df65cd7263c5fb43e72c61fa00c1cb0b2ad733e",
+  "reference_file": "demo/final cases/case_8_solvency_capital/reference_figures/case_8_solvency_capital_reference_figures.csv",
+  "reference_sha256": "b583cb95eb8ad53d403c7ab89d172778cedcdf137f224869dac24d8cf8dea35b",
+  "expected_results_file": "demo/final cases/case_8_solvency_capital/expected_results/case_8_solvency_capital_expected.json",
+  "expected_results_sha256": "08618a3ebabf5f7e70ffe0de7c8fe6f1de39c47a53fb972463ff6cead0246e46",
+  "formula_inventory_file": "demo/final cases/case_8_solvency_capital/formula_inventories/case_8_solvency_capital_formula_inventory.json",
+  "formula_inventory_sha256": "e559488d76e0e54988468ac65ffe3faf5a4b2ef967d2c09ba7eae7ddb0341a76",
+  "recalculation_engine": "LibreOffice",
+  "recalculation_engine_version": "LibreOfficeDev 26.8.0.0.alpha0 2c87e51eeaa2b413ff4ae097b2705eea1995d8e5",
+  "recalculated_at_utc": "2026-09-15T15:21:02.961131+00:00",
+  "tool_git_commit": "e6c7f1f9387a4e882f433615c31ca9fc4aa00927",
+  "tool_worktree_dirty_at_generation": true,
+  "python_version": "3.12.11",
+  "formula_cell_count": 27,
+  "supported_formula_count": 27,
+  "unsupported_formula_count": 0,
+  "authoritative_outputs": [
+    {
+      "cell": "QRT Bridge!B4",
+      "expected_value": 111000000
+    }
+  ],
+  "expected_internal_verdict": "pass",
+  "expected_external_verdict": "block",
+  "expected_gate_block": 3,
+  "synthetic_data": true
+}

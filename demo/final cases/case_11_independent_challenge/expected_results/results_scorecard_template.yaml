@@ -1,0 +1,77 @@
+schema_version: 1
+challenge_id: FILL_ME
+assessed_first_run:
+  tool_git_commit: FILL_ME
+  release_tag: FILL_ME
+  workbook_sha256_verified: null
+  expected_results_sha256_verified: null
+  audit_chain_verified: null
+
+scope_counts:
+  total_formula_cells: null
+  supported_formula_cells: null
+  supported_formula_coverage:
+    numerator: null
+    denominator: null
+    percentage: null
+    calculation: "supported formula cells / total formula cells * 100"
+  authoritative_outputs_total: null
+  authoritative_outputs_complete: null
+  output_chain_completeness:
+    numerator: null
+    denominator: null
+    percentage: null
+    calculation: "complete authoritative output chains / authoritative outputs * 100"
+
+detection:
+  in_scope_planted_issues: null
+  in_scope_detected_issues: null
+  unsupported_constructs_expected: null
+  unsupported_constructs_reported: null
+  unsupported_formula_recall:
+    numerator: null
+    denominator: null
+    percentage: null
+    calculation: "reported expected unsupported constructs / expected unsupported constructs * 100"
+  true_positives: null
+  false_positives: null
+  false_negatives: null
+  out_of_scope_observations:
+    expected: []
+    observed: []
+    missed: []
+    note: "Do not add these misses to the in-scope false-negative count."
+
+numeric_accuracy:
+  complete_outputs_compared: null
+  exact_matches: null
+  maximum_absolute_error: null
+  maximum_relative_error: null
+  partial_outputs_with_invented_python_value: null
+  note: "A partial output must have no invented Python target."
+
+performance:
+  parse_runtime_seconds: null
+  detection_runtime_seconds: null
+  reconstruction_runtime_seconds: null
+  peak_memory_megabytes: null
+  measurement_method: FILL_ME
+
+human_review:
+  reviewer_time_minutes: null
+  number_of_dispositions: null
+  number_of_manual_mappings: null
+  reviewer_name_or_pseudonymous_id: FILL_ME
+
+gate_results:
+  internal_verdict: FILL_ME
+  external_verdict: FILL_ME
+  context_match_verdict: FILL_ME
+  reached_gate: null
+  pdf_available: null
+
+evidence:
+  continuous_recording_file: FILL_ME
+  original_database_file: FILL_ME
+  first_run_evidence_hash: FILL_ME
+  notes: []

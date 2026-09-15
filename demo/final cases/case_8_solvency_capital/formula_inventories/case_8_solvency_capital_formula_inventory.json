@@ -1,0 +1,223 @@
+[
+  {
+    "cell_ref": "Own Funds!B7",
+    "formula": "=SUM(B4:B5)",
+    "functions": [
+      "SUM"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "SCR Modules!C4",
+    "formula": "=VLOOKUP(A4,Assumptions!$E$4:$F$7,2,FALSE())",
+    "functions": [
+      "VLOOKUP"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "SCR Modules!D4",
+    "formula": "=ROUND(B4*C4,0)",
+    "functions": [
+      "ROUND"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "SCR Modules!C5",
+    "formula": "=VLOOKUP(A5,Assumptions!$E$4:$F$7,2,FALSE())",
+    "functions": [
+      "VLOOKUP"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "SCR Modules!D5",
+    "formula": "=ROUND(B5*C5,0)",
+    "functions": [
+      "ROUND"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "SCR Modules!C6",
+    "formula": "=VLOOKUP(A6,Assumptions!$E$4:$F$7,2,FALSE())",
+    "functions": [
+      "VLOOKUP"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "SCR Modules!D6",
+    "formula": "=ROUND(B6*C6,0)",
+    "functions": [
+      "ROUND"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "SCR Modules!C7",
+    "formula": "=VLOOKUP(A7,Assumptions!$E$4:$F$7,2,FALSE())",
+    "functions": [
+      "VLOOKUP"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "SCR Modules!D7",
+    "formula": "=ROUND(B7*C7,0)",
+    "functions": [
+      "ROUND"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "SCR Modules!D9",
+    "formula": "=SUMIFS(D4:D7,E4:E7,Assumptions!$B$8)",
+    "functions": [
+      "SUMIFS"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Capital Summary!B5",
+    "formula": "='Own Funds'!B7",
+    "functions": [],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Capital Summary!C5",
+    "formula": "='Own Funds'!B7",
+    "functions": [],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Capital Summary!B6",
+    "formula": "='SCR Modules'!D9",
+    "functions": [],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Capital Summary!C6",
+    "formula": "='SCR Modules'!D9",
+    "functions": [],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Capital Summary!B7",
+    "formula": "=-Assumptions!$B$4",
+    "functions": [],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Capital Summary!C7",
+    "formula": "=-Diversification!$B$5",
+    "functions": [],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Capital Summary!B8",
+    "formula": "=Assumptions!$B$5",
+    "functions": [],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Capital Summary!C8",
+    "formula": "=Assumptions!$B$5",
+    "functions": [],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Capital Summary!B9",
+    "formula": "=ROUND(B6-Assumptions!$B$4+B8,0)",
+    "functions": [
+      "ROUND"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Capital Summary!C9",
+    "formula": "=ROUND(C6-47000000+C8,0)",
+    "functions": [
+      "ROUND"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Capital Summary!B10",
+    "formula": "=ROUND(B5/B9,3)",
+    "functions": [
+      "ROUND"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Capital Summary!C10",
+    "formula": "=ROUND(C5/C9,3)",
+    "functions": [
+      "ROUND"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Capital Summary!B11",
+    "formula": "=Assumptions!$B$6",
+    "functions": [],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Capital Summary!C11",
+    "formula": "=Assumptions!$B$6",
+    "functions": [],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Capital Summary!B12",
+    "formula": "=IF(B10>=B11,\"Dividend review may be considered\",\"Below management floor\")",
+    "functions": [
+      "IF"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Capital Summary!C12",
+    "formula": "=IF(C10>=C11,\"Dividend review may be considered\",\"Below management floor\")",
+    "functions": [
+      "IF"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "QRT Bridge!B4",
+    "formula": "='Capital Summary'!C9",
+    "functions": [],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  }
+]

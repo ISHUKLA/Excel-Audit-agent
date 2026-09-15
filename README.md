@@ -166,6 +166,27 @@ All demonstration workbooks are entirely synthetic. No real client, policyholder
 - Benchmark: `benchmark/CASE_6_BENCHMARK_REPORT.md`
 - What it shows: A 300-cohort, 8,453-formula baseline-versus-adverse reserve stress. Technical provisions increase by EUR 2,330,154.10, synthetic available own funds fall by the same amount, and the illustrative solvency ratio falls from 181.68% to 175.03%. The workbook is not a full actuarial model and does not implement or validate certified Solvency II or IFRS 17 methodology.
 
+## Competition Use-Case Evidence Pack
+
+[`demo/final cases/`](<demo/final cases/>) is a separate, reproducible evidence
+pack for live judging. It contains generated clean/defective IFRS 17-style
+cohort cases, a Solvency II capital-decision case, an intentionally incomplete
+life-pricing reconstruction, and the principal wrong-accounting-context refusal
+case. Each implemented case includes the recalculated workbook, applicable
+reference CSV, explicit expected results, complete formula inventory, SHA-256
+manifest and a verification guide.
+
+Cases 7a–11 are listed in Streamlit's **Load a demonstration case** dropdown.
+Cases 7a–10 load their synthetic artifacts through the normal four-gate journey;
+Case 11 displays its protocol-only status and does not load a workbook.
+
+Case 11 is protocol-only: no challenge workbook has been authored or inspected
+by the developer. Its independent-author brief, frozen public formula scope,
+sealed-results protocol, first-run checklist, scorecard and evidence tools are
+in [`demo/final cases/case_11_independent_challenge/`](<demo/final cases/case_11_independent_challenge/>).
+The challenge must be performed against a separately frozen and tagged release;
+imperfect first-run evidence is preserved rather than rewritten.
+
 ---
 
 ## Architecture

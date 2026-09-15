@@ -1,0 +1,46 @@
+# Public reconstruction scope handout
+
+This is the scope the independent author receives before authoring the
+challenge. It describes the current deterministic Python reconstruction engine,
+not every formula that Excel or LibreOffice can calculate.
+
+## Supported
+
+Plain arithmetic with cell references and these 20 functions:
+
+| Family | Functions |
+|---|---|
+| Basic numeric | `ABS`, `INT` |
+| Rounding | `ROUND`, `ROUNDUP`, `ROUNDDOWN`, `CEILING`, `FLOOR` |
+| Conditional and aggregate | `SUM`, `SUMIF`, `SUMIFS`, `COUNTIF`, `COUNTIFS`, `AVERAGEIF`, `AVERAGEIFS`, `IF` |
+| Criteria min/max | `MINIFS`, `MAXIFS` |
+| Exact lookup | `VLOOKUP`, `MATCH`, `INDEX` |
+
+Cross-tab references and nested supported functions are accepted. `ROUND` uses
+Excel-style half-away-from-zero behaviour; `INT` floors toward negative
+infinity. Blank handling follows the individual aggregate's documented engine
+behaviour.
+
+`VLOOKUP` is supported only with `range_lookup=FALSE`. `MATCH` is supported only
+with `match_type=0`. `INDEX` must return one scalar cell. Lookup results used in
+reconstruction must be numeric.
+
+## Explicitly outside this published scope
+
+- every unlisted function, including `SUMPRODUCT`, `IRR`, `XIRR` and `OFFSET`;
+- approximate `VLOOKUP` or `MATCH` modes;
+- array formulas, CSE arrays and dynamic-array spill results;
+- lookup operations that return whole rows/columns or text into arithmetic;
+- external-workbook references; and
+- unsupported values or dependency chains whose result cannot be independently
+  reconstructed.
+
+Unsupported formulas are retained verbatim. A chain that depends on one is
+reported as partial/incomplete, its Python target remains empty, and a cached
+spreadsheet value is not relabelled as verified. The author should include both
+in-scope and out-of-scope behaviour; do not redesign the challenge to maximise
+the supported percentage.
+
+This handout is generated from the same 20-function scope represented in
+`core/formula_catalogue.py`; that source file remains authoritative if a frozen
+release and this handout ever disagree.

@@ -1,0 +1,75 @@
+{
+  "gate1_context": {
+    "entity": "Glass Box Life Belgium SA",
+    "period": "31 December 2025",
+    "currency": "EUR",
+    "basis": "Synthetic reserve-accounting demonstration"
+  },
+  "reference_context": {
+    "entity": "Glass Box Life UK Ltd",
+    "period": "30 September 2025",
+    "currency": "GBP",
+    "basis": "Synthetic UK reserve ledger extract"
+  },
+  "authoritative_output_cells": [
+    "Accounting Bridge!B4",
+    "Accounting Bridge!B5",
+    "Accounting Bridge!B6",
+    "Accounting Bridge!B7"
+  ],
+  "summary_outputs": {
+    "claims_reserve": {
+      "cell": "Accounting Bridge!B4",
+      "expected_value": 78400000
+    },
+    "expense_reserve": {
+      "cell": "Accounting Bridge!B5",
+      "expected_value": 9600000
+    },
+    "risk_adjustment": {
+      "cell": "Accounting Bridge!B6",
+      "expected_value": 7500000
+    },
+    "management_reserve_overlay": {
+      "cell": "Accounting Bridge!B7",
+      "expected_value": 300000
+    }
+  },
+  "expected_finding": null,
+  "expected_mapping_count": 3,
+  "expected_unmatched_reference_ids": [
+    "REF-0004",
+    "REF-0005"
+  ],
+  "expected_unmapped_output_cells": [
+    "Accounting Bridge!B7"
+  ],
+  "mapped_numeric_difference": 0,
+  "external_block_reasons": [
+    "entity_mismatch",
+    "period_mismatch",
+    "currency_mismatch",
+    "unmatched_references",
+    "unmapped_output"
+  ],
+  "expected_internal_verdict": "pass",
+  "expected_external_verdict": "block",
+  "expected_gate_block": 3,
+  "pdf_available_after_gate4": false,
+  "schema_version": 1,
+  "case_id": "case_10_accounting_context",
+  "case_version": "1.0.0",
+  "synthetic_data": true,
+  "workbook_file": "demo/final cases/case_10_accounting_context/workbooks/case_10_accounting_context_failure.xlsx",
+  "workbook_sha256": "aada7dd4cda4e37e7b1374858f7f3365c885c43d079227f46612555c3a33e1e6",
+  "reference_file": "demo/final cases/case_10_accounting_context/reference_figures/case_10_wrong_ledger.csv",
+  "reference_sha256": "c19c70725b2ade8b5b0184d28c115ffc382f335995596e06cf23cdd20a1a3277",
+  "reference_control_total": 96250000,
+  "formula_inventory_file": "demo/final cases/case_10_accounting_context/formula_inventories/case_10_accounting_context_formula_inventory.json",
+  "formula_cell_count": 9,
+  "supported_formula_count": 9,
+  "unsupported_formula_count": 0,
+  "observed_findings": [],
+  "tool_git_commit": "e6c7f1f9387a4e882f433615c31ca9fc4aa00927",
+  "tool_worktree_dirty_at_generation": true
+}

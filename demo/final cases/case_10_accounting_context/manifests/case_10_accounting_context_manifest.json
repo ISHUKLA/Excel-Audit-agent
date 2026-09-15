@@ -1,0 +1,43 @@
+{
+  "case_id": "case_10_accounting_context",
+  "case_version": "1.0.0",
+  "workbook_file": "demo/final cases/case_10_accounting_context/workbooks/case_10_accounting_context_failure.xlsx",
+  "workbook_sha256": "aada7dd4cda4e37e7b1374858f7f3365c885c43d079227f46612555c3a33e1e6",
+  "reference_file": "demo/final cases/case_10_accounting_context/reference_figures/case_10_wrong_ledger.csv",
+  "reference_sha256": "c19c70725b2ade8b5b0184d28c115ffc382f335995596e06cf23cdd20a1a3277",
+  "expected_results_file": "demo/final cases/case_10_accounting_context/expected_results/case_10_accounting_context_expected.json",
+  "expected_results_sha256": "c636ec2ec3a09f82bb3047c3b77d99a0c2724bd4dd65afa5b838d9d9c2b9ab80",
+  "formula_inventory_file": "demo/final cases/case_10_accounting_context/formula_inventories/case_10_accounting_context_formula_inventory.json",
+  "formula_inventory_sha256": "8f144d4966d1c10ed698d16ab3983274c7bf317ea1121f35f7dd2c5330cd04b6",
+  "recalculation_engine": "LibreOffice",
+  "recalculation_engine_version": "LibreOfficeDev 26.8.0.0.alpha0 2c87e51eeaa2b413ff4ae097b2705eea1995d8e5",
+  "recalculated_at_utc": "2026-09-15T15:21:02.961131+00:00",
+  "tool_git_commit": "e6c7f1f9387a4e882f433615c31ca9fc4aa00927",
+  "tool_worktree_dirty_at_generation": true,
+  "python_version": "3.12.11",
+  "formula_cell_count": 9,
+  "supported_formula_count": 9,
+  "unsupported_formula_count": 0,
+  "authoritative_outputs": [
+    {
+      "cell": "Accounting Bridge!B4",
+      "expected_value": 78400000
+    },
+    {
+      "cell": "Accounting Bridge!B5",
+      "expected_value": 9600000
+    },
+    {
+      "cell": "Accounting Bridge!B6",
+      "expected_value": 7500000
+    },
+    {
+      "cell": "Accounting Bridge!B7",
+      "expected_value": 300000
+    }
+  ],
+  "expected_internal_verdict": "pass",
+  "expected_external_verdict": "block",
+  "expected_gate_block": 3,
+  "synthetic_data": true
+}

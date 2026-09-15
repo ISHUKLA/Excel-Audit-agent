@@ -154,20 +154,50 @@ def _run_case4_to_gate3_preview(orchestrator):
 
 
 # ---------------------------------------------------------------------------
-# 1-4: case listing and asset existence
+# Case listing and asset existence
 # ---------------------------------------------------------------------------
 
 
-def test_list_cases_returns_six_cases():
+def test_list_cases_returns_all_cases_in_chronological_order():
     cases = demo_cases.list_cases()
-    assert [c["number"] for c in cases] == [1, 2, 3, 4, 5, 6]
+    assert [c["number"] for c in cases] == [1, 2, 3, 4, 5, 6, "7a", "7b", 8, 9, 10, 11]
 
 
-def test_every_listed_case_loads():
+def test_every_loadable_listed_case_loads_and_case_11_remains_protocol_only():
     for case_meta in demo_cases.list_cases():
+        if case_meta["protocol_only"]:
+            assert case_meta["number"] == 11
+            assert case_meta["protocol_path"] == (
+                "final cases/case_11_independent_challenge/docs/README.md"
+            )
+            with pytest.raises(ValueError, match="protocol-only.*no workbook"):
+                demo_cases.load_case(case_meta["number"])
+            continue
         case = demo_cases.load_case(case_meta["number"])
         assert case["workbook_bytes"]
         assert case["entity"]
+        assert case["protocol_only"] is False
+
+
+def test_competition_cases_use_renumbered_assets_and_contexts():
+    for case_number in ("7a", "7b", 8, 9, 10):
+        case = demo_cases.load_case(case_number)
+        assert case["description"].startswith(f"Case {case_number}:")
+
+    clean = demo_cases.load_case("7a")
+    assert clean["reference_csv_path"].endswith(
+        "case_7a_ifrs17_clean_reference_figures.csv"
+    )
+
+    no_reference = demo_cases.load_case(9)
+    assert no_reference["reference_csv_path"] is None
+
+    wrong_context = demo_cases.load_case(10)
+    assert wrong_context["entity"] == "Glass Box Life Belgium SA"
+    assert wrong_context["currency"] == "EUR"
+    assert wrong_context["reference_entity"] == "Glass Box Life UK Ltd"
+    assert wrong_context["reference_period"] == "30 September 2025"
+    assert wrong_context["reference_currency"] == "GBP"
 
 
 def test_every_documented_asset_exists():
@@ -199,6 +229,12 @@ def test_every_documented_asset_exists():
         EXPECTED_RESULTS_DIR / "case_4_expected.json",
         EXPECTED_RESULTS_DIR / "case_5_expected.json",
         EXPECTED_RESULTS_DIR / "case_6_expected.json",
+        DEMO_DIR / "final cases" / "case_7_ifrs17" / "workbooks" / "case_7a_ifrs17_clean.xlsx",
+        DEMO_DIR / "final cases" / "case_7_ifrs17" / "workbooks" / "case_7b_ifrs17_missing_cohort.xlsx",
+        DEMO_DIR / "final cases" / "case_8_solvency_capital" / "workbooks" / "case_8_solvency_capital_decision.xlsx",
+        DEMO_DIR / "final cases" / "case_9_life_pricing" / "workbooks" / "case_9_life_pricing_incomplete.xlsx",
+        DEMO_DIR / "final cases" / "case_10_accounting_context" / "workbooks" / "case_10_accounting_context_failure.xlsx",
+        DEMO_DIR / "final cases" / "case_11_independent_challenge" / "docs" / "README.md",
     ):
         assert path.exists(), path
 

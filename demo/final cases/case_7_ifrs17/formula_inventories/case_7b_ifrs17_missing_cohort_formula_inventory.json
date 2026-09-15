@@ -1,0 +1,303 @@
+[
+  {
+    "cell_ref": "Cash Flow Calculation!B4",
+    "formula": "=IF('Cohort Data'!$F4=Assumptions!$B$8,ROUND('Cohort Data'!$C4*VLOOKUP('Cohort Data'!$B4,Assumptions!$E$4:$F$4,2,FALSE()),Assumptions!$B$6),0)",
+    "functions": [
+      "IF",
+      "ROUND",
+      "VLOOKUP"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flow Calculation!C4",
+    "formula": "=ROUND('Cohort Data'!$D4,Assumptions!$B$6)",
+    "functions": [
+      "ROUND"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flow Calculation!D4",
+    "formula": "=ROUND('Cohort Data'!$E4,Assumptions!$B$6)",
+    "functions": [
+      "ROUND"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flow Calculation!E4",
+    "formula": "=SUM(B4:D4)",
+    "functions": [
+      "SUM"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flow Calculation!B5",
+    "formula": "=IF('Cohort Data'!$F5=Assumptions!$B$8,ROUND('Cohort Data'!$C5*VLOOKUP('Cohort Data'!$B5,Assumptions!$E$4:$F$4,2,FALSE()),Assumptions!$B$6),0)",
+    "functions": [
+      "IF",
+      "ROUND",
+      "VLOOKUP"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flow Calculation!C5",
+    "formula": "=ROUND('Cohort Data'!$D5,Assumptions!$B$6)",
+    "functions": [
+      "ROUND"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flow Calculation!D5",
+    "formula": "=ROUND('Cohort Data'!$E5,Assumptions!$B$6)",
+    "functions": [
+      "ROUND"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flow Calculation!E5",
+    "formula": "=SUM(B5:D5)",
+    "functions": [
+      "SUM"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flow Calculation!B6",
+    "formula": "=IF('Cohort Data'!$F6=Assumptions!$B$8,ROUND('Cohort Data'!$C6*VLOOKUP('Cohort Data'!$B6,Assumptions!$E$4:$F$4,2,FALSE()),Assumptions!$B$6),0)",
+    "functions": [
+      "IF",
+      "ROUND",
+      "VLOOKUP"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flow Calculation!C6",
+    "formula": "=ROUND('Cohort Data'!$D6,Assumptions!$B$6)",
+    "functions": [
+      "ROUND"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flow Calculation!D6",
+    "formula": "=ROUND('Cohort Data'!$E6,Assumptions!$B$6)",
+    "functions": [
+      "ROUND"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flow Calculation!E6",
+    "formula": "=SUM(B6:D6)",
+    "functions": [
+      "SUM"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flow Calculation!B7",
+    "formula": "=IF('Cohort Data'!$F7=Assumptions!$B$8,ROUND('Cohort Data'!$C7*VLOOKUP('Cohort Data'!$B7,Assumptions!$E$4:$F$4,2,FALSE()),Assumptions!$B$6),0)",
+    "functions": [
+      "IF",
+      "ROUND",
+      "VLOOKUP"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flow Calculation!C7",
+    "formula": "=ROUND('Cohort Data'!$D7,Assumptions!$B$6)",
+    "functions": [
+      "ROUND"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flow Calculation!D7",
+    "formula": "=ROUND('Cohort Data'!$E7,Assumptions!$B$6)",
+    "functions": [
+      "ROUND"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flow Calculation!E7",
+    "formula": "=SUM(B7:D7)",
+    "functions": [
+      "SUM"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flow Calculation!B8",
+    "formula": "=IF('Cohort Data'!$F8=Assumptions!$B$8,ROUND('Cohort Data'!$C8*VLOOKUP('Cohort Data'!$B8,Assumptions!$E$4:$F$4,2,FALSE()),Assumptions!$B$6),0)",
+    "functions": [
+      "IF",
+      "ROUND",
+      "VLOOKUP"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flow Calculation!C8",
+    "formula": "=ROUND('Cohort Data'!$D8,Assumptions!$B$6)",
+    "functions": [
+      "ROUND"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flow Calculation!D8",
+    "formula": "=ROUND('Cohort Data'!$E8,Assumptions!$B$6)",
+    "functions": [
+      "ROUND"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flow Calculation!E8",
+    "formula": "=SUM(B8:D8)",
+    "functions": [
+      "SUM"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flow Calculation!B9",
+    "formula": "=IF('Cohort Data'!$F9=Assumptions!$B$8,ROUND('Cohort Data'!$C9*VLOOKUP('Cohort Data'!$B9,Assumptions!$E$4:$F$4,2,FALSE()),Assumptions!$B$6),0)",
+    "functions": [
+      "IF",
+      "ROUND",
+      "VLOOKUP"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flow Calculation!C9",
+    "formula": "=ROUND('Cohort Data'!$D9,Assumptions!$B$6)",
+    "functions": [
+      "ROUND"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flow Calculation!D9",
+    "formula": "=ROUND('Cohort Data'!$E9,Assumptions!$B$6)",
+    "functions": [
+      "ROUND"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Cash Flow Calculation!E9",
+    "formula": "=SUM(B9:D9)",
+    "functions": [
+      "SUM"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Reserve Summary!B5",
+    "formula": "=SUM('Cash Flow Calculation'!$B$4:$B$8)",
+    "functions": [
+      "SUM"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Reserve Summary!B6",
+    "formula": "=SUMIFS('Cash Flow Calculation'!$C$4:$C$9,'Cohort Data'!$F$4:$F$9,Assumptions!$B$8)",
+    "functions": [
+      "SUMIFS"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Reserve Summary!B7",
+    "formula": "=SUM('Cash Flow Calculation'!$D$4:$D$9)",
+    "functions": [
+      "SUM"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Reserve Summary!B8",
+    "formula": "=SUM(B5:B7)",
+    "functions": [
+      "SUM"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Reserve Summary!B9",
+    "formula": "=Assumptions!$B$4",
+    "functions": [],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Reserve Summary!B10",
+    "formula": "=Assumptions!$B$5",
+    "functions": [],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Reserve Summary!B11",
+    "formula": "=SUM(B8:B10)",
+    "functions": [
+      "SUM"
+    ],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Accounting Bridge!B4",
+    "formula": "=-'Reserve Summary'!B11",
+    "functions": [],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Accounting Bridge!B5",
+    "formula": "='Reserve Summary'!B11",
+    "functions": [],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  }
+]

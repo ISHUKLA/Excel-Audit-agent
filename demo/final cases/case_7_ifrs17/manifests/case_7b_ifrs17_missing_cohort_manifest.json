@@ -1,0 +1,31 @@
+{
+  "case_id": "case_7b_ifrs17_missing_cohort",
+  "case_version": "1.0.0",
+  "workbook_file": "demo/final cases/case_7_ifrs17/workbooks/case_7b_ifrs17_missing_cohort.xlsx",
+  "workbook_sha256": "c4edc30d82816f269fe1032a47251a9cdbdcf5d668314a979edeff6a8c0ab9cd",
+  "reference_file": "demo/final cases/case_7_ifrs17/reference_figures/case_7b_ifrs17_missing_cohort_reference_figures.csv",
+  "reference_sha256": "2dbc2abeae609924af2a95e5218ab5827843f30bb58cbea7412c5ec98986dcfe",
+  "expected_results_file": "demo/final cases/case_7_ifrs17/expected_results/case_7b_ifrs17_missing_cohort_expected.json",
+  "expected_results_sha256": "554285fda69780803c8c271292b3ab040e371bac4f49cf90450578009ad338ac",
+  "formula_inventory_file": "demo/final cases/case_7_ifrs17/formula_inventories/case_7b_ifrs17_missing_cohort_formula_inventory.json",
+  "formula_inventory_sha256": "86b8c593ed106b276e9543a34fedad93b014116c6f407feec2eb2ecf4f7f6344",
+  "recalculation_engine": "LibreOffice",
+  "recalculation_engine_version": "LibreOfficeDev 26.8.0.0.alpha0 2c87e51eeaa2b413ff4ae097b2705eea1995d8e5",
+  "recalculated_at_utc": "2026-09-15T15:21:02.961131+00:00",
+  "tool_git_commit": "e6c7f1f9387a4e882f433615c31ca9fc4aa00927",
+  "tool_worktree_dirty_at_generation": true,
+  "python_version": "3.12.11",
+  "formula_cell_count": 33,
+  "supported_formula_count": 33,
+  "unsupported_formula_count": 0,
+  "authoritative_outputs": [
+    {
+      "cell": "Accounting Bridge!B4",
+      "expected_value": -122200000
+    }
+  ],
+  "expected_internal_verdict": "pass",
+  "expected_external_verdict": "block",
+  "expected_gate_block": 3,
+  "synthetic_data": true
+}

@@ -256,6 +256,69 @@ def test_a_single_range_sum_is_not_flagged():
     assert detect_anomalies(parsed) == []
 
 
+def test_single_range_ending_before_adjacent_populated_source_row_is_flagged():
+    parsed = _parsed(
+        {
+            "Summary!B5": _cell(
+                "Summary!B5", formula="=SUM('Cash Flow Calculation'!B4:B8)", value=98.0
+            ),
+            "Cash Flow Calculation!B9": _cell(
+                "Cash Flow Calculation!B9", value=6.2
+            ),
+        },
+        tabs=["Summary", "Cash Flow Calculation"],
+    )
+
+    findings = detect_anomalies(parsed)
+
+    assert len(findings) == 1
+    assert findings[0].cell_ref == "B5"
+    assert "Cash Flow Calculation!B9" in findings[0].description
+
+
+def test_total_immediately_below_its_own_single_range_is_not_flagged():
+    parsed = _parsed(
+        {
+            "Provisions!A1": _cell("Provisions!A1", value=10.0),
+            "Provisions!A2": _cell("Provisions!A2", value=20.0),
+            "Provisions!A3": _cell("Provisions!A3", formula="=SUM(A1:A2)", value=30.0),
+        }
+    )
+
+    assert detect_anomalies(parsed) == []
+
+
+def test_adjacent_control_total_used_elsewhere_in_formula_is_not_flagged():
+    parsed = _parsed(
+        {
+            "Controls!B6": _cell(
+                "Controls!B6",
+                formula="=AccountingBridge!C9-SUM(AccountingBridge!C4:C8)",
+                value=0.0,
+            ),
+            "AccountingBridge!C9": _cell(
+                "AccountingBridge!C9", formula="=SUM(C4:C8)", value=95.8
+            ),
+        },
+        tabs=["Controls", "AccountingBridge"],
+    )
+
+    assert detect_anomalies(parsed) == []
+
+
+def test_explicit_range_plus_scalar_sum_is_not_treated_as_single_range():
+    parsed = _parsed(
+        {
+            "Provisions!B10": _cell("Provisions!B10", value=50.0),
+            "Provisions!B12": _cell(
+                "Provisions!B12", formula="=SUM(B8:B9,B11)", value=100.0
+            ),
+        }
+    )
+
+    assert detect_anomalies(parsed) == []
+
+
 def test_several_skipped_rows_are_all_named():
     parsed = _parsed(
         {"Provisions!A11": _cell("Provisions!A11", formula="=SUM(A1:A3,A7:A10)", value=40)}
