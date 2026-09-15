@@ -13,7 +13,7 @@ def load_case(case_number: int) -> dict:
     """Load a demonstration case.
 
     Args:
-        case_number: 1, 2, 3, or 4
+        case_number: 1, 2, 3, 4, 5, or 6
 
     Returns:
         dict with keys:
@@ -62,10 +62,28 @@ def load_case(case_number: int) -> dict:
             "basis": "IFRS 17 – synthetic demonstration",
             "description": "Case 4: Claims reserve roll-forward with signed GL reconciliation",
         },
+        5: {
+            "workbook": "case_5_supported_formula_demonstration.xlsx",
+            "reference_csv": "case_5_reference_figures.csv",
+            "entity": "Aurora Formula Assurance SA",
+            "period": "2025-Q4",
+            "currency": "EUR",
+            "basis": "Synthetic formula control demonstration",
+            "description": "Case 5: All supported formulas, plus explicit unsupported boundaries",
+        },
+        6: {
+            "workbook": "case_6_reserve_stress_business_impact.xlsx",
+            "reference_csv": "case_6_reference_figures.csv",
+            "entity": "Aurora General Insurance SA",
+            "period": "2025-Q4",
+            "currency": "EUR",
+            "basis": "Synthetic reserve stress demonstration",
+            "description": "Case 6: Large synthetic reserve stress and solvency impact",
+        },
     }
 
     if case_number not in cases:
-        raise ValueError(f"Case {case_number} not found. Choose 1, 2, 3, or 4.")
+        raise ValueError(f"Case {case_number} not found. Choose 1, 2, 3, 4, 5, or 6.")
 
     case_spec = cases[case_number]
 
@@ -104,4 +122,6 @@ def list_cases() -> list[dict]:
         {"number": 2, "name": "Spreadsheet Control Failures (incomplete)"},
         {"number": 3, "name": "Accounting Reconciliation Failure (block)"},
         {"number": 4, "name": "Claims Reserve Roll-Forward (pass after mapping approval)"},
+        {"number": 5, "name": "Supported Formula Demonstration (pass)"},
+        {"number": 6, "name": "Reserve Stress Business Impact (pass after mapping approval)"},
     ]
