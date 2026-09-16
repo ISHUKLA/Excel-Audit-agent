@@ -388,14 +388,12 @@
   },
   {
     "cell_ref": "Profitability Summary!B5",
-    "formula": "=SUMPRODUCT(NetCashFlows,DiscountFactors)",
+    "formula": "=SUMPRODUCT('Cash Flows'!$F$4:$F$9,'Cash Flows'!$G$4:$G$9)",
     "functions": [
       "SUMPRODUCT"
     ],
-    "supported_by_catalogue": false,
-    "unsupported_functions": [
-      "SUMPRODUCT"
-    ]
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
   },
   {
     "cell_ref": "Profitability Summary!B6",

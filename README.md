@@ -315,7 +315,7 @@ The six demonstration cases above are well-understood synthetic workbooks design
 - **Case 2 (control failures):** three findings and an incomplete reconstruction caused by an unsupported approximate lookup.
 - **Case 3 (accounts mismatch):** internal reconstruction passes while a currency mismatch blocks external reconciliation.
 - **Case 4 (reserve roll-forward):** a signed general-ledger bridge that passes after mapping approval.
-- **Case 5 (formula catalogue):** all 20 supported functions in a user-facing, fully reconciled workbook, plus explicit unsupported boundaries.
+- **Case 5 (formula catalogue):** all 26 supported functions in a user-facing, fully reconciled workbook, plus explicit unsupported boundaries.
 - **Case 6 (reserve stress):** a realistically sized synthetic calculation that quantifies reserve, own-funds and solvency-ratio impact.
 
 The formula qualification workbook under `tests/fixtures/` remains the test-only acceptance fixture. Case 5 makes the same declared function scope understandable and runnable through the actual user journey. A separate synthetic IFRS 17-related test fixture contains 10,847 formula cells, while the user-facing Case 6 contains 8,453 formula cells and an explicit business-impact bridge. Reproduce the established fixture benchmark with `python scripts/benchmark.py`; reproduce the Case 6 benchmark with `python scripts/benchmark_demo_case_6.py --runs 5`. The recorded environments and limitations are in `benchmark/BENCHMARK_REPORT.md` and `benchmark/CASE_6_BENCHMARK_REPORT.md`.

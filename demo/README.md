@@ -170,7 +170,7 @@ Gate 1 context:
 | Basis | Synthetic formula control demonstration | Synthetic formula control demonstration |
 | Signed net control total | – | 1,620,523.06 |
 
-At Gate 2, select every cell in `Outputs!C4:C23`. Each row has a unique label and account number so the external reconciliation remains one-to-one. At Gate 3, review and approve all 20 proposed mappings and select the internal and external materiality thresholds. The output table demonstrates every function in the live formula catalogue: `SUM`, `ABS`, `INT`, `ROUND`, `ROUNDUP`, `ROUNDDOWN`, `CEILING`, `FLOOR`, `SUMIF`, `SUMIFS`, `COUNTIF`, `COUNTIFS`, `AVERAGEIF`, `AVERAGEIFS`, `MINIFS`, `MAXIFS`, `IF`, exact `VLOOKUP`, exact `MATCH`, and `INDEX` including nested `INDEX/MATCH`.
+At Gate 2, select every cell in `Outputs!C4:C29`. Each row has a unique label and account number so the external reconciliation remains one-to-one. At Gate 3, review and approve all 26 proposed mappings and select the internal and external materiality thresholds. The output table demonstrates every function in the live formula catalogue: `SUM`, `ABS`, `INT`, `ROUND`, `ROUNDUP`, `ROUNDDOWN`, `CEILING`, `FLOOR`, `SUMIF`, `SUMIFS`, `COUNTIF`, `COUNTIFS`, `AVERAGEIF`, `AVERAGEIFS`, `MINIFS`, `MAXIFS`, `IF`, exact `VLOOKUP`, exact `MATCH`, `INDEX` including nested `INDEX/MATCH`, `AND`, `OR`, `SUMPRODUCT`, `NPV`, `CHOOSE`, and exact `XLOOKUP`.
 
 Expected outcomes:
 

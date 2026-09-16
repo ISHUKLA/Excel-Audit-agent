@@ -29,7 +29,13 @@
     "Outputs!C20",
     "Outputs!C21",
     "Outputs!C22",
-    "Outputs!C23"
+    "Outputs!C23",
+    "Outputs!C24",
+    "Outputs!C25",
+    "Outputs!C26",
+    "Outputs!C27",
+    "Outputs!C28",
+    "Outputs!C29"
   ],
   "formula_cases": [
     {
@@ -231,6 +237,66 @@
       "expected_value": 1.08,
       "expected_status": "complete",
       "expected_verdict": "pass"
+    },
+    {
+      "case_id": "FML-021",
+      "cell": "Outputs!C24",
+      "calculation_cell": "Calculations!B24",
+      "label": "Logical all-controls result",
+      "primary_function": "AND",
+      "expected_value": 1,
+      "expected_status": "complete",
+      "expected_verdict": "pass"
+    },
+    {
+      "case_id": "FML-022",
+      "cell": "Outputs!C25",
+      "calculation_cell": "Calculations!B25",
+      "label": "Logical any-control result",
+      "primary_function": "OR",
+      "expected_value": 1,
+      "expected_status": "complete",
+      "expected_verdict": "pass"
+    },
+    {
+      "case_id": "FML-023",
+      "cell": "Outputs!C26",
+      "calculation_cell": "Calculations!B26",
+      "label": "Weighted claim estimate",
+      "primary_function": "SUMPRODUCT",
+      "expected_value": 760400,
+      "expected_status": "complete",
+      "expected_verdict": "pass"
+    },
+    {
+      "case_id": "FML-024",
+      "cell": "Outputs!C27",
+      "calculation_cell": "Calculations!B27",
+      "label": "Present value of periodic cash flows",
+      "primary_function": "NPV",
+      "expected_value": -230.8585479133939,
+      "expected_status": "complete",
+      "expected_verdict": "pass"
+    },
+    {
+      "case_id": "FML-025",
+      "cell": "Outputs!C28",
+      "calculation_cell": "Calculations!B28",
+      "label": "Selected scenario risk factor",
+      "primary_function": "CHOOSE",
+      "expected_value": 1.08,
+      "expected_status": "complete",
+      "expected_verdict": "pass"
+    },
+    {
+      "case_id": "FML-026",
+      "cell": "Outputs!C29",
+      "calculation_cell": "Calculations!B29",
+      "label": "Exact product factor via XLOOKUP",
+      "primary_function": "XLOOKUP",
+      "expected_value": 1.08,
+      "expected_status": "complete",
+      "expected_verdict": "pass"
     }
   ],
   "unsupported_boundary_cells": [
@@ -247,42 +313,50 @@
     4
   ],
   "pdf_available_after_gate4": true,
-  "reference_control_total": 1620523.06,
+  "reference_control_total": 2380696.361452,
   "workbook_path": "demo/workbooks/case_5_supported_formula_demonstration.xlsx",
   "reference_csv_path": "demo/reference_figures/case_5_reference_figures.csv",
-  "sha256": "7e8dcb557a69a433aad2c601b67bfc8a7470a7878c11ec2b24d4abfed174a32c",
+  "sha256": "268d6504263a17a1216e99a5454262b17018752873a535839480949cebdb47cf",
   "recalculation_engine": "LibreOffice",
   "engine_version": "LibreOfficeDev 26.8.0.0.alpha0 2c87e51eeaa2b413ff4ae097b2705eea1995d8e5",
   "microsoft_excel_tested": false,
-  "formula_cell_count": 44,
+  "formula_cell_count": 56,
   "formula_count_by_function": {
     "ABS": 1,
+    "AND": 1,
     "AVERAGEIF": 1,
     "AVERAGEIFS": 1,
     "CEILING": 1,
+    "CHOOSE": 1,
     "COUNTIF": 1,
     "COUNTIFS": 1,
     "FLOOR": 1,
-    "IF": 1,
+    "IF": 3,
     "INDEX": 1,
     "INT": 1,
     "MATCH": 2,
     "MAXIFS": 1,
     "MINIFS": 1,
+    "NPV": 1,
     "OFFSET": 1,
+    "OR": 1,
     "ROUND": 1,
     "ROUNDDOWN": 1,
     "ROUNDUP": 1,
     "SUM": 3,
     "SUMIF": 1,
     "SUMIFS": 1,
-    "VLOOKUP": 2
+    "SUMPRODUCT": 1,
+    "VLOOKUP": 2,
+    "XLOOKUP": 1
   },
   "supported_functions": [
     "ABS",
+    "AND",
     "AVERAGEIF",
     "AVERAGEIFS",
     "CEILING",
+    "CHOOSE",
     "COUNTIF",
     "COUNTIFS",
     "FLOOR",
@@ -292,13 +366,17 @@
     "MATCH",
     "MAXIFS",
     "MINIFS",
+    "NPV",
+    "OR",
     "ROUND",
     "ROUNDDOWN",
     "ROUNDUP",
     "SUM",
     "SUMIF",
     "SUMIFS",
-    "VLOOKUP"
+    "SUMPRODUCT",
+    "VLOOKUP",
+    "XLOOKUP"
   ],
-  "generated_at": "2026-09-15T05:24:05.017749+00:00"
+  "generated_at": "2026-09-16T20:57:22.825718+00:00"
 }

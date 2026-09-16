@@ -514,14 +514,14 @@
     },
     {
       "case_id": "xlookup_exact",
-      "formula": "=VLOOKUP(\"Property\",Inputs!$E$4:$F$6,2,FALSE)",
+      "formula": "=_xlfn.XLOOKUP(\"Property\",Inputs!$E$4:$E$6,Inputs!$F$4:$F$6,,0,1)",
       "expected_value": 1.2,
       "expected_status": "complete",
       "expected_verdict": "pass",
       "functions": [
         "XLOOKUP"
       ],
-      "purpose": "XLOOKUP not in Excel/LibreOffice; VLOOKUP-equivalent formula used for fixture",
+      "purpose": "Exact numeric XLOOKUP, recalculated through LibreOffice",
       "cell": "Qualification!B44"
     }
   ],

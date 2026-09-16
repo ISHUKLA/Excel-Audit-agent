@@ -64,13 +64,13 @@ def test_independent_author_brief_contains_the_public_challenge_constraints():
     assert "does not validate actuarial methodology" in compact_brief
 
 
-def test_public_formula_handout_matches_the_live_20_function_catalogue():
+def test_public_formula_handout_matches_the_live_function_catalogue():
     handout = (CASE11 / "docs/PUBLIC_FORMULA_SUPPORT.md").read_text(encoding="utf-8")
     supported_section = handout.split("## Explicitly outside", 1)[0]
     listed = set(re.findall(r"`([A-Z]+)`", supported_section))
     assert listed == set(SUPPORTED_FUNCTIONS)
-    assert len(listed) == 20
-    for unsupported in ("SUMPRODUCT", "IRR", "XIRR", "OFFSET"):
+    assert len(listed) == len(SUPPORTED_FUNCTIONS)
+    for unsupported in ("IRR", "XIRR", "OFFSET"):
         assert f"`{unsupported}`" in handout
     assert "partial/incomplete" in handout
     assert "target remains empty" in handout

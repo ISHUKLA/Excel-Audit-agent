@@ -72,7 +72,7 @@
   "reference_control_total": 52177824.82,
   "workbook_path": "demo/workbooks/case_6_reserve_stress_business_impact.xlsx",
   "reference_csv_path": "demo/reference_figures/case_6_reference_figures.csv",
-  "sha256": "a5b61367e136d5eddeff2eedd766845636406f54a4c9c696fc05145baa84a58c",
+  "sha256": "d18b46c64c9744ac2e8f5b0e86a0b82ad10b47b345059dcd62e13b24d9de0725",
   "recalculation_engine": "LibreOffice",
   "engine_version": "LibreOfficeDev 26.8.0.0.alpha0 2c87e51eeaa2b413ff4ae097b2705eea1995d8e5",
   "microsoft_excel_tested": false,
@@ -101,9 +101,11 @@
   },
   "supported_functions": [
     "ABS",
+    "AND",
     "AVERAGEIF",
     "AVERAGEIFS",
     "CEILING",
+    "CHOOSE",
     "COUNTIF",
     "COUNTIFS",
     "FLOOR",
@@ -113,13 +115,17 @@
     "MATCH",
     "MAXIFS",
     "MINIFS",
+    "NPV",
+    "OR",
     "ROUND",
     "ROUNDDOWN",
     "ROUNDUP",
     "SUM",
     "SUMIF",
     "SUMIFS",
-    "VLOOKUP"
+    "SUMPRODUCT",
+    "VLOOKUP",
+    "XLOOKUP"
   ],
-  "generated_at": "2026-09-15T04:59:50.103358+00:00"
+  "generated_at": "2026-09-16T20:57:28.744872+00:00"
 }

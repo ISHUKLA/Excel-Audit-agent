@@ -137,7 +137,10 @@ function signedLine(label, account, value, evidence) {
   return {
     account_number: account,
     label,
-    amount: Math.abs(value),
+    // Reference figures and the human-entered control total use the same
+    // six-decimal currency precision. Without this, a long NPV decimal can
+    // make an otherwise complete control total fail on binary representation.
+    amount: excelRound(Math.abs(value), 6),
     debit_credit: value < 0 ? "credit" : "debit",
     ledger_source: "Synthetic formula control extract",
     evidence_reference: evidence,
@@ -177,15 +180,18 @@ async function buildCase5() {
   const exposureUnit = 100000;
   const factorByProduct = { Motor: 1.12, Property: 1.08, Liability: 1.18 };
 
-  inputs.getRange("A1:H1").values = [["Synthetic portfolio inputs"]];
-  inputs.getRange("A2:H2").values = [[
+  const portfolioWeights = [0.90, 1.05, 1.10, 0.95, 1.00, 1.15, 0.85, 1.08];
+
+  inputs.getRange("A1:I1").values = [["Synthetic portfolio inputs"]];
+  inputs.getRange("A2:I2").values = [[
     "All records and amounts are fictional. Blank optional reserves and explicit zeros are intentional.",
   ]];
-  inputs.getRange("A3:H3").values = [[
+  inputs.getRange("A3:I3").values = [[
     "Cohort ID", "Product", "Region", "Active", "Premium (EUR)", "Claim estimate (EUR)",
-    "Adjustment (EUR)", "Optional reserve (EUR)",
+    "Adjustment (EUR)", "Optional reserve (EUR)", "Portfolio weight",
   ]];
   inputs.getRange("A4:H11").values = inputRows;
+  inputs.getRange("I4:I11").values = portfolioWeights.map((value) => [value]);
 
   assumptions.getRange("A1:C1").values = [["Formula demonstration assumptions"]];
   assumptions.getRange("A3:C3").values = [["Input", "Value", "Use"]];
@@ -215,6 +221,15 @@ async function buildCase5() {
     ["Motor", factorByProduct.Motor],
     ["Property", factorByProduct.Property],
     ["Liability", factorByProduct.Liability],
+  ];
+  lookups.getRange("D1:E1").values = [["Synthetic periodic cash flows", null]];
+  lookups.getRange("D3:E3").values = [["Period", "Net cash flow (EUR)"]];
+  lookups.getRange("D4:E7").values = [[1, -1000], [2, 300], [3, 300], [4, 300]];
+  assumptions.getRange("A17:C20").values = [
+    ["Periodic discount rate", 0.10, "NPV control"],
+    ["Scenario 1 factor", 0.95, "CHOOSE control"],
+    ["Scenario 2 factor", 1.08, "CHOOSE control"],
+    ["Scenario 3 factor", 1.15, "CHOOSE control"],
   ];
 
   const cases = [
@@ -338,6 +353,42 @@ async function buildCase5() {
       expected: factorByProduct[selectedProduct],
       meaning: "Combines INDEX and MATCH to retrieve the same risk factor.",
     },
+    {
+      id: "FML-021", label: "Logical all-controls result", primary: "AND",
+      formula: "=IF(AND(Assumptions!$B$15,Assumptions!$B$15),1,0)",
+      expected: 1,
+      meaning: "Confirms that both required boolean controls are TRUE.",
+    },
+    {
+      id: "FML-022", label: "Logical any-control result", primary: "OR",
+      formula: "=IF(OR(Assumptions!$B$16,Assumptions!$B$15),1,0)",
+      expected: 1,
+      meaning: "Confirms that at least one boolean control is TRUE.",
+    },
+    {
+      id: "FML-023", label: "Weighted claim estimate", primary: "SUMPRODUCT",
+      formula: "=SUMPRODUCT(Inputs!$F$4:$F$11,Inputs!$I$4:$I$11)",
+      expected: claims.reduce((total, claim, index) => total + claim * portfolioWeights[index], 0),
+      meaning: "Weights cohort claim estimates without hiding the cohort-level drivers.",
+    },
+    {
+      id: "FML-024", label: "Present value of periodic cash flows", primary: "NPV",
+      formula: "=NPV(Assumptions!$B$17,Lookups!$E$4:$E$7)",
+      expected: -230.8585479133939,
+      meaning: "Applies Excel's period-one NPV convention to a visible cash-flow schedule.",
+    },
+    {
+      id: "FML-025", label: "Selected scenario risk factor", primary: "CHOOSE",
+      formula: "=CHOOSE(2,Assumptions!$B$18,Assumptions!$B$19,Assumptions!$B$20)",
+      expected: 1.08,
+      meaning: "Selects the second visible scenario factor using a 1-based index.",
+    },
+    {
+      id: "FML-026", label: "Exact product factor via XLOOKUP", primary: "XLOOKUP",
+      formula: "=_xlfn.XLOOKUP(Assumptions!$B$12,Lookups!$A$4:$A$6,Lookups!$B$4:$B$6,,0,1)",
+      expected: factorByProduct[selectedProduct],
+      meaning: "Retrieves a numeric exact-match factor with XLOOKUP.",
+    },
   ];
 
   const exercised = new Set(cases.flatMap((item) => {
@@ -357,19 +408,20 @@ async function buildCase5() {
     "Each row is a separate synthetic financial control. Formula inputs remain visible on the supporting tabs.",
   ]];
   calculations.getRange("A3:D3").values = [["Output label", "Calculated result", "Primary function", "Business meaning"]];
-  calculations.getRange("A4:A23").values = cases.map((item) => [item.label]);
-  calculations.getRange("B4:B23").formulas = cases.map((item) => [item.formula]);
-  calculations.getRange("C4:D23").values = cases.map((item) => [item.primary, item.meaning]);
+  const lastRow = cases.length + 3;
+  calculations.getRange(`A4:A${lastRow}`).values = cases.map((item) => [item.label]);
+  calculations.getRange(`B4:B${lastRow}`).formulas = cases.map((item) => [item.formula]);
+  calculations.getRange(`C4:D${lastRow}`).values = cases.map((item) => [item.primary, item.meaning]);
 
   outputs.getRange("A1:F1").values = [["Case 5: supported formula demonstration"]];
   outputs.getRange("A2:F2").values = [[
     "Select all cells in column C below at Gate 2. Each calculation should reconstruct completely.",
   ]];
   outputs.getRange("A3:F3").values = [["Control account", "Authoritative output", "Result", "Primary function", "Expected status", "Output cell"]];
-  outputs.getRange("A4:B23").values = cases.map((item) => [item.id, item.label]);
-  outputs.getRange("C4:C23").formulas = cases.map((_, index) => [`=Calculations!B${index + 4}`]);
-  outputs.getRange("D4:E23").values = cases.map((item) => [item.primary, "complete / pass"]);
-  outputs.getRange("F4:F23").values = cases.map((_, index) => [`Outputs!C${index + 4}`]);
+  outputs.getRange(`A4:B${lastRow}`).values = cases.map((item) => [item.id, item.label]);
+  outputs.getRange(`C4:C${lastRow}`).formulas = cases.map((_, index) => [`=Calculations!B${index + 4}`]);
+  outputs.getRange(`D4:E${lastRow}`).values = cases.map((item) => [item.primary, "complete / pass"]);
+  outputs.getRange(`F4:F${lastRow}`).values = cases.map((_, index) => [`Outputs!C${index + 4}`]);
 
   boundary.getRange("A1:C1").values = [["Deliberately unsupported boundary examples"]];
   boundary.getRange("A2:C2").values = [[
@@ -388,16 +440,16 @@ async function buildCase5() {
 
   guide.getRange("A1:C1").values = [["Case 5 demonstration guide"]];
   guide.getRange("A3:C8").values = [
-    ["Scope", "All 20 functions declared supported by the production formula catalogue.", null],
+    ["Scope", `All ${supportedFunctions.length} functions declared supported by the production formula catalogue.`, null],
     ["Synthetic data", "All entities, accounts and amounts are fictional.", null],
     ["Gate 1 context", "Aurora Formula Assurance SA; 2025-Q4; EUR; synthetic formula control demonstration.", null],
-    ["Gate 2 selection", "Select Outputs!C4:C23 as the authoritative outputs.", null],
+    ["Gate 2 selection", `Select Outputs!C4:C${lastRow} as the authoritative outputs.`, null],
     ["Gate 3", "Approve every proposed one-to-one mapping and choose both materiality thresholds.", null],
     ["Gate 4", "Create the named approval record before generating the PDF.", null],
   ];
   guide.getRange("A10:C10").values = [["Control", "Expected outcome", "Evidence"]];
   guide.getRange("A11:C15").values = [
-    ["Supported calculation population", "20 complete outputs", "Outputs!C4:C23"],
+    ["Supported calculation population", `${cases.length} complete outputs`, `Outputs!C4:C${lastRow}`],
     ["Internal reconciliation", "pass with zero deltas", "Excel cached values compared with Python reconstruction"],
     ["External reconciliation", "pass only after human mapping approval", "Synthetic formula control extract"],
     ["Unsupported boundary", "partial and incomplete", "Scope Boundary!B4:B5"],
@@ -419,14 +471,16 @@ async function buildCase5() {
   styleHeader(lookups, "A3:B3");
   styleHeader(boundary, "A3:C3");
   styleHeader(guide, "A10:C10");
-  outputs.getRange("C4:C23").format.numberFormat = currencyFormat;
-  outputs.getRange("C4:C23").format.font = { name: FONT, size: 10, color: DARK };
-  calculations.getRange("B4:B23").format.numberFormat = currencyFormat;
-  calculations.getRange("B4:B23").format.font = { name: FONT, size: 10, color: FORMULA_GREEN };
+  outputs.getRange(`C4:C${lastRow}`).format.numberFormat = currencyFormat;
+  outputs.getRange(`C4:C${lastRow}`).format.font = { name: FONT, size: 10, color: DARK };
+  calculations.getRange(`B4:B${lastRow}`).format.numberFormat = currencyFormat;
+  calculations.getRange(`B4:B${lastRow}`).format.font = { name: FONT, size: 10, color: FORMULA_GREEN };
   inputs.getRange("E4:H11").format.numberFormat = currencyFormat;
-  inputs.getRange("A4:H11").format.borders = { preset: "inside", style: "thin", color: "#E5E7EB" };
-  assumptions.getRange("B4:B16").format.fill = INPUT_YELLOW;
-  assumptions.getRange("B4:B16").format.font = { name: FONT, size: 10, color: INPUT_BLUE };
+  inputs.getRange("I4:I11").format.numberFormat = precisePercentageFormat;
+  inputs.getRange("A4:I11").format.borders = { preset: "inside", style: "thin", color: "#E5E7EB" };
+  assumptions.getRange("B4:B20").format.fill = INPUT_YELLOW;
+  assumptions.getRange("B4:B20").format.font = { name: FONT, size: 10, color: INPUT_BLUE };
+  assumptions.getRange("B17:B20").format.numberFormat = precisePercentageFormat;
   lookups.getRange("B4:B6").format.fill = INPUT_YELLOW;
   lookups.getRange("B4:B6").format.font = { name: FONT, size: 10, color: INPUT_BLUE };
   boundary.getRange("B4:B5").format.fill = RED;
@@ -436,19 +490,19 @@ async function buildCase5() {
   inputs.freezePanes.freezeRows(3);
   setWidths(outputs, { "A:A": 14, "B:B": 36, "C:C": 18, "D:D": 16, "E:E": 18, "F:F": 18 });
   setWidths(calculations, { "A:A": 36, "B:B": 18, "C:C": 16, "D:D": 62 });
-  setWidths(inputs, { "A:A": 14, "B:C": 14, "D:D": 11, "E:H": 20 });
+  setWidths(inputs, { "A:A": 14, "B:C": 14, "D:D": 11, "E:H": 20, "I:I": 16 });
   setWidths(assumptions, { "A:A": 31, "B:B": 20, "C:C": 48 });
-  setWidths(lookups, { "A:A": 20, "B:B": 16 });
+  setWidths(lookups, { "A:A": 20, "B:B": 16, "D:D": 12, "E:E": 22 });
   setWidths(boundary, { "A:A": 28, "B:B": 24, "C:C": 28 });
   setWidths(guide, { "A:A": 30, "B:B": 85, "C:C": 48 });
 
   workbook.recalculate();
   await renderPreviews(workbook, path.join(outputDir, "case5_previews"), {
-    Outputs: "A1:F23",
-    Calculations: "A1:D23",
-    Inputs: "A1:H11",
-    Assumptions: "A1:C16",
-    Lookups: "A1:B6",
+    Outputs: `A1:F${lastRow}`,
+    Calculations: `A1:D${lastRow}`,
+    Inputs: "A1:I11",
+    Assumptions: "A1:C20",
+    Lookups: "A1:E7",
     "Scope Boundary": "A1:C5",
     "Demo Guide": "A1:C15",
   });

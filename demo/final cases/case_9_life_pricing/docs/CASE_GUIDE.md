@@ -8,12 +8,13 @@ embedded directly in `Policy Projection!C4`. Supported intermediate arithmetic,
 rounding, conditional aggregation, exact lookup and cross-tab references
 reconstruct normally.
 
-The designated `Profitability Summary!B8` depends on both
-`=SUMPRODUCT(NetCashFlows,DiscountFactors)` and a valid `=IRR(NetCashFlows)`.
-Those functions remain outside the published catalogue. The workbook cache
-visibly holds a EUR 4.6 million margin, but Python supplies no substitute target
-and never describes that cache as reconstructed or verified. The internal
-verdict is `incomplete`, never `pass`.
+`=SUMPRODUCT(NetCashFlows,DiscountFactors)` now reconstructs independently, so
+the EUR 4.6 million present-value margin is traceable. The designated
+`Profitability Summary!B8` still depends on `=IRR(NetCashFlows)`, which remains
+outside the published catalogue. Python therefore supplies no substitute target
+for the designated profitability result and never describes that cached output
+as reconstructed or verified. The internal verdict is `incomplete`, never
+`pass`.
 
 No accounting figures are supplied, so the external verdict is explicitly
 `not_performed`. The live demonstration leaves the existing incomplete-result
@@ -28,7 +29,7 @@ by Glass Box.
 ## Verify
 
 Run `pytest tests/test_competition_cases_9_10.py -q`. Inspect the formula
-inventory for the two unsupported formula cells and spot-check
+inventory for the one unsupported formula cell and spot-check
 `4.6m - (-4.8m) = 9.4m`. Regenerate with
 `python scripts/generate_competition_cases.py --cases 9` plus the documented
 Node, Artifact Tool and LibreOffice paths.

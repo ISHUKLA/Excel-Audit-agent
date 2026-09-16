@@ -172,19 +172,11 @@ def qualification_cases() -> list[dict]:
         # Group I — CHOOSE. LibreOffice supports CHOOSE.
         _case("choose_index_1", "=CHOOSE(1,10,20,30)", 10.0),
         _case("choose_index_2", "=CHOOSE(2,10,20,30)", 20.0),
-        # Group E extension — XLOOKUP. This test *should* use XLOOKUP, but
-        # LibreOffice does not have XLOOKUP. So we use VLOOKUP's formula instead
-        # (=VLOOKUP("Property",Inputs!$E$4:$F$6,2,FALSE)=1.2) and then manually
-        # verify that the agent's internal XLOOKUP evaluator also produces 1.2
-        # for the same inputs (see reconciliation tests). The case framework
-        # records it as an XLOOKUP case for coverage purposes.
-        (lambda c: (c.update({"functions": ["XLOOKUP"]}), c)[1])(
-            _case(
-                "xlookup_exact",
-                '=VLOOKUP("Property",Inputs!$E$4:$F$6,2,FALSE)',
-                1.2,
-                purpose="XLOOKUP not in Excel/LibreOffice; VLOOKUP-equivalent formula used for fixture",
-            )
+        _case(
+            "xlookup_exact",
+            '=_xlfn.XLOOKUP("Property",Inputs!$E$4:$E$6,Inputs!$F$4:$F$6,,0,1)',
+            1.2,
+            purpose="Exact numeric XLOOKUP, recalculated through LibreOffice",
         ),
     ]
 

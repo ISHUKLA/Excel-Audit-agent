@@ -177,7 +177,6 @@ def test_case_9_supported_intermediates_reconstruct_but_designated_chain_is_part
     assert line.delta is None
     assert line.completeness == "partial"
     assert line.verdict == "incomplete"
-    assert any("SUMPRODUCT (unsupported)" in item for item in line.unsupported_elements)
     assert any("IRR (unsupported)" in item for item in line.unsupported_elements)
 
 
@@ -189,8 +188,8 @@ def test_case_9_inventory_and_finding_preserve_unsupported_and_hardcoded_evidenc
         for item in inventory
         for function in item["unsupported_functions"]
     }
-    assert unsupported == {"IRR", "SUMPRODUCT"}
-    assert expected["unsupported_formula_count"] == 2
+    assert unsupported == {"IRR"}
+    assert expected["unsupported_formula_count"] == 1
 
     findings = detect_anomalies(parse_workbook(_workbook_bytes(expected)))
     assert len(findings) == 1

@@ -19,3 +19,9 @@ FML-017,IF first active claim,80000,debit,Synthetic formula control extract,Case
 FML-018,Exact product risk factor,1.08,debit,Synthetic formula control extract,Case 5 formula row 18
 FML-019,Exact product table position,2,debit,Synthetic formula control extract,Case 5 formula row 19
 FML-020,Nested product risk factor,1.08,debit,Synthetic formula control extract,Case 5 formula row 20
+FML-021,Logical all-controls result,1,debit,Synthetic formula control extract,Case 5 formula row 21
+FML-022,Logical any-control result,1,debit,Synthetic formula control extract,Case 5 formula row 22
+FML-023,Weighted claim estimate,760400,debit,Synthetic formula control extract,Case 5 formula row 23
+FML-024,Present value of periodic cash flows,230.858548,credit,Synthetic formula control extract,Case 5 formula row 24
+FML-025,Selected scenario risk factor,1.08,debit,Synthetic formula control extract,Case 5 formula row 25
+FML-026,Exact product factor via XLOOKUP,1.08,debit,Synthetic formula control extract,Case 5 formula row 26

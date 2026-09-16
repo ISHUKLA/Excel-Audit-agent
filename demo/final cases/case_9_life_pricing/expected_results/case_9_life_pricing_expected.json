@@ -25,10 +25,8 @@
       "cell": "Profitability Summary!B5",
       "expected_value": 4600000,
       "tolerance": 0.01,
-      "expected_completeness": "partial",
-      "unsupported_functions": [
-        "SUMPRODUCT"
-      ]
+      "expected_completeness": "complete",
+      "unsupported_functions": []
     },
     "internal_rate_of_return": {
       "cell": "Profitability Summary!B6",
@@ -45,8 +43,7 @@
       "tolerance": 0.01,
       "expected_completeness": "partial",
       "unsupported_functions": [
-        "IRR",
-        "SUMPRODUCT"
+        "IRR"
       ]
     },
     "independent_pricing_result": {
@@ -57,10 +54,8 @@
       "cell": "Independent Pricing Reference!B5",
       "expected_value": 9400000,
       "tolerance": 0.01,
-      "expected_completeness": "partial",
-      "unsupported_functions": [
-        "SUMPRODUCT"
-      ]
+      "expected_completeness": "complete",
+      "unsupported_functions": []
     }
   },
   "expected_finding": {
@@ -69,7 +64,6 @@
     "literal": "0.03"
   },
   "unsupported_formulas": [
-    "SUMPRODUCT",
     "IRR"
   ],
   "approved_lapse": 0.06,
@@ -84,14 +78,14 @@
   "case_version": "1.0.0",
   "synthetic_data": true,
   "workbook_file": "demo/final cases/case_9_life_pricing/workbooks/case_9_life_pricing_incomplete.xlsx",
-  "workbook_sha256": "0340226f517ebf39abffa94250f778ba61e8c70735236af5845d68d776ada217",
+  "workbook_sha256": "70b865347f5bceecd0417a487fdc021d8642eeaabdf79bd90c70a717776ccd83",
   "reference_file": null,
   "reference_sha256": null,
   "reference_control_total": null,
   "formula_inventory_file": "demo/final cases/case_9_life_pricing/formula_inventories/case_9_life_pricing_formula_inventory.json",
   "formula_cell_count": 53,
-  "supported_formula_count": 51,
-  "unsupported_formula_count": 2,
+  "supported_formula_count": 52,
+  "unsupported_formula_count": 1,
   "observed_findings": [
     {
       "finding_id": "F0001",
@@ -101,6 +95,6 @@
       "raw_value": "=IF(B4>0,0.03,0)"
     }
   ],
-  "tool_git_commit": "e6c7f1f9387a4e882f433615c31ca9fc4aa00927",
+  "tool_git_commit": "227f3e680cc4243e913c6cff9f4c30f937e28b57",
   "tool_worktree_dirty_at_generation": true
 }
