@@ -54,7 +54,7 @@ This tool automates the legwork — parsing the spreadsheet, reconstructing its 
 
 ## Supported Formula Catalogue
 
-The reconstruction engine supports 20 functions across five groups:
+The reconstruction engine supports 26 functions across nine groups:
 
 **Group A — Basic arithmetic (2 functions)**
 - `ABS` — absolute value
@@ -81,12 +81,26 @@ The reconstruction engine supports 20 functions across five groups:
 - `MINIFS` — minimum of matching numeric cells
 - `MAXIFS` — maximum of matching numeric cells
 
-**Group E — Lookup functions, exact match only (3 functions)**
+**Group E — Lookup functions, exact match only (4 functions)**
 - `VLOOKUP` — exact-match column lookup (`range_lookup` must be `FALSE`; omitted or `TRUE` is reported as unsupported, since this tool does not verify the lookup column is sorted and will not silently trust an approximate match)
 - `MATCH` — exact-match position lookup (`match_type` must be `0`; the default `1` and `-1` are unsupported for the same reason)
 - `INDEX` — scalar lookup by row/column position within a 1D or 2D range (returning a whole row/column via `row_num`/`col_num` of `0` is an array result and out of scope)
+- `XLOOKUP` — exact-match lookup with flexible return array (`match_mode` 0 only; +/-1 assume sorted data and are unsupported; `search_mode` +/-1 both supported, +/-2 unsupported for consistency with the sortedness posture; `if_not_found` is parsed but not used, so a miss is unsupported like VLOOKUP/MATCH)
 
-A matched VLOOKUP/INDEX cell that holds text, rather than a number, is also reported as unsupported: every function in this catalogue feeds its result back into further arithmetic, which cannot carry a text value through.
+A matched lookup cell (from any of these four functions) that holds text, rather than a number, is also reported as unsupported: every function in this catalogue feeds its result back into further arithmetic, which cannot carry a text value through. This constraint bites particularly often for XLOOKUP, which is idiomatic for text lookups.
+
+**Group F — Logical (2 functions)**
+- `AND` — returns 1.0 if all arguments are true, 0.0 if any is false; all arguments evaluated (no short-circuit) for full verification
+- `OR` — returns 1.0 if any argument is true, 0.0 if all are false; all arguments evaluated for full verification
+
+**Group G — Array product (1 function)**
+- `SUMPRODUCT` — sums the element-wise products of ranges (all input ranges must have matching dimensions; text and blank cells coerce to 0, TRUE/FALSE to 1/0, per Excel's own SUMPRODUCT semantics, distinct from this catalogue's other functions)
+
+**Group H — Time-value-of-money (1 function)**
+- `NPV` — net present value of periodic cash flows at a fixed rate (matches Excel's exact `NPV` convention: the first cash flow is discounted at period 1, not period 0; an initial time-0 outflow is the caller's own responsibility to add outside the call, same as in Excel; text/logical cells in a range are skipped, not zero-filled, so later flows shift down by one period if an earlier cell is non-numeric)
+
+**Group I — Index-based selection (1 function)**
+- `CHOOSE` — returns one of N values based on a 1-based integer index (fractional indices truncate toward zero; only the selected value is evaluated, matching Excel's lazy evaluation; a selected value resolving to text is unsupported, the same architectural constraint as VLOOKUP/INDEX/XLOOKUP)
 
 **Out of scope:** array formulas (including CSE array formulas and dynamic-array spill behavior) remain unsupported at every group.
 

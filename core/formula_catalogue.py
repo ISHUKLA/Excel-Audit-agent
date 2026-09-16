@@ -100,9 +100,11 @@ FUNCTION_ARG_SPECS: dict[str, list[ArgRole]] = {
     "MINIFS": ["range", "range", "criteria", "range", "criteria"],
     "MAXIFS": ["range", "range", "criteria", "range", "criteria"],
     # Group C final — IF(condition, value_if_true, value_if_false). Condition
-    # is a boolean expression (comparison or cell ref, evaluated to bool; the
-    # other two are the values to return. Both branches are evaluated but only
-    # one is returned.
+    # is a boolean expression (comparison or cell ref), evaluated to bool; the
+    # other two are the values to return. Only the CHOSEN branch is ever
+    # resolved, matching Excel's own lazy evaluation (see
+    # agents/reconciliation.py's _if_evaluator) — the untaken branch's text is
+    # never touched, so IF(B1=0, 0, A1/B1) does not fail when B1 is 0.
     "IF": ["condition", "value", "value"],
     # Group E — lookup functions. Exact match only: VLOOKUP's range_lookup
     # (default TRUE) and MATCH's match_type (default 1, and -1) all assume
@@ -117,6 +119,36 @@ FUNCTION_ARG_SPECS: dict[str, list[ArgRole]] = {
     "VLOOKUP": ["value", "range", "index", "flag"],
     "MATCH": ["value", "range", "flag"],
     "INDEX": ["range", "index", "index"],
+    # XLOOKUP — exact match only (match_mode 0); +/-1 (sorted-data
+    # assumption) and 2 (wildcard) are unsupported. search_mode +/-1 are
+    # both supported (no sortedness assumption); +/-2 (binary search) are
+    # not, for consistency with match_mode's sortedness posture. if_not_found
+    # (4th arg) is parsed but not used — a miss is unsupported, matching
+    # VLOOKUP/MATCH's own "no match" behavior.
+    "XLOOKUP": ["value", "range", "range", "value", "flag", "flag"],
+    # Group F — logical. AND/OR take 1-255 arguments, all the same role
+    # ("condition") — this list names the first two only; the evaluator
+    # itself, not this catalogue, is what actually enforces argument count.
+    # No short-circuiting: every argument is evaluated, matching Excel.
+    "AND": ["condition", "condition"],
+    "OR": ["condition", "condition"],
+    # Group G — array product aggregation. Every array argument must expand
+    # to identical dimensions; text/blank cells coerce to 0, TRUE/FALSE to
+    # 1/0 (SUMPRODUCT's own numeric coercion, not shared with the criteria
+    # engine's text-equality treatment of booleans elsewhere in this file).
+    "SUMPRODUCT": ["range", "range"],
+    # Group H — time-value-of-money. `rate` is a single value; the remaining
+    # arguments are periodic cash flows (scalars or ranges) in period order.
+    # Matches Excel's own NPV exactly: the first cash flow is discounted at
+    # period 1, never period 0 — an initial time-0 outflow is the caller's
+    # own responsibility to add outside the call, same as in Excel.
+    "NPV": ["value", "range"],
+    # Group I — index-based selection. index_num is structural (which
+    # argument to return), not a business number; a fractional index_num
+    # truncates toward the integer below (Excel's own documented behavior).
+    # The selected value resolving to text is unsupported, the same
+    # architectural wall as VLOOKUP/INDEX/XLOOKUP.
+    "CHOOSE": ["index", "value", "value"],
 }
 
 SUPPORTED_FUNCTIONS = frozenset(FUNCTION_ARG_SPECS)

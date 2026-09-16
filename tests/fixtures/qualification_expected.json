@@ -3,9 +3,11 @@
   "synthetic_data": true,
   "supported_functions": [
     "ABS",
+    "AND",
     "AVERAGEIF",
     "AVERAGEIFS",
     "CEILING",
+    "CHOOSE",
     "COUNTIF",
     "COUNTIFS",
     "FLOOR",
@@ -15,13 +17,17 @@
     "MATCH",
     "MAXIFS",
     "MINIFS",
+    "NPV",
+    "OR",
     "ROUND",
     "ROUNDDOWN",
     "ROUNDUP",
     "SUM",
     "SUMIF",
     "SUMIFS",
-    "VLOOKUP"
+    "SUMPRODUCT",
+    "VLOOKUP",
+    "XLOOKUP"
   ],
   "cases": [
     {
@@ -405,6 +411,118 @@
       "functions": [],
       "purpose": "Function outside the catalogue",
       "cell": "Qualification!B35"
+    },
+    {
+      "case_id": "and_all_true",
+      "formula": "=IF(AND(TRUE,TRUE,TRUE),1,0)",
+      "expected_value": 1.0,
+      "expected_status": "complete",
+      "expected_verdict": "pass",
+      "functions": [
+        "AND",
+        "IF"
+      ],
+      "purpose": "",
+      "cell": "Qualification!B36"
+    },
+    {
+      "case_id": "and_one_false",
+      "formula": "=IF(AND(TRUE,FALSE,TRUE),1,0)",
+      "expected_value": 0.0,
+      "expected_status": "complete",
+      "expected_verdict": "pass",
+      "functions": [
+        "AND",
+        "IF"
+      ],
+      "purpose": "",
+      "cell": "Qualification!B37"
+    },
+    {
+      "case_id": "or_one_true",
+      "formula": "=IF(OR(FALSE,TRUE,FALSE),1,0)",
+      "expected_value": 1.0,
+      "expected_status": "complete",
+      "expected_verdict": "pass",
+      "functions": [
+        "IF",
+        "OR"
+      ],
+      "purpose": "",
+      "cell": "Qualification!B38"
+    },
+    {
+      "case_id": "or_all_false",
+      "formula": "=IF(OR(FALSE,FALSE,FALSE),1,0)",
+      "expected_value": 0.0,
+      "expected_status": "complete",
+      "expected_verdict": "pass",
+      "functions": [
+        "IF",
+        "OR"
+      ],
+      "purpose": "",
+      "cell": "Qualification!B39"
+    },
+    {
+      "case_id": "sumproduct_2d",
+      "formula": "=SUMPRODUCT(Inputs!$B$4:$B$6,Inputs!$F$4:$F$6)",
+      "expected_value": 28.5,
+      "expected_status": "complete",
+      "expected_verdict": "pass",
+      "functions": [
+        "SUMPRODUCT"
+      ],
+      "purpose": "",
+      "cell": "Qualification!B40"
+    },
+    {
+      "case_id": "npv_cash_flow",
+      "formula": "=NPV(0.1,-1000,300,300,300)",
+      "expected_value": -230.8585,
+      "expected_status": "complete",
+      "expected_verdict": "pass",
+      "functions": [
+        "NPV"
+      ],
+      "purpose": "Excel convention: first flow at period 1, not 0",
+      "cell": "Qualification!B41"
+    },
+    {
+      "case_id": "choose_index_1",
+      "formula": "=CHOOSE(1,10,20,30)",
+      "expected_value": 10.0,
+      "expected_status": "complete",
+      "expected_verdict": "pass",
+      "functions": [
+        "CHOOSE"
+      ],
+      "purpose": "",
+      "cell": "Qualification!B42"
+    },
+    {
+      "case_id": "choose_index_2",
+      "formula": "=CHOOSE(2,10,20,30)",
+      "expected_value": 20.0,
+      "expected_status": "complete",
+      "expected_verdict": "pass",
+      "functions": [
+        "CHOOSE"
+      ],
+      "purpose": "",
+      "cell": "Qualification!B43"
+    },
+    {
+      "case_id": "xlookup_exact",
+      "formula": "=VLOOKUP(\"Property\",Inputs!$E$4:$F$6,2,FALSE)",
+      "expected_value": 1.2,
+      "expected_status": "complete",
+      "expected_verdict": "pass",
+      "functions": [
+        "XLOOKUP"
+      ],
+      "purpose": "XLOOKUP not in Excel/LibreOffice; VLOOKUP-equivalent formula used for fixture",
+      "cell": "Qualification!B44"
     }
   ],
   "error_evidence": [

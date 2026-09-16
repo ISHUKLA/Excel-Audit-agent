@@ -616,7 +616,18 @@ _CRITERIA_CONSUMING_FUNCTIONS = {
     # VLOOKUP/MATCH's lookup_value is exactly like a criteria: a text
     # literal there (VLOOKUP("Motor", ...)) is what the function expects,
     # not "text used in arithmetic".
-    "VLOOKUP", "MATCH",
+    "VLOOKUP", "MATCH", "XLOOKUP",
+    # AND/OR's arguments are conditions exactly like IF's, and can contain
+    # the same text comparisons, e.g. AND(A1="Motor", B1>0).
+    "AND", "OR",
+    # CHOOSE(index, value1, value2, ...) commonly mixes text and numeric
+    # options in the same call — e.g. CHOOSE(2, "a", 200, "c") — and only
+    # the SELECTED value is ever touched at runtime (_choose_evaluator).
+    # Without this exemption, a text literal in an UNSELECTED slot would
+    # statically disqualify the whole formula regardless of which index is
+    # actually chosen; the runtime evaluator, not this textual pre-check,
+    # is what decides whether the one value actually picked is numeric.
+    "CHOOSE",
 }
 # Bounds the row*column expansion for a lookup function's table_array/array
 # argument, mirroring agents/parser.py's own range-expansion ceiling — a
@@ -1211,8 +1222,8 @@ def _maxifs_evaluator(
     return max_val
 
 
-def _evaluate_if_condition(condition_text: str, own_tab: str, values: dict) -> bool:
-    """Evaluate an IF condition to a boolean.
+def _evaluate_if_condition(condition_text: str, own_tab: str, values: dict) -> Optional[bool]:
+    """Evaluate an IF condition to a boolean, or None if it cannot be resolved.
 
     A condition can be:
     - A comparison (e.g., "A1>0", "A1>=B1", B1="Motor") — split on operator, evaluate both sides, compare
@@ -1221,6 +1232,17 @@ def _evaluate_if_condition(condition_text: str, own_tab: str, values: dict) -> b
 
     For equality/inequality (= and <>), use the comparison engine to handle text matching.
     For numeric comparisons, both sides must be numeric.
+
+    Returns None — never a guessed True/False — when a side of the comparison
+    (or the bare condition itself) is a genuinely unresolvable reference: a
+    dependency truly absent from `values`, or an unparseable expression. This
+    is distinct from a reference that resolves to an actual blank cell
+    (present in `values`, mapped to None), which Excel itself treats as
+    FALSE. Collapsing "unresolvable" into "False" would silently pick a
+    branch and report a computed number for a condition this tool never
+    actually evaluated — every caller (IF, and AND/OR which share this
+    function) must check for None and propagate it as unsupported rather
+    than treat it as a falsy condition.
     """
     condition = condition_text.strip()
     if condition.upper() == "TRUE":
@@ -1298,14 +1320,20 @@ def _evaluate_if_condition(condition_text: str, own_tab: str, values: dict) -> b
                     # For <>, negate the result
                     return not evaluate_criteria(left_val, right_val)
             except Exception:
-                return False
+                # An unexpected failure while resolving either side is a
+                # condition this tool couldn't evaluate — unsupported, not a
+                # false comparison it's actually confident about.
+                return None
         else:
             # Numeric comparison operators: both sides must be numeric
             left_val = _resolve_and_eval_expr(left, own_tab, values)
             right_val = _resolve_and_eval_expr(right, own_tab, values)
 
             if left_val is None or right_val is None:
-                return False
+                # Neither side resolved to a number — e.g. a genuinely
+                # missing dependency, or a comparison Excel itself would
+                # reject as #VALUE!. Not the same as "compared and False".
+                return None
 
             if operator_found == ">":
                 return left_val > right_val
@@ -1326,10 +1354,17 @@ def _evaluate_if_condition(condition_text: str, own_tab: str, values: dict) -> b
             # failed IF condition.
             result = None
         if result is None:
-            # Try as a bare cell reference
-            for key in _references_in(condition, own_tab):
-                result = values.get(key)
-                break
+            # Try as a bare cell reference. A reference genuinely absent
+            # from `values` (never resolved) is an unsupported condition —
+            # only a reference PRESENT but mapped to None is a true blank
+            # cell, which Excel does treat as FALSE (handled just below).
+            refs = _references_in(condition, own_tab)
+            if not refs:
+                return None
+            key = refs[0]
+            if key not in values:
+                return None
+            result = values.get(key)
         if result is None:
             return False
         # Coerce to boolean
@@ -1344,8 +1379,9 @@ def _if_evaluator(
     args_text: str, own_tab: str, values: dict, warnings: list[str], own_ref: str
 ) -> Optional[float]:
     """IF(condition, value_if_true, value_if_false) — returns one of two values
-    based on a boolean condition. Both branches are evaluated, but only the
-    matching one is returned."""
+    based on a boolean condition. Only the chosen branch is ever resolved —
+    matching Excel's own lazy evaluation, where IF(B1=0, 0, A1/B1) does not
+    raise #DIV/0! when B1 is 0, because the division is never reached."""
     parts = _split_function_args(args_text)
     if len(parts) != 3:
         return None
@@ -1355,6 +1391,10 @@ def _if_evaluator(
     value_if_false = parts[2].strip()
 
     condition_result = _evaluate_if_condition(condition, own_tab, values)
+    if condition_result is None:
+        # Unresolvable is not the same signal as "condition is False" — a
+        # branch was never chosen, so nothing here can be reported as complete.
+        return None
 
     chosen_branch = value_if_true if condition_result else value_if_false
 
@@ -1362,6 +1402,61 @@ def _if_evaluator(
         return _resolve_and_eval_expr(chosen_branch, own_tab, values)
     except _UnresolvableReference:
         return None
+
+
+# ---------------------------------------------------------------------------
+# Group F — logical (AND, OR)
+# ---------------------------------------------------------------------------
+
+
+def _and_evaluator(
+    args_text: str, own_tab: str, values: dict, warnings: list[str], own_ref: str
+) -> Optional[float]:
+    """AND(logical1, [logical2, ...]) — 1.0 if every argument is TRUE, else 0.0.
+
+    Every argument is evaluated regardless of an earlier one already being
+    FALSE — Excel does not short-circuit AND, and neither does this: skipping
+    a later argument could hide a genuinely unresolvable one behind an
+    already-decided result, silently reporting complete when this tool never
+    actually checked every condition.
+
+    Reuses `_evaluate_if_condition`, the same condition parser IF uses, so
+    AND/IF can never disagree about what a given argument's truth value is.
+    A range-shaped argument (`AND(A1:A3>0)`, Excel's array-formula meaning)
+    is out of scope like every other array formula: `_evaluate_if_condition`
+    has no range handling, so it fails closed to unsupported for free.
+    """
+    parts = _split_function_args(args_text)
+    if not parts:
+        return None
+    result = True
+    for part in parts:
+        condition = _evaluate_if_condition(part.strip(), own_tab, values)
+        if condition is None:
+            return None
+        result = result and condition
+    return 1.0 if result else 0.0
+
+
+def _or_evaluator(
+    args_text: str, own_tab: str, values: dict, warnings: list[str], own_ref: str
+) -> Optional[float]:
+    """OR(logical1, [logical2, ...]) — 1.0 if any argument is TRUE, else 0.0.
+
+    Same no-short-circuit rationale as `_and_evaluator`: every argument is
+    evaluated, and any single unresolvable argument makes the whole OR
+    unsupported, even if an earlier argument already resolved to TRUE.
+    """
+    parts = _split_function_args(args_text)
+    if not parts:
+        return None
+    result = False
+    for part in parts:
+        condition = _evaluate_if_condition(part.strip(), own_tab, values)
+        if condition is None:
+            return None
+        result = result or condition
+    return 1.0 if result else 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -1539,6 +1634,112 @@ def _match_evaluator(
     return None
 
 
+def _flatten_1d_table(table: list[list[str]]) -> Optional[list[str]]:
+    """A row-major `_expand_table_rows` result, flattened to 1D — or None if
+    it genuinely has more than one row AND more than one column. Shared by
+    XLOOKUP's lookup_array and return_array, both of which must be a single
+    row or a single column in real Excel (a 2D return_array is XLOOKUP's
+    row/column "spill" behavior — an array formula, out of scope)."""
+    if len(table) == 1:
+        return table[0]
+    if all(len(row) == 1 for row in table):
+        return [row[0] for row in table]
+    return None
+
+
+def _xlookup_evaluator(
+    args_text: str, own_tab: str, values: dict, warnings: list[str], own_ref: str
+) -> Optional[float]:
+    """XLOOKUP(lookup_value, lookup_array, return_array, [if_not_found],
+    [match_mode], [search_mode]).
+
+    Exact match only (match_mode 0) — the same posture as VLOOKUP/MATCH:
+    match_mode +/-1 (next larger/smaller) both assume the array is sorted,
+    which this tool cannot verify, so they are unsupported with a warning
+    rather than trusted. match_mode 2 (wildcard) is a distinct capability,
+    deliberately deferred rather than folded into this first pass.
+
+    search_mode +/-1 (first-to-last / last-to-first) are both supported —
+    neither implies a sortedness assumption, only which of several exact
+    matches wins when the lookup value repeats. search_mode +/-2 (binary
+    search) are unsupported for consistency with the sortedness posture
+    above, even though a linear scan here would give a correct answer
+    regardless of the array's actual sort order.
+
+    `if_not_found` (the 4th argument) is parsed for arity but not used — a
+    "no match" result is unsupported here exactly like VLOOKUP/MATCH's "no
+    match", rather than substituting a fallback value that might itself be
+    text this tool cannot carry forward.
+
+    A matched `return_array` cell holding text is unsupported for the same
+    architectural reason as VLOOKUP/INDEX: no evaluator in this catalogue
+    can carry a text result back into further arithmetic. This bites more
+    often for XLOOKUP than VLOOKUP in practice, since XLOOKUP is idiomatic
+    for text lookups (names, labels) at least as often as numeric ones.
+    """
+    parts = _split_function_args(args_text)
+    if len(parts) < 3 or len(parts) > 6:
+        return None
+
+    try:
+        lookup_value = _resolve_criteria_arg(parts[0], own_tab, values)
+    except _UnresolvableReference:
+        return None
+
+    lookup_table = _expand_table_rows(parts[1], own_tab)
+    if not lookup_table or not lookup_table[0]:
+        return None
+    lookup_refs = _flatten_1d_table(lookup_table)
+    if lookup_refs is None:
+        return None
+
+    return_table = _expand_table_rows(parts[2], own_tab)
+    if not return_table or not return_table[0]:
+        return None
+    return_refs = _flatten_1d_table(return_table)
+    if return_refs is None:
+        return None
+
+    if len(lookup_refs) != len(return_refs):
+        return None
+
+    match_mode = 0
+    if len(parts) >= 5:
+        match_mode_raw = _resolve_and_eval_expr(parts[4], own_tab, values)
+        if match_mode_raw is None:
+            return None
+        match_mode = int(match_mode_raw)
+    if match_mode != 0:
+        warnings.append(
+            f"{own_ref}: XLOOKUP with an approximate match_mode ({match_mode}) is "
+            f"not evaluated — this tool does not verify the lookup array is "
+            f"sorted, so an approximate match is reported as unsupported "
+            f"rather than silently computed"
+        )
+        return None
+
+    search_mode = 1
+    if len(parts) == 6:
+        search_mode_raw = _resolve_and_eval_expr(parts[5], own_tab, values)
+        if search_mode_raw is None:
+            return None
+        search_mode = int(search_mode_raw)
+    if search_mode not in (1, -1):
+        warnings.append(
+            f"{own_ref}: XLOOKUP with search_mode {search_mode} (binary search) is "
+            f"not evaluated — this tool does not verify the lookup array is "
+            f"sorted, which binary search silently assumes"
+        )
+        return None
+
+    order = range(len(lookup_refs)) if search_mode == 1 else range(len(lookup_refs) - 1, -1, -1)
+    for i in order:
+        if evaluate_criteria(values.get(lookup_refs[i]), lookup_value):
+            matched = values.get(return_refs[i])
+            return float(matched) if _is_numeric_cell_value(matched) else None
+    return None
+
+
 def _index_evaluator(
     args_text: str, own_tab: str, values: dict, warnings: list[str], own_ref: str
 ) -> Optional[float]:
@@ -1589,6 +1790,204 @@ def _index_evaluator(
     return float(matched) if _is_numeric_cell_value(matched) else None
 
 
+# ---------------------------------------------------------------------------
+# Group I — index-based selection (CHOOSE)
+# ---------------------------------------------------------------------------
+
+
+def _choose_evaluator(
+    args_text: str, own_tab: str, values: dict, warnings: list[str], own_ref: str
+) -> Optional[float]:
+    """CHOOSE(index_num, value1, [value2, ...]) — returns the value at the
+    1-based position index_num.
+
+    A fractional index_num is TRUNCATED toward the integer below it — Excel's
+    own documented behavior, not round-to-nearest (CHOOSE(1.9, ...) selects
+    value1, not value2).
+
+    Only the SELECTED value argument is ever resolved, matching Excel's (and
+    this tool's IF's) lazy evaluation — an unresolvable UNCHOSEN argument is
+    irrelevant and never touched, so CHOOSE(1, 10, 1/0) is not penalized for
+    a division error in a branch that was never taken.
+
+    The selected value resolving to text is unsupported — the same
+    architectural wall as VLOOKUP/INDEX/XLOOKUP (no evaluator here can carry
+    a text result into further arithmetic), and CHOOSE is at least as often
+    used to pick between text labels as numbers in practice.
+    """
+    parts = _split_function_args(args_text)
+    if len(parts) < 2:
+        return None
+
+    index_raw = _resolve_and_eval_expr(parts[0], own_tab, values)
+    if index_raw is None:
+        return None
+    index = math.floor(index_raw)
+    if index < 1 or index > len(parts) - 1:
+        return None
+
+    chosen = parts[index].strip()
+    try:
+        return _resolve_and_eval_expr(chosen, own_tab, values)
+    except _UnresolvableReference:
+        return None
+
+
+# ---------------------------------------------------------------------------
+# Group G — array product aggregation (SUMPRODUCT)
+# ---------------------------------------------------------------------------
+
+
+def _sumproduct_element(value) -> float:
+    """SUMPRODUCT's own numeric coercion — distinct from every other
+    evaluator's "text is unresolvable" rule.
+
+    Text and blank cells inside an array both read as 0 (Excel's actual,
+    documented SUMPRODUCT behavior — unlike bare arithmetic, where a text
+    operand is #VALUE!). TRUE/FALSE reads as 1/0, which is also a
+    SUMPRODUCT-specific rule: Group C's criteria engine treats booleans by
+    text-equality, not numeric coercion, and that convention deliberately
+    does not leak into this function.
+    """
+    if isinstance(value, bool):
+        return 1.0 if value else 0.0
+    if isinstance(value, (int, float)):
+        return float(value)
+    return 0.0
+
+
+def _sumproduct_evaluator(
+    args_text: str, own_tab: str, values: dict, warnings: list[str], own_ref: str
+) -> Optional[float]:
+    """SUMPRODUCT(array1, [array2, ...]) — sums the element-wise products of
+    matching-shaped ranges. A single argument is valid Excel and is
+    equivalent to SUM.
+
+    Every argument must be a genuine range/cell reference, expanded via the
+    row-major, shape-aware `_expand_table_rows` (not the flat
+    `_references_in`) so a same-cell-count-but-different-shape mismatch
+    (e.g. a 3x2 range against a 2x3 range) is caught as a real dimension
+    mismatch rather than silently zipped together by position. A bare
+    scalar argument — either a literal (`SUMPRODUCT(A1:A3, 2)`) or a nested
+    function's scalar result — fails `_expand_table_rows`'s reference match
+    and is unsupported: Excel's scalar-broadcast behavior for SUMPRODUCT is
+    explicitly out of scope for this first implementation.
+    """
+    parts = _split_function_args(args_text)
+    if not parts:
+        return None
+
+    arrays: list[list[list[str]]] = []
+    shape: Optional[tuple[int, int]] = None
+    for part in parts:
+        table = _expand_table_rows(part.strip(), own_tab)
+        if not table or not table[0]:
+            return None
+        this_shape = (len(table), len(table[0]))
+        if shape is None:
+            shape = this_shape
+        elif this_shape != shape:
+            return None
+        arrays.append(table)
+
+    total = 0.0
+    n_rows, n_cols = shape
+    for row in range(n_rows):
+        for col in range(n_cols):
+            product = 1.0
+            for table in arrays:
+                product *= _sumproduct_element(values.get(table[row][col]))
+            total += product
+    return total
+
+
+# ---------------------------------------------------------------------------
+# Group H — time-value-of-money (NPV)
+# ---------------------------------------------------------------------------
+
+
+def _npv_evaluator(
+    args_text: str, own_tab: str, values: dict, warnings: list[str], own_ref: str
+) -> Optional[float]:
+    """NPV(rate, value1, [value2, ...]) — net present value at a fixed rate.
+
+    Matches Excel's own NPV exactly, not a "friendlier" variant: the FIRST
+    cash flow is discounted by (1+rate)^1, not (1+rate)^0 — there is no
+    period-0 term. A workbook that wants an undiscounted time-0 outflow
+    included adds it OUTSIDE the call (Excel's own idiom: `=NPV(rate,
+    B2:B10)+B1`), which needs no special support here — it's just ordinary
+    addition applied to this function's returned scalar.
+
+    Only equally-spaced periodic cash flows are supported — this is what
+    Excel's NPV itself is (irregular/dated cash flows are XNPV, a different
+    function, out of scope).
+
+    Range arguments are flattened via the row-major `_expand_table_rows`,
+    not the column-major `_references_in`, because a genuine 2D range's
+    element ORDER determines each cash flow's period — unlike SUMPRODUCT,
+    where only shape-matching (not order) matters. Multiple arguments after
+    `rate` concatenate in argument order.
+
+    Per Excel's documented NPV behavior, a text or boolean cell inside a
+    range argument is SKIPPED, not zero-filled — it does not consume a
+    period position, so every later cash flow's period shifts down by one.
+    This is a genuine, easy-to-get-wrong Excel quirk, deliberately not
+    treated the same as SUM's or SUMPRODUCT's blank-as-zero convention.
+    """
+    parts = _split_function_args(args_text)
+    if len(parts) < 2:
+        return None
+
+    # `_resolve_and_eval_expr` already raises `_UnresolvableReference` for a
+    # bare range ("a bare range outside SUM") — a genuine range rate
+    # argument fails closed here for free. A single cell reference or a
+    # literal both resolve normally, matching Excel's own single-value rate.
+    try:
+        rate = _resolve_and_eval_expr(parts[0], own_tab, values)
+    except _UnresolvableReference:
+        return None
+    if rate is None:
+        return None
+
+    # Collected as raw resolved values (not cell keys) so a literal cash-flow
+    # argument needs no synthetic dict entry — this function never mutates
+    # the shared `values` dict.
+    raw_flows: list[object] = []
+    for part in parts[1:]:
+        part = part.strip()
+        table = _expand_table_rows(part, own_tab)
+        if table is not None:
+            for row in table:
+                raw_flows.extend(values.get(ref) for ref in row)
+            continue
+        # Not a range — a bare literal or a nested function's scalar result
+        # is still a single valid cash flow argument.
+        try:
+            raw_flows.append(float(part))
+        except ValueError:
+            return None
+
+    if not raw_flows:
+        return None
+
+    total = Decimal(0)
+    rate_decimal = Decimal(str(rate))
+    period = 0
+    for value in raw_flows:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            # Text/blank/error: skipped entirely, not zero-filled — the next
+            # cash flow keeps its own period rather than shifting into this
+            # one's slot.
+            continue
+        period += 1
+        try:
+            discount = (Decimal(1) + rate_decimal) ** period
+            total += Decimal(str(value)) / discount
+        except (ArithmeticError, ValueError):
+            return None
+    return float(total)
+
+
 # Dispatch table. Every key here must also be a key in
 # core/formula_catalogue.py's FUNCTION_ARG_SPECS (and vice versa) — enforced
 # by tests/test_reconciliation.py's catalogue/evaluator parity test, not by
@@ -1616,6 +2015,12 @@ _EVALUATORS = {
     "VLOOKUP": _vlookup_evaluator,
     "MATCH": _match_evaluator,
     "INDEX": _index_evaluator,
+    "XLOOKUP": _xlookup_evaluator,
+    "AND": _and_evaluator,
+    "OR": _or_evaluator,
+    "SUMPRODUCT": _sumproduct_evaluator,
+    "NPV": _npv_evaluator,
+    "CHOOSE": _choose_evaluator,
 }
 
 

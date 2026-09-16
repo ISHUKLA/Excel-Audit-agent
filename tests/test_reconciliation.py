@@ -1931,3 +1931,641 @@ def test_index_match_type_returns_a_text_result_is_unsupported():
     line = run_reconciliation(parsed(cells, graph), ["Provisions!D1"]).lines[0]
     assert line.target_value is None
     assert line.completeness == "partial"
+
+
+# ---------------------------------------------------------------------------
+# IF's condition path: unresolvable must never collapse into False
+# ---------------------------------------------------------------------------
+
+
+def test_if_condition_referencing_a_missing_dependency_is_unsupported():
+    """A1 is not declared as a dependency of C1 in the graph at all — a
+    reference the formula uses but the dependency graph never resolved, so
+    it's genuinely absent from `values` (distinct from a cell that IS a
+    declared dependency but happens to be blank; see the next test). Before
+    the fix this silently resolved the condition to False and picked
+    value_if_false, reporting a confident (wrong) number."""
+    cells = {
+        "Provisions!C1": cell("Provisions!C1", formula="=IF(A1>0,1,2)", value=2.0),
+    }
+    graph = {"Provisions!C1": []}
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!C1"]).lines[0]
+    assert line.target_value is None
+    assert line.completeness == "partial"
+
+
+def test_if_condition_on_a_genuinely_blank_cell_is_still_false():
+    """Unlike a missing dependency, a cell that IS present but blank (None)
+    is Excel's real FALSE — this must keep working after the fix."""
+    cells = {
+        "Provisions!A1": cell("Provisions!A1", value=None),
+        "Provisions!C1": cell("Provisions!C1", formula="=IF(A1,1,2)", value=2.0),
+    }
+    graph = {"Provisions!C1": ["Provisions!A1"], "Provisions!A1": []}
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!C1"]).lines[0]
+    assert line.target_value == 2.0
+    assert line.completeness == "complete"
+
+
+def test_if_numeric_comparison_against_a_text_cell_is_unsupported():
+    """A1>0 where A1 holds text is Excel's #VALUE! — not a false comparison
+    this tool is confident about."""
+    cells = {
+        "Provisions!A1": cell("Provisions!A1", value="not a number"),
+        "Provisions!C1": cell("Provisions!C1", formula="=IF(A1>0,1,2)", value=2.0),
+    }
+    graph = {"Provisions!C1": ["Provisions!A1"], "Provisions!A1": []}
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!C1"]).lines[0]
+    assert line.target_value is None
+    assert line.completeness == "partial"
+
+
+# ---------------------------------------------------------------------------
+# Group F — AND, OR
+# ---------------------------------------------------------------------------
+
+
+def test_and_all_true_returns_one():
+    cells = {
+        "Provisions!A1": cell("Provisions!A1", value=10.0),
+        "Provisions!B1": cell("Provisions!B1", value=5.0),
+        "Provisions!C1": cell("Provisions!C1", formula="=AND(A1>0,B1>0)", value=1.0),
+    }
+    graph = {"Provisions!C1": ["Provisions!A1", "Provisions!B1"], "Provisions!A1": [], "Provisions!B1": []}
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!C1"]).lines[0]
+    assert line.target_value == 1.0
+    assert line.completeness == "complete"
+
+
+def test_and_one_false_returns_zero():
+    cells = {
+        "Provisions!A1": cell("Provisions!A1", value=10.0),
+        "Provisions!B1": cell("Provisions!B1", value=-5.0),
+        "Provisions!C1": cell("Provisions!C1", formula="=AND(A1>0,B1>0)", value=0.0),
+    }
+    graph = {"Provisions!C1": ["Provisions!A1", "Provisions!B1"], "Provisions!A1": [], "Provisions!B1": []}
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!C1"]).lines[0]
+    assert line.target_value == 0.0
+    assert line.completeness == "complete"
+
+
+def test_and_unresolvable_argument_is_unsupported_even_after_an_earlier_false():
+    """The first argument is already decisively False, but AND must not
+    short-circuit — the second argument (B1) is never declared as a
+    dependency of C1 in the graph, so it's genuinely unresolved, and must
+    still make the whole cell unsupported, not silently reuse the False
+    verdict the first argument already produced."""
+    cells = {
+        "Provisions!A1": cell("Provisions!A1", value=-5.0),
+        "Provisions!C1": cell("Provisions!C1", formula="=AND(A1>0,B1>0)", value=0.0),
+    }
+    graph = {"Provisions!C1": ["Provisions!A1"], "Provisions!A1": []}
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!C1"]).lines[0]
+    assert line.target_value is None
+    assert line.completeness == "partial"
+
+
+def test_or_one_true_returns_one():
+    cells = {
+        "Provisions!A1": cell("Provisions!A1", value=-10.0),
+        "Provisions!B1": cell("Provisions!B1", value=5.0),
+        "Provisions!C1": cell("Provisions!C1", formula="=OR(A1>0,B1>0)", value=1.0),
+    }
+    graph = {"Provisions!C1": ["Provisions!A1", "Provisions!B1"], "Provisions!A1": [], "Provisions!B1": []}
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!C1"]).lines[0]
+    assert line.target_value == 1.0
+    assert line.completeness == "complete"
+
+
+def test_or_all_false_returns_zero():
+    cells = {
+        "Provisions!A1": cell("Provisions!A1", value=-10.0),
+        "Provisions!B1": cell("Provisions!B1", value=-5.0),
+        "Provisions!C1": cell("Provisions!C1", formula="=OR(A1>0,B1>0)", value=0.0),
+    }
+    graph = {"Provisions!C1": ["Provisions!A1", "Provisions!B1"], "Provisions!A1": [], "Provisions!B1": []}
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!C1"]).lines[0]
+    assert line.target_value == 0.0
+    assert line.completeness == "complete"
+
+
+def test_or_unresolvable_argument_is_unsupported_even_after_an_earlier_true():
+    """B1 is never declared as a dependency of C1 in the graph — genuinely
+    unresolved, distinct from a declared-but-blank dependency."""
+    cells = {
+        "Provisions!A1": cell("Provisions!A1", value=10.0),
+        "Provisions!C1": cell("Provisions!C1", formula="=OR(A1>0,B1>0)", value=1.0),
+    }
+    graph = {"Provisions!C1": ["Provisions!A1"], "Provisions!A1": []}
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!C1"]).lines[0]
+    assert line.target_value is None
+    assert line.completeness == "partial"
+
+
+def test_and_or_nest_inside_if():
+    """Exercises the innermost-out unwrapping loop: OR resolves to a literal
+    first, then AND sees a plain 1.0/0.0 rather than nested function syntax,
+    then IF picks a branch from AND's own literal result."""
+    cells = {
+        "Provisions!A1": cell("Provisions!A1", value=10.0),
+        "Provisions!B1": cell("Provisions!B1", value=-5.0),
+        "Provisions!C1": cell("Provisions!C1", value=1.0),
+        "Provisions!D1": cell(
+            "Provisions!D1", formula="=IF(AND(A1>0,OR(B1>0,C1>0)),100,200)", value=100.0
+        ),
+    }
+    graph = {
+        "Provisions!D1": ["Provisions!A1", "Provisions!B1", "Provisions!C1"],
+        "Provisions!A1": [], "Provisions!B1": [], "Provisions!C1": [],
+    }
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!D1"]).lines[0]
+    assert line.target_value == 100.0
+    assert line.completeness == "complete"
+
+
+def test_and_text_equality_condition():
+    cells = {
+        "Provisions!A1": cell("Provisions!A1", value="Motor"),
+        "Provisions!B1": cell("Provisions!B1", value=10.0),
+        "Provisions!C1": cell(
+            "Provisions!C1", formula='=AND(A1="Motor",B1>0)', value=1.0
+        ),
+    }
+    graph = {"Provisions!C1": ["Provisions!A1", "Provisions!B1"], "Provisions!A1": [], "Provisions!B1": []}
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!C1"]).lines[0]
+    assert line.target_value == 1.0
+    assert line.completeness == "complete"
+
+
+# ---------------------------------------------------------------------------
+# Group G — SUMPRODUCT
+# ---------------------------------------------------------------------------
+
+
+def _sumproduct_table_cells():
+    return {
+        "Provisions!A1": cell("Provisions!A1", value=1.0),
+        "Provisions!A2": cell("Provisions!A2", value=2.0),
+        "Provisions!A3": cell("Provisions!A3", value=3.0),
+        "Provisions!B1": cell("Provisions!B1", value=10.0),
+        "Provisions!B2": cell("Provisions!B2", value=20.0),
+        "Provisions!B3": cell("Provisions!B3", value=30.0),
+    }
+
+
+def _sumproduct_graph():
+    return {
+        "Provisions!A1": [], "Provisions!A2": [], "Provisions!A3": [],
+        "Provisions!B1": [], "Provisions!B2": [], "Provisions!B3": [],
+    }
+
+
+def test_sumproduct_two_ranges_numeric():
+    cells = dict(_sumproduct_table_cells())
+    cells["Provisions!C1"] = cell(
+        "Provisions!C1", formula="=SUMPRODUCT(A1:A3,B1:B3)", value=140.0
+    )
+    graph = dict(_sumproduct_graph())
+    graph["Provisions!C1"] = ["Provisions!A1", "Provisions!A2", "Provisions!A3", "Provisions!B1", "Provisions!B2", "Provisions!B3"]
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!C1"]).lines[0]
+    assert line.target_value == pytest.approx(140.0)
+    assert line.completeness == "complete"
+
+
+def test_sumproduct_single_range_equals_sum():
+    cells = dict(_sumproduct_table_cells())
+    cells["Provisions!C1"] = cell("Provisions!C1", formula="=SUMPRODUCT(A1:A3)", value=6.0)
+    graph = dict(_sumproduct_graph())
+    graph["Provisions!C1"] = ["Provisions!A1", "Provisions!A2", "Provisions!A3"]
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!C1"]).lines[0]
+    assert line.target_value == pytest.approx(6.0)
+    assert line.completeness == "complete"
+
+
+def test_sumproduct_text_cell_coerced_to_zero():
+    cells = dict(_sumproduct_table_cells())
+    cells["Provisions!A2"] = cell("Provisions!A2", value="not numeric")
+    cells["Provisions!C1"] = cell(
+        "Provisions!C1", formula="=SUMPRODUCT(A1:A3,B1:B3)", value=100.0
+    )
+    graph = dict(_sumproduct_graph())
+    graph["Provisions!C1"] = ["Provisions!A1", "Provisions!A2", "Provisions!A3", "Provisions!B1", "Provisions!B2", "Provisions!B3"]
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!C1"]).lines[0]
+    # A2's text drops its whole product term (2*20=40) to 0: 1*10 + 0 + 3*30 = 100
+    assert line.target_value == pytest.approx(100.0)
+    assert line.completeness == "complete"
+
+
+def test_sumproduct_boolean_cell_coerced_to_one_or_zero():
+    cells = dict(_sumproduct_table_cells())
+    cells["Provisions!A1"] = cell("Provisions!A1", value=True)
+    cells["Provisions!A2"] = cell("Provisions!A2", value=False)
+    cells["Provisions!C1"] = cell(
+        "Provisions!C1", formula="=SUMPRODUCT(A1:A3,B1:B3)", value=100.0
+    )
+    graph = dict(_sumproduct_graph())
+    graph["Provisions!C1"] = ["Provisions!A1", "Provisions!A2", "Provisions!A3", "Provisions!B1", "Provisions!B2", "Provisions!B3"]
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!C1"]).lines[0]
+    # TRUE*10 + FALSE*20 + 3*30 = 10 + 0 + 90 = 100
+    assert line.target_value == pytest.approx(100.0)
+    assert line.completeness == "complete"
+
+
+def test_sumproduct_mismatched_dimensions_is_unsupported():
+    cells = dict(_sumproduct_table_cells())
+    cells["Provisions!C1"] = cell(
+        "Provisions!C1", formula="=SUMPRODUCT(A1:A3,B1:B2)", value=0.0
+    )
+    graph = dict(_sumproduct_graph())
+    graph["Provisions!C1"] = ["Provisions!A1", "Provisions!A2", "Provisions!A3", "Provisions!B1", "Provisions!B2"]
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!C1"]).lines[0]
+    assert line.target_value is None
+    assert line.completeness == "partial"
+
+
+def test_sumproduct_scalar_broadcast_argument_is_unsupported():
+    """Excel would broadcast a bare scalar across the other array; this
+    first implementation deliberately does not, and must not guess."""
+    cells = dict(_sumproduct_table_cells())
+    cells["Provisions!C1"] = cell(
+        "Provisions!C1", formula="=SUMPRODUCT(A1:A3,2)", value=0.0
+    )
+    graph = dict(_sumproduct_graph())
+    graph["Provisions!C1"] = ["Provisions!A1", "Provisions!A2", "Provisions!A3"]
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!C1"]).lines[0]
+    assert line.target_value is None
+    assert line.completeness == "partial"
+
+
+def test_sumproduct_nested_inside_sum():
+    cells = dict(_sumproduct_table_cells())
+    cells["Provisions!D1"] = cell("Provisions!D1", value=1000.0)
+    cells["Provisions!C1"] = cell(
+        "Provisions!C1", formula="=SUM(D1,SUMPRODUCT(A1:A3,B1:B3))", value=1140.0
+    )
+    graph = dict(_sumproduct_graph())
+    graph["Provisions!D1"] = []
+    graph["Provisions!C1"] = ["Provisions!D1", "Provisions!A1", "Provisions!A2", "Provisions!A3", "Provisions!B1", "Provisions!B2", "Provisions!B3"]
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!C1"]).lines[0]
+    assert line.target_value == pytest.approx(1140.0)
+    assert line.completeness == "complete"
+
+
+# ---------------------------------------------------------------------------
+# Group H — NPV
+# ---------------------------------------------------------------------------
+
+
+def test_npv_hand_calculated_cash_flow():
+    """NPV(0.1, -1000, 300, 300, 300) = -1000/1.1 + 300/1.1^2 + 300/1.1^3 +
+    300/1.1^4 ~= -230.86 (hand-verifiable: first flow at PERIOD 1, not 0)."""
+    cells = {
+        "Provisions!C1": cell(
+            "Provisions!C1", formula="=NPV(0.1,-1000,300,300,300)", value=-230.86
+        ),
+    }
+    graph = {"Provisions!C1": []}
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!C1"]).lines[0]
+    assert line.target_value == pytest.approx(-230.858, abs=0.01)
+    assert line.completeness == "complete"
+
+
+def test_npv_zero_rate_is_plain_sum():
+    cells = {
+        "Provisions!C1": cell("Provisions!C1", formula="=NPV(0,100,100,100)", value=300.0),
+    }
+    graph = {"Provisions!C1": []}
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!C1"]).lines[0]
+    assert line.target_value == pytest.approx(300.0)
+    assert line.completeness == "complete"
+
+
+def test_npv_range_argument():
+    cells = {
+        "Provisions!A1": cell("Provisions!A1", value=-1000.0),
+        "Provisions!A2": cell("Provisions!A2", value=300.0),
+        "Provisions!A3": cell("Provisions!A3", value=300.0),
+        "Provisions!A4": cell("Provisions!A4", value=300.0),
+        "Provisions!C1": cell("Provisions!C1", formula="=NPV(0.1,A1:A4)", value=-230.86),
+    }
+    graph = {
+        "Provisions!C1": ["Provisions!A1", "Provisions!A2", "Provisions!A3", "Provisions!A4"],
+        "Provisions!A1": [], "Provisions!A2": [], "Provisions!A3": [], "Provisions!A4": [],
+    }
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!C1"]).lines[0]
+    assert line.target_value == pytest.approx(-230.858, abs=0.01)
+    assert line.completeness == "complete"
+
+
+def test_npv_rate_from_a_cell_reference():
+    cells = {
+        "Provisions!R1": cell("Provisions!R1", value=0.1),
+        "Provisions!C1": cell(
+            "Provisions!C1", formula="=NPV(R1,-1000,300,300,300)", value=-230.86
+        ),
+    }
+    graph = {"Provisions!C1": ["Provisions!R1"], "Provisions!R1": []}
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!C1"]).lines[0]
+    assert line.target_value == pytest.approx(-230.858, abs=0.01)
+    assert line.completeness == "complete"
+
+
+def test_npv_rate_as_a_range_is_unsupported():
+    cells = {
+        "Provisions!A1": cell("Provisions!A1", value=0.1),
+        "Provisions!A2": cell("Provisions!A2", value=0.2),
+        "Provisions!C1": cell("Provisions!C1", formula="=NPV(A1:A2,300,300)", value=0.0),
+    }
+    graph = {"Provisions!C1": ["Provisions!A1", "Provisions!A2"], "Provisions!A1": [], "Provisions!A2": []}
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!C1"]).lines[0]
+    assert line.target_value is None
+    assert line.completeness == "partial"
+
+
+def test_npv_text_cell_in_range_is_skipped_not_zero_filled():
+    """A2 holds text: Excel's real NPV behavior SKIPS it (does not consume a
+    period), so A3's 300 lands at period 2, not period 3. Hand-check:
+    -1000/1.1^1 + 300/1.1^2 = -909.0909... + 247.9339... ~= -661.157."""
+    cells = {
+        "Provisions!A1": cell("Provisions!A1", value=-1000.0),
+        "Provisions!A2": cell("Provisions!A2", value="not a cash flow"),
+        "Provisions!A3": cell("Provisions!A3", value=300.0),
+        "Provisions!C1": cell("Provisions!C1", formula="=NPV(0.1,A1:A3)", value=-661.16),
+    }
+    graph = {
+        "Provisions!C1": ["Provisions!A1", "Provisions!A2", "Provisions!A3"],
+        "Provisions!A1": [], "Provisions!A2": [], "Provisions!A3": [],
+    }
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!C1"]).lines[0]
+    assert line.target_value == pytest.approx(-661.157, abs=0.01)
+    assert line.completeness == "complete"
+
+
+def test_npv_unresolvable_rate_is_unsupported():
+    cells = {
+        "Provisions!C1": cell("Provisions!C1", formula="=NPV(A1,300,300)", value=0.0),
+    }
+    graph = {"Provisions!C1": []}
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!C1"]).lines[0]
+    assert line.target_value is None
+    assert line.completeness == "partial"
+
+
+def test_npv_requires_at_least_one_cash_flow():
+    cells = {
+        "Provisions!C1": cell("Provisions!C1", formula="=NPV(0.1)", value=0.0),
+    }
+    graph = {"Provisions!C1": []}
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!C1"]).lines[0]
+    assert line.target_value is None
+    assert line.completeness == "partial"
+
+
+# ---------------------------------------------------------------------------
+# XLOOKUP
+# ---------------------------------------------------------------------------
+
+
+def _xlookup_table_cells():
+    return {
+        "Provisions!A1": cell("Provisions!A1", value="Motor"),
+        "Provisions!B1": cell("Provisions!B1", value=1.5),
+        "Provisions!A2": cell("Provisions!A2", value="Property"),
+        "Provisions!B2": cell("Provisions!B2", value=2.0),
+        "Provisions!A3": cell("Provisions!A3", value="Liability"),
+        "Provisions!B3": cell("Provisions!B3", value=1.75),
+    }
+
+
+def _xlookup_graph():
+    return {
+        "Provisions!A1": [], "Provisions!B1": [],
+        "Provisions!A2": [], "Provisions!B2": [],
+        "Provisions!A3": [], "Provisions!B3": [],
+    }
+
+
+def test_xlookup_exact_match_numeric_result():
+    cells = dict(_xlookup_table_cells())
+    cells["Provisions!D1"] = cell(
+        "Provisions!D1", formula='=XLOOKUP("Property",A1:A3,B1:B3)', value=2.0
+    )
+    graph = dict(_xlookup_graph())
+    graph["Provisions!D1"] = ["Provisions!A1", "Provisions!A2", "Provisions!A3", "Provisions!B1", "Provisions!B2", "Provisions!B3"]
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!D1"]).lines[0]
+    assert line.target_value == 2.0
+    assert line.completeness == "complete"
+
+
+def test_xlookup_exact_match_text_result_is_unsupported():
+    """XLOOKUP returning a text cell (its most idiomatic use — looking up a
+    label) hits the same architectural wall as VLOOKUP/INDEX: no evaluator
+    in this catalogue can carry text back into further arithmetic."""
+    cells = dict(_xlookup_table_cells())
+    cells["Provisions!D1"] = cell(
+        "Provisions!D1", formula='=XLOOKUP(2,B1:B3,A1:A3)', value="Property"
+    )
+    graph = dict(_xlookup_graph())
+    graph["Provisions!D1"] = ["Provisions!A1", "Provisions!A2", "Provisions!A3", "Provisions!B1", "Provisions!B2", "Provisions!B3"]
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!D1"]).lines[0]
+    assert line.target_value is None
+    assert line.completeness == "partial"
+
+
+def test_xlookup_no_match_is_incomplete_not_a_guess():
+    cells = dict(_xlookup_table_cells())
+    cells["Provisions!D1"] = cell(
+        "Provisions!D1", formula='=XLOOKUP("Marine",A1:A3,B1:B3)', value=0.0
+    )
+    graph = dict(_xlookup_graph())
+    graph["Provisions!D1"] = ["Provisions!A1", "Provisions!A2", "Provisions!A3", "Provisions!B1", "Provisions!B2", "Provisions!B3"]
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!D1"]).lines[0]
+    assert line.target_value is None
+    assert line.completeness == "partial"
+
+
+def test_xlookup_approximate_match_mode_is_unsupported_with_warning():
+    cells = dict(_xlookup_table_cells())
+    cells["Provisions!D1"] = cell(
+        "Provisions!D1", formula='=XLOOKUP("Property",A1:A3,B1:B3,,1)', value=2.0
+    )
+    graph = dict(_xlookup_graph())
+    graph["Provisions!D1"] = ["Provisions!A1", "Provisions!A2", "Provisions!A3", "Provisions!B1", "Provisions!B2", "Provisions!B3"]
+    warnings: list[str] = []
+    result = run_reconciliation(parsed(cells, graph), ["Provisions!D1"], warnings=warnings)
+    line = result.lines[0]
+    assert line.target_value is None
+    assert line.completeness == "partial"
+    assert any("match_mode" in w for w in warnings)
+
+
+def test_xlookup_binary_search_mode_is_unsupported():
+    cells = dict(_xlookup_table_cells())
+    cells["Provisions!D1"] = cell(
+        "Provisions!D1", formula='=XLOOKUP("Property",A1:A3,B1:B3,,0,2)', value=2.0
+    )
+    graph = dict(_xlookup_graph())
+    graph["Provisions!D1"] = ["Provisions!A1", "Provisions!A2", "Provisions!A3", "Provisions!B1", "Provisions!B2", "Provisions!B3"]
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!D1"]).lines[0]
+    assert line.target_value is None
+    assert line.completeness == "partial"
+
+
+def test_xlookup_reverse_search_mode_finds_the_last_match():
+    """Two rows share the lookup value "Motor"; search_mode -1 (last-to-
+    first) must return B2's value, not B1's — this is a real Excel
+    capability, not a sortedness assumption, so it's supported."""
+    cells = dict(_xlookup_table_cells())
+    cells["Provisions!A2"] = cell("Provisions!A2", value="Motor")
+    cells["Provisions!D1"] = cell(
+        "Provisions!D1", formula='=XLOOKUP("Motor",A1:A3,B1:B3,,0,-1)', value=2.0
+    )
+    graph = dict(_xlookup_graph())
+    graph["Provisions!D1"] = ["Provisions!A1", "Provisions!A2", "Provisions!A3", "Provisions!B1", "Provisions!B2", "Provisions!B3"]
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!D1"]).lines[0]
+    assert line.target_value == 2.0
+    assert line.completeness == "complete"
+
+
+def test_xlookup_mismatched_array_lengths_is_unsupported():
+    cells = dict(_xlookup_table_cells())
+    cells["Provisions!D1"] = cell(
+        "Provisions!D1", formula='=XLOOKUP("Property",A1:A3,B1:B2)', value=0.0
+    )
+    graph = dict(_xlookup_graph())
+    graph["Provisions!D1"] = ["Provisions!A1", "Provisions!A2", "Provisions!A3", "Provisions!B1", "Provisions!B2"]
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!D1"]).lines[0]
+    assert line.target_value is None
+    assert line.completeness == "partial"
+
+
+def test_xlookup_2d_return_array_is_unsupported():
+    cells = dict(_xlookup_table_cells())
+    cells["Provisions!D1"] = cell(
+        "Provisions!D1", formula='=XLOOKUP("Property",A1:A3,A1:B3)', value=0.0
+    )
+    graph = dict(_xlookup_graph())
+    graph["Provisions!D1"] = ["Provisions!A1", "Provisions!A2", "Provisions!A3", "Provisions!B1", "Provisions!B2", "Provisions!B3"]
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!D1"]).lines[0]
+    assert line.target_value is None
+    assert line.completeness == "partial"
+
+
+# ---------------------------------------------------------------------------
+# Group I — CHOOSE
+# ---------------------------------------------------------------------------
+
+
+def test_choose_index_1_returns_first_value():
+    cells = {
+        "Provisions!C1": cell("Provisions!C1", formula="=CHOOSE(1,10,20,30)", value=10.0),
+    }
+    graph = {"Provisions!C1": []}
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!C1"]).lines[0]
+    assert line.target_value == 10.0
+    assert line.completeness == "complete"
+
+
+def test_choose_index_3_returns_third_value():
+    cells = {
+        "Provisions!C1": cell("Provisions!C1", formula="=CHOOSE(3,10,20,30)", value=30.0),
+    }
+    graph = {"Provisions!C1": []}
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!C1"]).lines[0]
+    assert line.target_value == 30.0
+    assert line.completeness == "complete"
+
+
+def test_choose_index_from_a_cell_reference():
+    cells = {
+        "Provisions!B1": cell("Provisions!B1", value=2.0),
+        "Provisions!C1": cell("Provisions!C1", formula="=CHOOSE(B1,10,20,30)", value=20.0),
+    }
+    graph = {"Provisions!C1": ["Provisions!B1"], "Provisions!B1": []}
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!C1"]).lines[0]
+    assert line.target_value == 20.0
+    assert line.completeness == "complete"
+
+
+def test_choose_fractional_index_truncates_not_rounds():
+    """CHOOSE(1.9, ...) selects value1, not value2 — Excel truncates toward
+    the integer below, it does not round to nearest."""
+    cells = {
+        "Provisions!C1": cell("Provisions!C1", formula="=CHOOSE(1.9,10,20,30)", value=10.0),
+    }
+    graph = {"Provisions!C1": []}
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!C1"]).lines[0]
+    assert line.target_value == 10.0
+    assert line.completeness == "complete"
+
+
+def test_choose_selected_text_result_is_unsupported():
+    cells = {
+        "Provisions!C1": cell("Provisions!C1", formula='=CHOOSE(1,"a","b")', value="a"),
+    }
+    graph = {"Provisions!C1": []}
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!C1"]).lines[0]
+    assert line.target_value is None
+    assert line.completeness == "partial"
+
+
+def test_choose_unselected_text_option_does_not_block_a_numeric_pick():
+    """A mixed numeric/text option list is common; only the SELECTED slot
+    (index 2, numeric) is ever touched — the unselected text options must
+    not disqualify the formula."""
+    cells = {
+        "Provisions!C1": cell(
+            "Provisions!C1", formula='=CHOOSE(2,"a",200,"c")', value=200.0
+        ),
+    }
+    graph = {"Provisions!C1": []}
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!C1"]).lines[0]
+    assert line.target_value == 200.0
+    assert line.completeness == "complete"
+
+
+def test_choose_out_of_range_index_is_unsupported_not_a_crash():
+    cells = {
+        "Provisions!C1": cell("Provisions!C1", formula="=CHOOSE(5,10,20,30)", value=0.0),
+    }
+    graph = {"Provisions!C1": []}
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!C1"]).lines[0]
+    assert line.target_value is None
+    assert line.completeness == "partial"
+
+
+def test_choose_index_below_one_is_unsupported():
+    cells = {
+        "Provisions!C1": cell("Provisions!C1", formula="=CHOOSE(0,10,20,30)", value=0.0),
+    }
+    graph = {"Provisions!C1": []}
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!C1"]).lines[0]
+    assert line.target_value is None
+    assert line.completeness == "partial"
+
+
+def test_choose_unresolvable_unselected_branch_does_not_block_the_selection():
+    """CHOOSE is lazy like IF: value2's division by zero is never evaluated
+    because index 1 is selected."""
+    cells = {
+        "Provisions!C1": cell(
+            "Provisions!C1", formula="=CHOOSE(1,10,1/0)", value=10.0
+        ),
+    }
+    graph = {"Provisions!C1": []}
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!C1"]).lines[0]
+    assert line.target_value == 10.0
+    assert line.completeness == "complete"
+
+
+def test_choose_nested_inside_sum():
+    cells = {
+        "Provisions!D1": cell("Provisions!D1", value=1000.0),
+        "Provisions!C1": cell(
+            "Provisions!C1", formula="=SUM(D1,CHOOSE(2,10,20,30))", value=1020.0
+        ),
+    }
+    graph = {"Provisions!C1": ["Provisions!D1"], "Provisions!D1": []}
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!C1"]).lines[0]
+    assert line.target_value == pytest.approx(1020.0)
+    assert line.completeness == "complete"

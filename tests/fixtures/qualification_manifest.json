@@ -1,18 +1,20 @@
 {
   "schema_version": 1,
-  "qualified_at": "2026-09-14T13:50:05.959130+00:00",
+  "qualified_at": "2026-09-16T19:59:03.029632+00:00",
   "recalculation_engine": "LibreOffice",
-  "engine_version": "LibreOfficeDev 26.8.0.0.alpha0 2c87e51eeaa2b413ff4ae097b2705eea1995d8e5",
+  "engine_version": "LibreOffice 26.2.5.2 cd7284b4cbbfeb507e630c1aac019f4157393acb",
   "microsoft_excel_tested": false,
   "workbook": "tests/fixtures/qualification_workbook.xlsx",
-  "sha256": "d6eaaf11c98861ef4218d4a72f453edf86f8cde9c9d7a5c52d049d8d439a7bc0",
+  "sha256": "dde8d8b4c1be6c48694a134ecd00130ce281b0e07f12a07bba17d3f17dedbb98",
   "generation_command": "python scripts/generate_qualification_workbook.py",
   "recalculation_command": "bash scripts/recalculate_with_libreoffice.sh",
   "supported_functions": [
     "ABS",
+    "AND",
     "AVERAGEIF",
     "AVERAGEIFS",
     "CEILING",
+    "CHOOSE",
     "COUNTIF",
     "COUNTIFS",
     "FLOOR",
@@ -22,17 +24,25 @@
     "MATCH",
     "MAXIFS",
     "MINIFS",
+    "NPV",
+    "OR",
     "ROUND",
     "ROUNDDOWN",
     "ROUNDUP",
     "SUM",
     "SUMIF",
     "SUMIFS",
-    "VLOOKUP"
+    "SUMPRODUCT",
+    "VLOOKUP",
+    "XLOOKUP"
   ],
   "formula_manifest": {
     "ABS": [
       "Qualification!B5"
+    ],
+    "AND": [
+      "Qualification!B36",
+      "Qualification!B37"
     ],
     "AVERAGEIF": [
       "Qualification!B17"
@@ -42,6 +52,10 @@
     ],
     "CEILING": [
       "Qualification!B11"
+    ],
+    "CHOOSE": [
+      "Qualification!B42",
+      "Qualification!B43"
     ],
     "COUNTIF": [
       "Qualification!B15"
@@ -54,7 +68,14 @@
       "Inputs!D7",
       "Qualification!B22",
       "Qualification!B24",
-      "Qualification!B25"
+      "Qualification!B25",
+      "Qualification!B37",
+      "Qualification!B38",
+      "Qualification!B38",
+      "Qualification!B39",
+      "Qualification!B39",
+      "Qualification!B39",
+      "Qualification!B44"
     ],
     "FLOOR": [
       "Qualification!B12"
@@ -63,7 +84,11 @@
       "Qualification!B21",
       "Qualification!B22",
       "Qualification!B23",
-      "Qualification!B24"
+      "Qualification!B24",
+      "Qualification!B36",
+      "Qualification!B37",
+      "Qualification!B38",
+      "Qualification!B39"
     ],
     "INDEX": [
       "Qualification!B27",
@@ -87,8 +112,15 @@
     "NA": [
       "Errors!B4"
     ],
+    "NPV": [
+      "Qualification!B41"
+    ],
     "OFFSET": [
       "Qualification!B35"
+    ],
+    "OR": [
+      "Qualification!B38",
+      "Qualification!B39"
     ],
     "ROUND": [
       "Qualification!B29",
@@ -112,6 +144,9 @@
     "SUMIFS": [
       "Qualification!B14"
     ],
+    "SUMPRODUCT": [
+      "Qualification!B40"
+    ],
     "TRUE": [
       "Inputs!D4",
       "Inputs!D6",
@@ -119,11 +154,18 @@
       "Qualification!B16",
       "Qualification!B21",
       "Qualification!B23",
-      "Qualification!B32"
+      "Qualification!B32",
+      "Qualification!B36",
+      "Qualification!B36",
+      "Qualification!B36",
+      "Qualification!B37",
+      "Qualification!B37",
+      "Qualification!B38"
     ],
     "VLOOKUP": [
       "Qualification!B25",
-      "Qualification!B32"
+      "Qualification!B32",
+      "Qualification!B44"
     ]
   },
   "all_formula_cells": {
@@ -164,7 +206,16 @@
     "Qualification!B33": "=MATCH(\"Property\",Inputs!$E$4:$E$6,1)",
     "Qualification!B34": "=INDEX(Inputs!$B$4:$B$8,0)",
     "Qualification!B35": "=OFFSET(Inputs!$B$4,1,0)",
+    "Qualification!B36": "=IF(AND(TRUE(),TRUE(),TRUE()),1,0)",
+    "Qualification!B37": "=IF(AND(TRUE(),FALSE(),TRUE()),1,0)",
+    "Qualification!B38": "=IF(OR(FALSE(),TRUE(),FALSE()),1,0)",
+    "Qualification!B39": "=IF(OR(FALSE(),FALSE(),FALSE()),1,0)",
     "Qualification!B4": "=SUM(Inputs!$B$4:$B$8)",
+    "Qualification!B40": "=SUMPRODUCT(Inputs!$B$4:$B$6,Inputs!$F$4:$F$6)",
+    "Qualification!B41": "=NPV(0.1,-1000,300,300,300)",
+    "Qualification!B42": "=CHOOSE(1,10,20,30)",
+    "Qualification!B43": "=CHOOSE(2,10,20,30)",
+    "Qualification!B44": "=VLOOKUP(\"Property\",Inputs!$E$4:$F$6,2,FALSE())",
     "Qualification!B5": "=ABS(Inputs!$B$6)",
     "Qualification!B6": "=INT(-1.2)",
     "Qualification!B7": "=ROUND(2.5,0)",
