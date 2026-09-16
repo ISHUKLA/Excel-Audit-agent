@@ -102,6 +102,18 @@ A matched lookup cell (from any of these four functions) that holds text, rather
 **Group I — Index-based selection (1 function)**
 - `CHOOSE` — returns one of N values based on a 1-based integer index (fractional indices truncate toward zero; only the selected value is evaluated, matching Excel's lazy evaluation; a selected value resolving to text is unsupported, the same architectural constraint as VLOOKUP/INDEX/XLOOKUP)
 
+### Implementation notes
+
+**Group F (AND, OR):** All arguments evaluated (no short-circuit) for full verification. Fixed IF/AND/OR condition-evaluation bug: unresolvable conditions now properly unsupported instead of silently guessed as False.
+
+**Group G (SUMPRODUCT):** Row-major range expansion, dimension-mismatch fail-closed. Text/blank/boolean coercion matches Excel's documented SUMPRODUCT semantics.
+
+**Group H (NPV):** Excel's exact timing (period 1, not 0). Text/logical cells skipped without zero-filling per Excel's documented behavior.
+
+**Group I (CHOOSE):** Lazy evaluation of only selected branch. Fractional index truncates toward zero, matching Excel exactly.
+
+**Group E extended:** XLOOKUP joins VLOOKUP/MATCH/INDEX for exact-match lookup. All four share the "matched text is unsupported" architectural constraint.
+
 **Out of scope:** array formulas (including CSE array formulas and dynamic-array spill behavior) remain unsupported at every group.
 
 ---
