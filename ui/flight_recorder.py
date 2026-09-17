@@ -18,6 +18,8 @@ from core.flight_recorder_state import (
     describe_node,
     describe_pipeline,
     NODE_ORDER,
+    PipelineState,
+    NodeDefinition,
 )
 
 
@@ -42,7 +44,7 @@ def display_flight_recorder(audit_log: AuditLog, report_id: str) -> None:
     _render_chain_verification(chain_valid, chain_message, audit_log, report_id)
 
 
-def _render_header(report_id: str, state) -> None:
+def _render_header(report_id: str, state: PipelineState) -> None:
     """Render title, subtitle, and metric boxes."""
     st.markdown(f"## Governance Flight Recorder — Report `{report_id}`")
     st.markdown("### Live Execution Map")
@@ -63,7 +65,7 @@ def _render_header(report_id: str, state) -> None:
     st.divider()
 
 
-def _render_cascading_lock_warning(state) -> None:
+def _render_cascading_lock_warning(state: PipelineState) -> None:
     """Render a red banner if pipeline is locked due to gate_3 block."""
     if state.is_all_locked and state.blocking_node:
         st.warning(
@@ -73,7 +75,7 @@ def _render_cascading_lock_warning(state) -> None:
         st.divider()
 
 
-def _render_pipeline_visualization(state) -> None:
+def _render_pipeline_visualization(state: PipelineState) -> None:
     """Render the 9-node pipeline as expandable cards."""
     st.markdown("### Pipeline Nodes")
 
@@ -107,7 +109,7 @@ def _render_node_card(
     actor_type: str,
     event: Optional[dict],
     evidence_summary: dict,
-    rules,
+    rules: NodeDefinition,
 ) -> None:
     """Render one node as an expandable card with status, evidence, and rules."""
     status_emoji = _status_emoji(status)
