@@ -650,6 +650,35 @@ def screen_2_findings_review() -> None:
 
         st.caption(f"Showing {len(filtered_findings)} of {len(findings)} findings")
 
+        bulk_col1, bulk_col2, bulk_col3 = st.columns(3)
+        if bulk_col1.button(
+            "Confirm all shown", key="bulk_confirm_all", disabled=not filtered_findings
+        ):
+            for finding in filtered_findings:
+                decisions[finding.finding_id] = {"decision": "confirmed", "reason": ""}
+        if bulk_col2.button(
+            "Override all shown", key="bulk_override_all", disabled=not filtered_findings
+        ):
+            for finding in filtered_findings:
+                decisions[finding.finding_id] = {
+                    "decision": "overridden",
+                    "reason": decisions.get(finding.finding_id, {}).get("reason", ""),
+                }
+            st.caption(
+                "Each overridden finding still needs a reason below before you can submit."
+            )
+        if bulk_col3.button(
+            "Dismiss all shown", key="bulk_dismiss_all", disabled=not filtered_findings
+        ):
+            for finding in filtered_findings:
+                decisions[finding.finding_id] = {
+                    "decision": "dismissed",
+                    "reason": decisions.get(finding.finding_id, {}).get("reason", ""),
+                }
+            st.caption(
+                "Each dismissed finding still needs a reason below before you can submit."
+            )
+
     for finding in filtered_findings:
         with st.container(border=True):
             st.markdown(

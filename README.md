@@ -2,7 +2,7 @@
 
 *A human-governed agentic AI tool for reviewing actuarial and financial spreadsheets.*
 
-**[▶ Watch the demo video](https://www.youtube.com/watch?v=bvdnjimTNCQ)**
+**[▶ Watch the demo video](https://www.youtube.com/watch?v=bvdnjimTNCQ)** · **[▶ Run the solution here](#local-setup)**
 
 ---
 
@@ -421,11 +421,16 @@ All files contain synthetic data. This evidence qualifies the declared reconstru
 ```bash
 git clone https://github.com/ISHUKLA/Excel-Audit-agent.git
 cd Excel-Audit-agent
+python3 -m venv .venv
+source .venv/bin/activate      # Windows: .venv\Scripts\activate
+python --version               # confirm 3.11 or 3.13 before installing
 pip install -r requirements.txt
 cp .env.example .env
 # Edit .env and add your ANTHROPIC_API_KEY
-streamlit run app.py
+python -m streamlit run app.py
 ```
+
+Activating a venv first and running `python -m streamlit` (rather than a bare `streamlit` command) avoids the most common local setup failure: a `streamlit` binary elsewhere on `$PATH` resolving to a different, unrelated Python install with the wrong version or missing dependencies. `python -m streamlit` always uses whichever `python` is active.
 
 Open `http://localhost:8501`.
 
