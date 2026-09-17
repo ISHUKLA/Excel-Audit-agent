@@ -1,16 +1,23 @@
 {
   "_comment": [
-    "This file is NOT authentication and NOT a security control.",
-    "It is a local registry of names, checked against whatever is typed at",
-    "Gate 4, so that an unregistered name or a typo is caught before an",
-    "approval record is written to the report.",
-    "It proves nothing about who was actually sitting at the keyboard.",
-    "Anyone with write access to this file can add a name to it.",
-    "Treat it as a spell-checker for approver names, not as a gate on identity."
+    "CRO (Chief Risk Officer) registry for Gate 4 (named approval record).",
+    "Gate 4 enforces a name-registry check: the approval_name must appear in",
+    "this list with role='cro'.",
+    "This is not authentication — it only confirms the typed name matches an entry.",
+    "It proves nothing about who actually typed the name.",
+    "Anyone with write access to this file can add names.",
+    "The registry check prevents non-CRO or unregistered names from being recorded;",
+    "it does not authenticate identity. A production authorization model requires",
+    "different infrastructure (e.g., directory service, certificate, MFA)."
   ],
   "approvers": [
     {
       "name": "Divyank",
+      "role": "cro",
+      "registered_at": "2026-09-17"
+    },
+    {
+      "name": "Isaac Shukla",
       "role": "cro",
       "registered_at": "2026-09-17"
     }

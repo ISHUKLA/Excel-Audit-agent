@@ -1,9 +1,13 @@
 {
   "_comment": [
-    "Authorized reviewers for Gates 1–3.",
-    "Only names in this list can proceed through the workflow.",
-    "This is a local registry, not authentication.",
-    "Anyone with write access to this file can add names."
+    "Authorized reviewers for Gate 1 (context confirmation) through report preparation.",
+    "Gate 1 enforces a name-registry check: the actor must appear in this list.",
+    "This is not authentication — it only confirms the typed name matches an entry.",
+    "It proves nothing about who actually typed the name.",
+    "Anyone with write access to this file can add names.",
+    "The registry check prevents unregistered names from proceeding; it does not",
+    "authenticate identity. A production authorization model requires different",
+    "infrastructure (e.g., directory service, certificate, MFA)."
   ],
   "reviewers": [
     {

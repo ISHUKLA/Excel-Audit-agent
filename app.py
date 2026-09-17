@@ -1,8 +1,9 @@
-"""Streamlit interface for the five-stage Excel audit review workflow.
+"""Streamlit interface for the Excel audit review workflow.
 
 This module collects input, calls the orchestrator, and renders returned model
 data. Reconciliation, gate, mapping, and evidence-integrity decisions remain in
-the non-UI modules.
+the non-UI modules. Authorization checks (reviewer and CRO registry validation)
+are enforced at the gate layer, not here — app.py only calls and renders.
 """
 
 import json
@@ -15,7 +16,11 @@ import streamlit as st
 from dotenv import load_dotenv
 
 from agents.orchestrator import Orchestrator, PipelineStateError
-from core.gates import GateBlockedError
+from core.gates import (
+    GateBlockedError,
+    _is_authorized_reviewer,
+    _is_cro_approver,
+)
 from core.models import (
     AI_DOCUMENTATION_STATUS_LABELS,
     FileContext,
@@ -111,44 +116,6 @@ def _init_state() -> None:
     }
     for key, value in defaults.items():
         st.session_state.setdefault(key, value)
-
-
-def _load_authorized_reviewers() -> dict:
-    """Load authorized reviewers from config."""
-    try:
-        with open("config/authorized_reviewers.json") as f:
-            return json.load(f)
-    except FileNotFoundError:
-        return {"reviewers": []}
-
-
-def _is_authorized_reviewer(name: str) -> bool:
-    """Check if name is an authorized reviewer."""
-    if not name or not name.strip():
-        return False
-    config = _load_authorized_reviewers()
-    return any(r["name"].lower() == name.lower() for r in config.get("reviewers", []))
-
-
-def _load_authorized_approvers() -> dict:
-    """Load authorized approvers from config."""
-    try:
-        with open("config/authorized_approvers.json") as f:
-            return json.load(f)
-    except FileNotFoundError:
-        return {"approvers": []}
-
-
-def _is_cro_approver(name: str) -> bool:
-    """Check if name is a CRO (Chief Risk Officer) authorized to approve."""
-    if not name or not name.strip():
-        return False
-    config = _load_authorized_approvers()
-    approver = next(
-        (a for a in config.get("approvers", []) if a["name"].lower() == name.lower()),
-        None
-    )
-    return approver is not None and approver.get("role") == "cro"
 
 
 def _identity_sidebar() -> None:
@@ -1155,28 +1122,27 @@ def screen_4_approval_record() -> None:
     approval_role = st.text_input("Your role at the organisation", key="approval_role")
     if approval_name.strip():
         if _is_cro_approver(approval_name):
-            st.success(f"✓ {approval_name} is authorized to approve (CRO)")
+            st.success(f"✓ {approval_name} is registered as a CRO")
         else:
-            st.error(f"⚠ {approval_name} is not a CRO. Only Chief Risk Officers (CROs) can approve.")
+            st.warning(
+                f"’{approval_name}’ is not registered as a CRO. "
+                "Only Chief Risk Officers can approve."
+            )
         disclosure = _orchestrator().preview_independence_disclosure(
             st.session_state.report_id, approval_name.strip()
         )
         st.info(disclosure)
     else:
-        st.caption("Enter a CRO name to preview the report’s independence disclosure.")
+        st.caption("Enter your name to preview the report’s independence disclosure.")
 
     st.markdown(
-        "**This confirms your typed identity and the timestamp. It is not a "
-        "cryptographic or legal signature.**"
+        "**This confirms your typed identity and the timestamp. It is not "
+        "authentication, not a cryptographic signature, and not a legal attestation.**"
     )
-    ready = bool(approval_name.strip()) and bool(approval_role.strip()) and _is_cro_approver(approval_name)
+    ready = bool(approval_name.strip()) and bool(approval_role.strip())
     if not st.button(
         "Record approval and generate report", disabled=not ready, type="primary"
     ):
-        return
-
-    if not _is_cro_approver(approval_name):
-        st.error(f"Only CROs can approve. '{approval_name}' is not registered as a CRO.")
         return
 
     try:

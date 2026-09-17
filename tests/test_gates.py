@@ -38,7 +38,7 @@ CONTEXT = {"workbook_hash": "a" * 64, "code_version": "0.1.0"}
 DEFAULT_PCT = 0.01
 DEFAULT_ABS = 100.0
 APPROVER = "Isaac Shukla"
-REGISTRY = [{"name": "Isaac Shukla", "role": "actuary", "registered_at": "2026-08-10"}]
+REGISTRY = [{"name": "Isaac Shukla", "role": "cro", "registered_at": "2026-08-10"}]
 
 
 @pytest.fixture
@@ -866,32 +866,24 @@ def test_gate_4_logs_a_report_approved_event(audit_log):
     assert "report_signed" not in events
 
 
-def test_an_unregistered_name_does_not_block_but_is_recorded(audit_log):
-    """A registry check is a spell-checker, not authentication. Blocking on it
-    would present it as something it isn't — but the discrepancy still belongs
-    in the trail."""
+def test_an_unregistered_name_blocks_gate_4(audit_log):
+    """Gate 4 enforces the CRO registry check: unregistered or non-CRO names block."""
+    with pytest.raises(GateBlockedError, match="not registered as a CRO"):
+        approval_record_gate(
+            an_audit_report(), "Someone Unknown", "Controller", REGISTRY, "Someone Unknown", audit_log, CONTEXT
+        )
+
+
+def test_a_cro_registered_name_passes_gate_4(audit_log):
+    """A registered CRO name satisfies Gate 4 and does not block."""
     import json
 
     report = approval_record_gate(
-        an_audit_report(), "Someone Unknown", "Controller", REGISTRY, "Someone Unknown", audit_log, CONTEXT
-    )
-
-    assert report.report_approval_name == "Someone Unknown"
-
-    payloads = [json.loads(r["payload_json"]) for r in audit_log.get_rows("RPT-001")]
-    actions = [p.get("action") for p in payloads]
-    assert "approval_record_unregistered_name" in actions
-    assert any(p.get("name_in_registry") is False for p in payloads)
-
-
-def test_a_registered_name_produces_no_unregistered_event(audit_log):
-    import json
-
-    approval_record_gate(
         an_audit_report(), "isaac shukla", "Senior Actuary", REGISTRY, APPROVER, audit_log, CONTEXT
     )
+    assert report.report_approval_name == "isaac shukla"
     payloads = [json.loads(r["payload_json"]) for r in audit_log.get_rows("RPT-001")]
-    assert "approval_record_unregistered_name" not in [p.get("action") for p in payloads]
+    assert "approval_record_created" in [p.get("action") for p in payloads]
 
 
 def test_independence_disclosure_in_the_solo_case(audit_log):
@@ -913,8 +905,9 @@ def test_independence_disclosure_names_both_when_they_differ(audit_log):
         [], a_parsed_file(), ["Provisions!C5"], "RPT-001", "Preparer Person", audit_log, CONTEXT
     )
 
+    approver_registry = [{"name": "Approver Person", "role": "cro", "registered_at": "2026-08-10"}]
     report = approval_record_gate(
-        an_audit_report(), "Approver Person", "Controller", REGISTRY, "Approver Person", audit_log, CONTEXT
+        an_audit_report(), "Approver Person", "Controller", approver_registry, "Approver Person", audit_log, CONTEXT
     )
 
     assert "prepared by Preparer Person" in report.independence_disclosure

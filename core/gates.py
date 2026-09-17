@@ -4,6 +4,12 @@ Every gate that records a decision chains it into the tamper-evident log with a
 context dict, so the log says what the decision was made against and not merely
 that one occurred.
 
+Gates 1 and 4 enforce name registry checks against authorized_reviewers.json and
+authorized_approvers.json. These are name-registry matches, not authentication —
+they prove only that a typed name appears in the configuration, not who actually
+typed it. Registry enforcement is identical at all entry points: both Streamlit
+UI and direct function callers (tests, scripts) must satisfy the same checks.
+
 Gate 4 produces a NAMED APPROVAL RECORD: a typed name, checked against a local
 registry, with a timestamp. It is not a signature and not an attestation. The
 vocabulary in this module is "approval" throughout, deliberately — both earlier
@@ -25,6 +31,55 @@ from core.models import (
     ReferenceFigures,
 )
 from core.verdict_logic import compute_verdict
+
+
+def _load_authorized_reviewers() -> dict:
+    """Load authorized reviewers from config."""
+    try:
+        with open("config/authorized_reviewers.json") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {"reviewers": []}
+
+
+def _is_authorized_reviewer(name: str) -> bool:
+    """Check if name is an authorized reviewer.
+
+    This is a registry check, not authentication. It only confirms the typed
+    name appears in config/authorized_reviewers.json.
+    """
+    if not name or not name.strip():
+        return False
+    config = _load_authorized_reviewers()
+    return any(r["name"].lower() == name.lower() for r in config.get("reviewers", []))
+
+
+def _load_authorized_approvers() -> dict:
+    """Load authorized approvers from config."""
+    try:
+        with open("config/authorized_approvers.json") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {"approvers": []}
+
+
+def _is_cro_approver(name: str, registry: list[dict] | None = None) -> bool:
+    """Check if name is a CRO (Chief Risk Officer) authorized to approve.
+
+    This is a registry check, not authentication. It only confirms the typed
+    name appears in the provided registry (or config file if not provided) with
+    role='cro'.
+    """
+    if not name or not name.strip():
+        return False
+    if registry is None:
+        config = _load_authorized_approvers()
+        registry = config.get("approvers", [])
+    approver = next(
+        (a for a in registry if a["name"].lower() == name.lower()),
+        None
+    )
+    return approver is not None and approver.get("role") == "cro"
 
 _SAME_PERSON_DISCLOSURE = (
     "The preparer and the approver were the same individual for this report. "
@@ -57,6 +112,10 @@ def context_gate(
     """Confirm the tool understood the assignment, and check the two sides
     describe the same thing.
 
+    The actor must be registered as an authorized reviewer. This is a name-registry
+    check, not authentication — it confirms the typed name appears in
+    config/authorized_reviewers.json, no more.
+
     A context mismatch does NOT block here. The human should still be able to
     proceed with the Excel-side work even when the accounting comparison can't
     be trusted; the mismatch flows through to cap external_verdict at "block"
@@ -65,6 +124,12 @@ def context_gate(
     if not confirmed:
         raise GateBlockedError(
             f"Gate 1 blocked: context for '{file_context.filename}' has not been confirmed"
+        )
+
+    if not _is_authorized_reviewer(actor):
+        raise GateBlockedError(
+            f"Gate 1 blocked: '{actor}' is not registered as an authorized reviewer. "
+            "Contact your supervisor to be added to config/authorized_reviewers.json"
         )
 
     context_match_verdict, basis_warning = _compare_context(file_context, reference_figures)
@@ -506,32 +571,19 @@ def approval_record_gate(
     It is not a signature, not an attestation, and makes no claim about identity
     beyond what someone typed.
 
-    The registry check does NOT block. Blocking on it would present a
-    spell-checker as an authentication control. An unregistered name is recorded
-    as its own event so the discrepancy is visible in the trail instead of
-    silently accepted.
+    The approval_name must be registered as a CRO (Chief Risk Officer) in
+    config/authorized_approvers.json. This is a name-registry check, not
+    authentication — it confirms the typed name appears in the registry, no more.
+    An unregistered or non-CRO name blocks the approval.
     """
     if not (approval_name or "").strip():
         raise GateBlockedError("Gate 4 blocked: an approval requires a name")
 
-    registered = any(
-        _same(entry.get("name"), approval_name) for entry in authorized_approvers
-    )
-    if not registered:
-        audit_log.log_event(
-            report_id=report.report_id,
-            event_type="gate_decision",
-            payload={
-                "gate": 4,
-                "action": "approval_record_unregistered_name",
-                "approval_name": approval_name,
-                "note": (
-                    "name is not in config/authorized_approvers.json. This is a "
-                    "registry check, not authentication, so it does not block."
-                ),
-            },
-            actor=actor,
-            context=context,
+    if not _is_cro_approver(approval_name, authorized_approvers):
+        raise GateBlockedError(
+            f"Gate 4 blocked: '{approval_name}' is not registered as a CRO. "
+            "Only Chief Risk Officers can approve. Contact your supervisor to be added "
+            "to config/authorized_approvers.json with role='cro'."
         )
 
     report.report_approval_name = approval_name
@@ -549,7 +601,7 @@ def approval_record_gate(
             "action": "approval_record_created",
             "approval_name": approval_name,
             "role": role,
-            "name_in_registry": registered,
+            "name_in_registry": True,
             "independence_disclosure": report.independence_disclosure,
         },
         actor=actor,
