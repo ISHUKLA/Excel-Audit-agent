@@ -126,6 +126,8 @@ A matched lookup cell (from any of these four functions) that holds text, rather
 
 **Hosted deployment is not recommended without additional access control.** This tool has no application-level authentication. A hosted instance would be reachable by anyone with the URL. If hosting is genuinely needed, that remains post-MVP scope and requires real authentication.
 
+**Full runbook:** [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) walks systems administrators and DevOps engineers through both deployment paths step by step — local (no Docker, ~15 minutes) and Docker (~30 minutes) — covering prerequisites, the Anthropic API key, `config/users.json` setup, and the persistent `/data` volume for Docker.
+
 ---
 
 ## Governance Flight Recorder
