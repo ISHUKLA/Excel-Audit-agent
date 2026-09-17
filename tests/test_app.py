@@ -92,6 +92,7 @@ def _render_gate3(monkeypatch, tmp_path, *, documentation_client=None, use_real_
     app.session_state["reconciliation_result"] = preview
     app.session_state["materiality_defaults"] = orchestrator.get_materiality_defaults(report_id)
     app.session_state["reference_figures"] = None
+    app.session_state["current_user"] = fixtures["ACTOR"]
     app.session_state["reviewer_name"] = fixtures["ACTOR"]
     app.session_state["reviewer_role"] = "actuary"
     app.session_state["context_match_verdict"] = state["context_match_verdict"]
