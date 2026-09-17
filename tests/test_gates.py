@@ -6,6 +6,8 @@ mapping-approval test uses a 99%-confidence match, and the completeness test
 uses a reconciliation where everything that IS mapped reconciles perfectly.
 """
 
+import inspect
+import json
 from datetime import datetime, timezone
 
 import pytest
@@ -839,51 +841,88 @@ def test_a_control_total_mismatch_blocks_external_reconciliation(audit_log):
 
 def test_gate_4_blocks_on_an_empty_name(audit_log):
     with pytest.raises(GateBlockedError, match="requires a name"):
-        approval_record_gate(an_audit_report(), "", "Senior Actuary", REGISTRY, APPROVER, audit_log, CONTEXT)
+        approval_record_gate(an_audit_report(), "", REGISTRY, audit_log, CONTEXT)
 
 
 def test_gate_4_blocks_on_a_whitespace_name(audit_log):
     with pytest.raises(GateBlockedError):
-        approval_record_gate(an_audit_report(), "   ", "Senior Actuary", REGISTRY, APPROVER, audit_log, CONTEXT)
+        approval_record_gate(an_audit_report(), "   ", REGISTRY, audit_log, CONTEXT)
 
 
-def test_gate_4_records_name_role_and_timestamp(audit_log):
+def test_gate_4_derives_canonical_name_and_role_from_registry(audit_log):
     report = approval_record_gate(
-        an_audit_report(), APPROVER, "Senior Actuary", REGISTRY, APPROVER, audit_log, CONTEXT
+        an_audit_report(), "  isaac shukla  ", REGISTRY, audit_log, CONTEXT
     )
 
     assert report.report_approval_name == APPROVER
-    assert report.report_approval_role == "Senior Actuary"
+    assert report.report_approval_role == "cro"
     assert report.report_approval_at is not None
+    assert "role" not in inspect.signature(approval_record_gate).parameters
 
 
 def test_gate_4_logs_a_report_approved_event(audit_log):
     approval_record_gate(
-        an_audit_report(), APPROVER, "Senior Actuary", REGISTRY, APPROVER, audit_log, CONTEXT
+        an_audit_report(), APPROVER, REGISTRY, audit_log, CONTEXT
     )
-    events = [r["event_type"] for r in audit_log.get_rows("RPT-001")]
+    rows = audit_log.get_rows("RPT-001")
+    events = [r["event_type"] for r in rows]
     assert "report_approved" in events
     assert "report_signed" not in events
+    payload = json.loads(rows[-1]["payload_json"])
+    assert payload["approval_name"] == APPROVER
+    assert payload["role"] == "cro"
+    assert payload["identity_confirmation"] == "local_registry_only"
+    assert payload["authentication_performed"] is False
+    assert rows[-1]["actor"] == APPROVER
 
 
 def test_an_unregistered_name_blocks_gate_4(audit_log):
     """Gate 4 enforces the CRO registry check: unregistered or non-CRO names block."""
     with pytest.raises(GateBlockedError, match="not registered as a CRO"):
         approval_record_gate(
-            an_audit_report(), "Someone Unknown", "Controller", REGISTRY, "Someone Unknown", audit_log, CONTEXT
+            an_audit_report(), "Someone Unknown", REGISTRY, audit_log, CONTEXT
         )
 
 
 def test_a_cro_registered_name_passes_gate_4(audit_log):
     """A registered CRO name satisfies Gate 4 and does not block."""
-    import json
-
     report = approval_record_gate(
-        an_audit_report(), "isaac shukla", "Senior Actuary", REGISTRY, APPROVER, audit_log, CONTEXT
+        an_audit_report(), "isaac shukla", REGISTRY, audit_log, CONTEXT
     )
-    assert report.report_approval_name == "isaac shukla"
+    assert report.report_approval_name == APPROVER
+    assert report.report_approval_role == "cro"
     payloads = [json.loads(r["payload_json"]) for r in audit_log.get_rows("RPT-001")]
     assert "approval_record_created" in [p.get("action") for p in payloads]
+
+
+def test_gate_4_blocks_on_duplicate_registry_identity(audit_log):
+    duplicate_registry = [
+        *REGISTRY,
+        {"name": " isaac shukla ", "role": "cro"},
+    ]
+
+    with pytest.raises(GateBlockedError, match="multiple authorized approver entries"):
+        approval_record_gate(
+            an_audit_report(), APPROVER, duplicate_registry, audit_log, CONTEXT
+        )
+
+
+def test_gate_4_blocks_on_malformed_registry_entry(audit_log):
+    malformed_registry = [{"name": APPROVER}]
+
+    with pytest.raises(GateBlockedError, match="non-empty role"):
+        approval_record_gate(
+            an_audit_report(), APPROVER, malformed_registry, audit_log, CONTEXT
+        )
+
+
+def test_gate_4_blocks_a_registered_non_cro_role(audit_log):
+    non_cro_registry = [{"name": APPROVER, "role": "actuary"}]
+
+    with pytest.raises(GateBlockedError, match="not registered as a CRO"):
+        approval_record_gate(
+            an_audit_report(), APPROVER, non_cro_registry, audit_log, CONTEXT
+        )
 
 
 def test_independence_disclosure_in_the_solo_case(audit_log):
@@ -893,7 +932,7 @@ def test_independence_disclosure_in_the_solo_case(audit_log):
     findings_review_gate([], a_parsed_file(), ["Provisions!C5"], "RPT-001", APPROVER, audit_log, CONTEXT)
 
     report = approval_record_gate(
-        an_audit_report(), APPROVER, "Senior Actuary", REGISTRY, APPROVER, audit_log, CONTEXT
+        an_audit_report(), APPROVER, REGISTRY, audit_log, CONTEXT
     )
 
     assert "same individual" in report.independence_disclosure
@@ -907,7 +946,7 @@ def test_independence_disclosure_names_both_when_they_differ(audit_log):
 
     approver_registry = [{"name": "Approver Person", "role": "cro", "registered_at": "2026-08-10"}]
     report = approval_record_gate(
-        an_audit_report(), "Approver Person", "Controller", approver_registry, "Approver Person", audit_log, CONTEXT
+        an_audit_report(), "Approver Person", approver_registry, audit_log, CONTEXT
     )
 
     assert "prepared by Preparer Person" in report.independence_disclosure
@@ -916,7 +955,7 @@ def test_independence_disclosure_names_both_when_they_differ(audit_log):
 
 def test_independence_disclosure_is_never_blank(audit_log):
     report = approval_record_gate(
-        an_audit_report(), APPROVER, "Senior Actuary", REGISTRY, APPROVER, audit_log, CONTEXT
+        an_audit_report(), APPROVER, REGISTRY, audit_log, CONTEXT
     )
     assert report.independence_disclosure.strip() != ""
     assert "No independent review was performed." in report.independence_disclosure
@@ -926,7 +965,7 @@ def test_approval_and_independence_can_coexist(audit_log):
     """Someone approved it, and nobody independent reviewed it. Both true."""
     context_gate(a_file_context(), None, True, "RPT-001", APPROVER, audit_log, CONTEXT)
     report = approval_record_gate(
-        an_audit_report(), APPROVER, "Senior Actuary", REGISTRY, APPROVER, audit_log, CONTEXT
+        an_audit_report(), APPROVER, REGISTRY, audit_log, CONTEXT
     )
     assert report.report_approval_name is not None
     assert "No independent review" in report.independence_disclosure

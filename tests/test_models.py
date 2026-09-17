@@ -726,7 +726,7 @@ def test_an_approved_report_can_still_disclose_no_independent_review():
     report = an_audit_report(
         report_approval_name="Isaac Shukla",
         report_approval_at=NOW,
-        report_approval_role="Senior Actuary",
+        report_approval_role="cro",
     )
     assert report.report_approval_name == "Isaac Shukla"
     assert "No independent review occurred." in report.independence_disclosure

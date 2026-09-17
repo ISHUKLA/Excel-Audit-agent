@@ -513,10 +513,11 @@ class AuditReport(BaseModel):
     rather than left to the report template to get right.
 
     Gate 4's output is `report_approval_name`/`report_approval_at`/
-    `report_approval_role` — a typed name checked against
-    config/authorized_approvers.json, with a timestamp, and no professional
-    claim beyond that. Deliberately not named `approved_by`, which already means
-    something narrower on AccountMapping.
+    `report_approval_role` — a typed name resolved to one canonical entry in
+    config/authorized_approvers.json, with the role derived from that same entry
+    and a timestamp. This is a local identity confirmation, not authentication,
+    and makes no professional claim beyond that. Deliberately not named
+    `approved_by`, which already means something narrower on AccountMapping.
     """
 
     file_context: FileContext

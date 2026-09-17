@@ -150,7 +150,7 @@ A matched lookup cell (from any of these four functions) that holds text, rather
    The tool shows internal consistency (Excel vs. Python) and accounts reconciliation (Python vs. supplied figures) side by side. Set materiality thresholds for each — the UI suggests 1%, but the choice is yours. Review proposed account mappings. Read the AI documentation disclosure and explicitly choose "Use optional Claude documentation" or "Continue without AI documentation" — neither is preselected. Click "Confirm reconciliation".
 
 6. **Record named approval (Gate 4).**
-   Enter your name and role. Click "Record approval". The PDF is generated and ready for download.
+   Enter your name. The application displays the matching role from its local authorized-approvers registry; the role is not free text. Click "Record approval". The PDF is generated and ready for download. This is a local identity confirmation only, not authentication.
 
 7. **Download and verify.**
    Click "Download PDF". The report contains the full audit trail, source mappings, and all human decisions.
@@ -281,9 +281,9 @@ You set a materiality threshold for each comparison. The UI suggests 1%, but the
 
 ### Gate 4: Named Approval Record
 
-A named person records their name and role, stored with a timestamp. This is identity confirmation and nothing more; it is not a professional signature or attestation.
+A named person enters their name. Gate 4 resolves exactly one matching CRO entry in the local authorized-approvers registry and stores the canonical registry name and role with a timestamp. The role is not entered as free text. This is a local identity confirmation only, not authentication.
 
-**Unblocks:** Name and role are entered and the record is submitted. The PDF is then generated and available for download.
+**Unblocks:** The name resolves to exactly one well-formed CRO registry entry and the record is submitted. The PDF is then generated and available for download.
 
 ---
 
@@ -301,7 +301,7 @@ This table makes explicit where the AI is involved and where the decisions are e
 | Confirming context (Gate 1) | Human decision | Reviewer verifies the workbook bytes and context. |
 | Disposing of findings (Gate 2) | Human decision | Reviewer confirms, overrides, or dismisses each anomaly. |
 | Setting materiality thresholds (Gate 3) | Human decision | Thresholds are never chosen by the tool. |
-| Recording approval (Gate 4) | Human decision | Reviewer enters their name and role. |
+| Recording approval (Gate 4) | Human decision | Reviewer enters their name; the canonical name and role are derived from the local registry. This confirms a local registry match, not authentication. |
 
 ---
 
@@ -483,7 +483,7 @@ Backups are an operational necessity, not merely good practice.
 ## Known Limitations
 
 - **No independent reviewer enforced.** The same person can complete all four gates.
-- **No application-level authentication.** The authorized-approvers file is a local name registry, not authentication.
+- **No application-level authentication.** Gate 4 provides a visible local identity confirmation by matching a typed name to the authorized-approvers file and deriving the stored role from that entry. It does not authenticate who typed the name.
 - **Audit log is tamper-evident, not tamper-proof.** Someone with file access can modify `audit.db`; verification detects this after the fact.
 - **Chain verification does not defend against wholesale forgery.** Detecting that would require an anchor held outside the file.
 - **Whole workbook held in memory.** A very large file will consume proportional memory. No maximum upload size is enforced.

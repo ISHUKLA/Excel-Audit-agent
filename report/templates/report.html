@@ -69,8 +69,9 @@
 
 <p><strong>Named approval record:</strong> Approved by {{ report.report_approval_name }}
   ({{ report.report_approval_role }}) at {{ report.report_approval_at|timestamp }}.</p>
-<p class="definition">A named approval record is a typed identity confirmation captured with a timestamp, checked
-against a local registry of expected names. It is not a signature, an attestation engagement, or any other formal or legal instrument.</p>
+<p class="definition"><strong>Local identity confirmation only - not authentication.</strong>
+The name and role below were resolved from the local authorized-approvers registry and captured with a timestamp.
+This is not a signature, an attestation engagement, or any other formal or legal instrument.</p>
 <p class="definition"><strong>Tamper-evident:</strong> Tamper-evident means any modification to the underlying log after the fact can be detected by re-verifying its hash chain - it does not mean the log file itself cannot be edited by someone with direct access to this machine.</p>
 
 <table class="meta" aria-label="Report header">

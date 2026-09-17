@@ -384,8 +384,9 @@ def test_full_pipeline_mapping_traceability_reporting_and_evidence_integrity(
     assert "does not constitute actuarial validation" in report.disclaimer
     assert any(item.is_approved for item in report.mappings)
 
-    final_report = recovered.submit_approval_record(report_id, ACTOR, "actuary")
+    final_report = recovered.submit_approval_record(report_id, ACTOR)
     assert final_report.report_approval_name == ACTOR
+    assert final_report.report_approval_role == "cro"
     assert final_report.report_approval_at is not None
     assert "No independent review was performed" in final_report.independence_disclosure
     pdf_bytes = generate_report_pdf(final_report, recovered.get_audit_rows(report_id))

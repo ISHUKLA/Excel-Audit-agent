@@ -48,7 +48,6 @@ from agents.orchestrator import Orchestrator, PipelineStateError
 from core.gates import (
     GateBlockedError,
     _is_authorized_reviewer,
-    _is_cro_approver,
 )
 from core.models import (
     AI_DOCUMENTATION_STATUS_LABELS,
@@ -141,7 +140,6 @@ def _init_state() -> None:
         "audit_rows": [],
         "integrity_result": None,
         "approval_name": "",
-        "approval_role": "",
     }
     for key, value in defaults.items():
         st.session_state.setdefault(key, value)
@@ -866,7 +864,6 @@ def screen_3_reconciliation() -> None:
             st.session_state.external_verdict = report.external_verdict
             st.session_state.report_preparation_error = None
             st.session_state.approval_name = ""
-            st.session_state.approval_role = ""
             st.session_state.screen = 4
             st.rerun()
         return
@@ -1099,7 +1096,6 @@ def screen_3_reconciliation() -> None:
     st.session_state.report_preview = _orchestrator().get_report(st.session_state.report_id)
     st.session_state.report_preparation_error = None
     st.session_state.approval_name = ""
-    st.session_state.approval_role = ""
     st.session_state.screen = 4
     st.rerun()
 
@@ -1148,27 +1144,51 @@ def screen_4_approval_record() -> None:
         st.info("No Anthropic API calls were recorded for this report.")
 
     approval_name = st.text_input("Your full name", key="approval_name")
-    approval_role = st.text_input("Your role at the organisation", key="approval_role")
+    registered_identity = None
+    registry_error = None
     if approval_name.strip():
-        if _is_cro_approver(approval_name):
-            st.success(f"✓ {approval_name} is registered as a CRO")
-        else:
+        try:
+            registered_identity = _orchestrator().get_registered_approver_identity(
+                approval_name
+            )
+        except ValueError as exc:
+            registry_error = str(exc)
+            st.error(
+                f"The local approver registry is invalid; Gate 4 is blocked: {exc}"
+            )
+
+        if registered_identity is not None:
+            st.success(
+                f"✓ Registry match: {registered_identity['name']}"
+            )
+            st.text_input(
+                "Registered role (from local registry)",
+                value=registered_identity["role"],
+                disabled=True,
+            )
+        elif registry_error is None:
             st.warning(
                 f"’{approval_name}’ is not registered as a CRO. "
                 "Only Chief Risk Officers can approve."
             )
         disclosure = _orchestrator().preview_independence_disclosure(
-            st.session_state.report_id, approval_name.strip()
+            st.session_state.report_id,
+            (
+                registered_identity["name"]
+                if registered_identity is not None
+                else approval_name.strip()
+            ),
         )
         st.info(disclosure)
     else:
         st.caption("Enter your name to preview the report’s independence disclosure.")
 
     st.markdown(
-        "**This confirms your typed identity and the timestamp. It is not "
-        "authentication, not a cryptographic signature, and not a legal attestation.**"
+        "**Local identity confirmation only - not authentication.** The displayed "
+        "name and role come from the local authorized-approvers registry. This is "
+        "not a cryptographic signature or a legal attestation."
     )
-    ready = bool(approval_name.strip()) and bool(approval_role.strip())
+    ready = registered_identity is not None
     if not st.button(
         "Record approval and generate report", disabled=not ready, type="primary"
     ):
@@ -1177,7 +1197,7 @@ def screen_4_approval_record() -> None:
     try:
         with st.spinner("Recording the named approval record…"):
             final_report = _orchestrator().submit_approval_record(
-                st.session_state.report_id, approval_name.strip(), approval_role.strip()
+                st.session_state.report_id, approval_name.strip()
             )
     except ChainIntegrityError as exc:
         _chain_integrity_error(exc)

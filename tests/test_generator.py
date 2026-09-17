@@ -288,9 +288,9 @@ def _report(**overrides) -> AuditReport:
             "The preparer and the approver were the same individual for this report. "
             "No independent review was performed."
         ),
-        report_approval_name="Header Approver",
+        report_approval_name="Isaac Shukla",
         report_approval_at=APPROVED_AT,
-        report_approval_role="Financial Controller",
+        report_approval_role="cro",
         generated_at=GENERATED_AT,
         report_id="RPT-2026-001",
         audit_log_verification_note=(
@@ -317,7 +317,7 @@ def _audit_rows() -> list[dict]:
             "row_id": 2,
             "event_type": "report_approved",
             "payload_json": json.dumps({"gate": 4, "action": "approval_record_created"}),
-            "actor": "Header Approver",
+            "actor": "Isaac Shukla",
             "timestamp": "2026-08-11T10:15:00+00:00",
             "row_hash": "d" * 64,
         },
@@ -456,8 +456,10 @@ def test_header_contract_and_findings_wording_match_the_models():
     html = render_report_html(_report(), _audit_rows())
 
     assert GENERATED_AT.isoformat() in html
-    assert "Header Approver" in html
-    assert "Financial Controller" in html
+    assert "Isaac Shukla" in html
+    assert "cro" in html
+    assert "Local identity confirmation only - not authentication" in html
+    assert "name and role below were resolved from the local" in html
     findings_start = html.index('id="section-2-findings"')
     findings_end = html.index('id="section-3a-internal"')
     findings_block = html[findings_start:findings_end].lower()

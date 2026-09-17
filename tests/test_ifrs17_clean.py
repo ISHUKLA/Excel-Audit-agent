@@ -164,9 +164,10 @@ def test_clean_large_case_completes_all_four_real_gates_and_generates_pdf(pipeli
     with pytest.raises(ValueError, match="before Gate 4"):
         generate_report_pdf(pre_approval_report, pipeline.get_audit_rows(report_id))
 
-    final_report = pipeline.submit_approval_record(report_id, ACTOR, "actuary")
+    final_report = pipeline.submit_approval_record(report_id, ACTOR)
     pdf_bytes = generate_report_pdf(final_report, pipeline.get_audit_rows(report_id))
     assert final_report.report_approval_name == ACTOR
+    assert final_report.report_approval_role == "cro"
     assert final_report.report_approval_at is not None
     assert pdf_bytes.startswith(b"%PDF")
 

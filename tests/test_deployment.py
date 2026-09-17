@@ -99,6 +99,8 @@ def test_readme_leads_with_local_first_posture_and_plain_limitations():
     assert "named approval record" in lower_readme
     assert "No independent reviewer enforced" in readme
     assert "No application-level authentication." in readme
+    assert "local identity confirmation" in lower_readme
+    assert "does not authenticate who typed the name" in lower_readme
     assert "tamper-evident, not tamper-proof" in readme
     assert "Data minimization is informal" in readme
     assert "not a certified privacy or regulatory control" in readme

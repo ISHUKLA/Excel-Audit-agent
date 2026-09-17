@@ -87,6 +87,16 @@ class _CountingFakeClient:
         self.messages = _CountingMessagesAPI(response_text)
 
 
+class _Gate4RegistryStub:
+    def get_registered_approver_identity(self, approval_name):
+        if approval_name.strip().casefold() == "isaac shukla":
+            return {"name": "Isaac Shukla", "role": "cro"}
+        return None
+
+    def preview_independence_disclosure(self, report_id, approval_name):
+        return f"Local preview for {approval_name} on {report_id}."
+
+
 _VALID_DOC_JSON = (
     '{"method_summary": "Carries the provision output.", "assumptions": [], '
     '"data_sources": [], "anomalies_noted": [], "role_notes": ""}'
@@ -218,7 +228,7 @@ def test_provider_failure_message_is_retryable_and_does_not_echo_raw_content():
     assert "renderer internals" not in pdf_message
 
 
-def test_approval_screen_has_no_pdf_export_and_requires_both_identity_fields():
+def test_approval_screen_uses_registry_role_and_discloses_no_authentication():
     app = _initial_app()
     app.session_state["screen"] = 4
     app.session_state["report_preview"] = GENERATOR_FIXTURES["_report"]()
@@ -233,7 +243,46 @@ def test_approval_screen_has_no_pdf_export_and_requires_both_identity_fields():
         button for button in app.button if button.label == "Record approval and generate report"
     )
     assert record_button.disabled is True
+    assert "Your role at the organisation" not in {
+        text_input.label for text_input in app.text_input
+    }
+    assert any(
+        "Local identity confirmation only - not authentication" in block.value
+        for block in app.markdown
+    )
+    source = APP_PATH.read_text(encoding="utf-8")
+    assert '"Registered role (from local registry)"' in source
+    assert "approval_role.strip()" not in source
     assert not app.get("download_button")
+
+
+def test_approval_screen_displays_registry_derived_role_as_read_only():
+    app = AppTest.from_file(str(APP_PATH))
+    app.session_state["orchestrator"] = _Gate4RegistryStub()
+    app.session_state["report_id"] = "RPT-GATE4-UI"
+    app.session_state["screen"] = 4
+    app.session_state["report_preview"] = GENERATOR_FIXTURES["_report"]()
+    app.session_state["findings"] = []
+    app = app.run(timeout=20)
+
+    approval_name = next(
+        text_input for text_input in app.text_input if text_input.label == "Your full name"
+    )
+    approval_name.set_value("  isaac shukla  ")
+    app = app.run(timeout=20)
+
+    registered_role = next(
+        text_input
+        for text_input in app.text_input
+        if text_input.label == "Registered role (from local registry)"
+    )
+    assert registered_role.value == "cro"
+    assert registered_role.disabled is True
+    record_button = next(
+        button for button in app.button if button.label == "Record approval and generate report"
+    )
+    assert record_button.disabled is False
+    assert any("Registry match: Isaac Shukla" in success.value for success in app.success)
 
 
 def test_report_screen_exposes_download_badges_traceability_and_integrity_check():

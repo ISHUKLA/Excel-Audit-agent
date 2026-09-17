@@ -70,16 +70,57 @@ def _is_cro_approver(name: str, registry: list[dict] | None = None) -> bool:
     name appears in the provided registry (or config file if not provided) with
     role='cro'.
     """
-    if not name or not name.strip():
+    try:
+        return resolve_cro_approver(name, registry) is not None
+    except ValueError:
         return False
+
+
+def resolve_cro_approver(
+    name: str, registry: list[dict] | None = None
+) -> dict | None:
+    """Resolve one canonical CRO identity from the local registry.
+
+    The registry is the sole source of the name and role stored by Gate 4.
+    Malformed or duplicate entries are configuration errors: guessing between
+    them could create a contradictory approval record, so callers must fail
+    closed instead.
+    """
+    if not isinstance(name, str) or not name.strip():
+        return None
     if registry is None:
         config = _load_authorized_approvers()
         registry = config.get("approvers", [])
-    approver = next(
-        (a for a in registry if a["name"].lower() == name.lower()),
-        None
-    )
-    return approver is not None and approver.get("role") == "cro"
+    if not isinstance(registry, list):
+        raise ValueError("authorized approvers configuration must contain a list")
+
+    requested_name = name.strip().casefold()
+    matches = []
+    for index, entry in enumerate(registry):
+        if not isinstance(entry, dict):
+            raise ValueError(f"authorized approver entry {index} must be an object")
+        entry_name = entry.get("name")
+        entry_role = entry.get("role")
+        if not isinstance(entry_name, str) or not entry_name.strip():
+            raise ValueError(
+                f"authorized approver entry {index} must have a non-empty name"
+            )
+        if not isinstance(entry_role, str) or not entry_role.strip():
+            raise ValueError(
+                f"authorized approver entry {index} must have a non-empty role"
+            )
+        if entry_name.strip().casefold() == requested_name:
+            matches.append(
+                {**entry, "name": entry_name.strip(), "role": entry_role.strip()}
+            )
+
+    if len(matches) > 1:
+        raise ValueError(
+            f"multiple authorized approver entries match {name.strip()!r}"
+        )
+    if not matches or matches[0]["role"].casefold() != "cro":
+        return None
+    return matches[0]
 
 _SAME_PERSON_DISCLOSURE = (
     "The preparer and the approver were the same individual for this report. "
@@ -559,9 +600,7 @@ def _aggregate(lines: list, empty: str) -> str:
 def approval_record_gate(
     report: AuditReport,
     approval_name: str,
-    role: str,
     authorized_approvers: list[dict],
-    actor: str,
     audit_log: AuditLog,
     context: dict,
 ) -> AuditReport:
@@ -579,18 +618,27 @@ def approval_record_gate(
     if not (approval_name or "").strip():
         raise GateBlockedError("Gate 4 blocked: an approval requires a name")
 
-    if not _is_cro_approver(approval_name, authorized_approvers):
+    try:
+        approver = resolve_cro_approver(approval_name, authorized_approvers)
+    except ValueError as exc:
+        raise GateBlockedError(
+            f"Gate 4 blocked: authorized approver registry is invalid: {exc}"
+        ) from exc
+
+    if approver is None:
         raise GateBlockedError(
             f"Gate 4 blocked: '{approval_name}' is not registered as a CRO. "
             "Only Chief Risk Officers can approve. Contact your supervisor to be added "
             "to config/authorized_approvers.json with role='cro'."
         )
 
-    report.report_approval_name = approval_name
+    canonical_name = approver["name"]
+    canonical_role = approver["role"]
+    report.report_approval_name = canonical_name
     report.report_approval_at = datetime.now(timezone.utc)
-    report.report_approval_role = role
+    report.report_approval_role = canonical_role
     report.independence_disclosure = independence_disclosure_preview(
-        report_id=report.report_id, approval_name=approval_name, audit_log=audit_log
+        report_id=report.report_id, approval_name=canonical_name, audit_log=audit_log
     )
 
     audit_log.log_event(
@@ -599,12 +647,14 @@ def approval_record_gate(
         payload={
             "gate": 4,
             "action": "approval_record_created",
-            "approval_name": approval_name,
-            "role": role,
+            "approval_name": canonical_name,
+            "role": canonical_role,
             "name_in_registry": True,
+            "identity_confirmation": "local_registry_only",
+            "authentication_performed": False,
             "independence_disclosure": report.independence_disclosure,
         },
-        actor=actor,
+        actor=canonical_name,
         context=context,
     )
 

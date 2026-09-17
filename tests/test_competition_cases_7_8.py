@@ -228,7 +228,7 @@ def test_case_7_clean_reaches_named_approval_and_pdf(tmp_path):
             orchestrator.get_report(report_id), orchestrator.get_audit_rows(report_id)
         )
 
-    report = orchestrator.submit_approval_record(report_id, ACTOR, "actuary")
+    report = orchestrator.submit_approval_record(report_id, ACTOR)
     pdf = generate_report_pdf(report, orchestrator.get_audit_rows(report_id))
     assert pdf.startswith(b"%PDF")
 
@@ -263,7 +263,7 @@ def test_case_7_defective_internal_pass_external_block_and_no_gate4(tmp_path):
             acknowledge_incomplete=False,
         )
     with pytest.raises(PipelineStateError):
-        orchestrator.submit_approval_record(report_id, ACTOR, "actuary")
+        orchestrator.submit_approval_record(report_id, ACTOR)
     with pytest.raises(PipelineStateError):
         orchestrator.get_report(report_id)
 
@@ -324,6 +324,6 @@ def test_case_8_separate_verdicts_external_block_and_no_gate4(tmp_path):
             acknowledge_incomplete=False,
         )
     with pytest.raises(PipelineStateError):
-        orchestrator.submit_approval_record(report_id, ACTOR, "actuary")
+        orchestrator.submit_approval_record(report_id, ACTOR)
     with pytest.raises(PipelineStateError):
         orchestrator.get_report(report_id)

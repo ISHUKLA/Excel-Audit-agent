@@ -231,7 +231,8 @@ def test_cases_complete_all_four_gates_and_only_then_generate_pdf(number, tmp_pa
     with pytest.raises(ValueError, match="named approval record"):
         generate_report_pdf(report_before_gate4, orchestrator.get_audit_rows(report_id))
 
-    report = orchestrator.submit_approval_record(report_id, ACTOR, "actuary")
+    report = orchestrator.submit_approval_record(report_id, ACTOR)
+    assert report.report_approval_role == "cro"
     pdf = generate_report_pdf(report, orchestrator.get_audit_rows(report_id))
     assert pdf.startswith(b"%PDF")
     assert len(pdf) > 1_000

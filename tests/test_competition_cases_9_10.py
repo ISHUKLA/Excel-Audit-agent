@@ -226,7 +226,7 @@ def test_case_9_no_reference_is_not_performed_and_unacknowledged_incomplete_bloc
 
     assert orchestrator.get_stage(report_id) == "post_reconciliation"
     with pytest.raises(PipelineStateError, match="expected one of"):
-        orchestrator.submit_approval_record(report_id, ACTOR, "actuary")
+        orchestrator.submit_approval_record(report_id, ACTOR)
     with pytest.raises(PipelineStateError, match="not been assembled"):
         orchestrator.get_report(report_id)
 
@@ -309,4 +309,4 @@ def test_case_10_fuzzy_mapping_needs_human_and_zero_delta_cannot_cure_context(tm
         )
     assert orchestrator.get_stage(report_id) == "post_reconciliation"
     with pytest.raises(PipelineStateError, match="expected one of"):
-        orchestrator.submit_approval_record(report_id, ACTOR, "actuary")
+        orchestrator.submit_approval_record(report_id, ACTOR)

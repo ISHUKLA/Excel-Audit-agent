@@ -37,6 +37,7 @@ from core.gates import (
     independence_disclosure_preview,
     preview_reconciliation,
     reconciliation_gate,
+    resolve_cro_approver,
 )
 from core.models import (
     AccountMapping,
@@ -532,7 +533,6 @@ class Orchestrator:
         self,
         report_id: str,
         approval_name: str,
-        role: str,
     ) -> AuditReport:
         """Complete Gate 4 and return the report with its named approval record."""
         state = self._state_for(report_id)
@@ -541,15 +541,15 @@ class Orchestrator:
         report = approval_record_gate(
             report=state["report"],
             approval_name=approval_name,
-            role=role,
             authorized_approvers=authorized_approvers,
-            actor=approval_name,
             audit_log=self._audit_log,
             context=state["context"],
         )
         state["report"] = report
         state["stage"] = "post_approval_record"
-        self._snapshot(report_id, "post_approval_record", approval_name)
+        self._snapshot(
+            report_id, "post_approval_record", report.report_approval_name
+        )
         return report
 
     def resume(self, report_id: str) -> dict:
@@ -621,8 +621,17 @@ class Orchestrator:
         )
 
     def is_approver_registered(self, approval_name: str) -> bool:
+        return self.get_registered_approver_identity(approval_name) is not None
+
+    def get_registered_approver_identity(
+        self, approval_name: str
+    ) -> Optional[dict[str, str]]:
+        """Return canonical local-registry identity data for Gate 4 display."""
         approvers = _load_authorized_approvers(self._authorized_approvers_path)
-        return any(_same_name(entry.get("name"), approval_name) for entry in approvers)
+        entry = resolve_cro_approver(approval_name, approvers)
+        if entry is None:
+            return None
+        return {"name": entry["name"], "role": entry["role"]}
 
     def verify_evidence_integrity(self) -> tuple[bool, list[str]]:
         return self._audit_log.verify_chain()

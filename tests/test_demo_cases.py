@@ -469,8 +469,9 @@ def test_case_4_report_generation_remains_gated_by_named_approval(pipeline):
     with pytest.raises(ValueError, match="named approval record"):
         generate_report_pdf(report_before, orchestrator.get_audit_rows(report_id))
 
-    final_report = orchestrator.submit_approval_record(report_id, ACTOR, "actuary")
+    final_report = orchestrator.submit_approval_record(report_id, ACTOR)
     assert final_report.report_approval_name == ACTOR
+    assert final_report.report_approval_role == "cro"
     assert final_report.report_approval_at is not None
 
     pdf_bytes = generate_report_pdf(final_report, orchestrator.get_audit_rows(report_id))

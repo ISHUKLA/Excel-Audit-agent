@@ -318,6 +318,16 @@ def _start_preview(orchestrator, reference_figures=None):
     return report_id, preview
 
 
+def test_gate_4_identity_preview_is_canonical_and_registry_derived(tmp_path):
+    orchestrator, _, _ = _orchestrator(tmp_path)
+
+    assert orchestrator.get_registered_approver_identity("  isaac shukla  ") == {
+        "name": ACTOR,
+        "role": "cro",
+    }
+    assert orchestrator.get_registered_approver_identity("Someone Unknown") is None
+
+
 def test_full_staged_pipeline_snapshots_every_pause_and_supplies_gate_context(
     monkeypatch, tmp_path
 ):
@@ -354,12 +364,13 @@ def test_full_staged_pipeline_snapshots_every_pause_and_supplies_gate_context(
         use_ai_documentation=True,
         ai_transmission_acknowledged=True,
     )
-    report = orchestrator.submit_approval_record(report_id, ACTOR, "actuary")
+    report = orchestrator.submit_approval_record(report_id, ACTOR)
 
     assert (internal, external) == ("pass", "not_performed")
     assert final_result.verdicts_are_final is True
     assert report.translation_and_reconciliation_verdict == "pass"
     assert report.report_approval_name == ACTOR
+    assert report.report_approval_role == "cro"
     assert "No independent review was performed" in report.independence_disclosure
     assert report.generated_at <= report.report_approval_at
     assert len(report.llm_data_manifest) == 1
@@ -1302,9 +1313,10 @@ def test_declined_ai_documentation_still_reaches_gate_4_and_approval(monkeypatch
     report_id, preview = _start_preview(orchestrator)
 
     _submit_gate3_with_ai_choice(orchestrator, report_id, preview, use_ai=False)
-    report = orchestrator.submit_approval_record(report_id, ACTOR, "actuary")
+    report = orchestrator.submit_approval_record(report_id, ACTOR)
 
     assert report.report_approval_name == ACTOR
+    assert report.report_approval_role == "cro"
     assert report.ai_documentation_status == "declined"
 
 
