@@ -92,8 +92,8 @@ def _init_state() -> None:
         "reconciliation_result": None,
         "mapping_decisions": {},
         "reference_figures": None,
-        "reviewer_name": "",
         "reviewer_role": ROLE_OPTIONS[0],
+        "current_user": "",
         "context_match_verdict": "not_checked",
         "materiality_defaults": None,
         "internal_verdict": None,
@@ -111,6 +111,68 @@ def _init_state() -> None:
     }
     for key, value in defaults.items():
         st.session_state.setdefault(key, value)
+
+
+def _load_authorized_reviewers() -> dict:
+    """Load authorized reviewers from config."""
+    try:
+        with open("config/authorized_reviewers.json") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {"reviewers": []}
+
+
+def _is_authorized_reviewer(name: str) -> bool:
+    """Check if name is an authorized reviewer."""
+    if not name or not name.strip():
+        return False
+    config = _load_authorized_reviewers()
+    return any(r["name"].lower() == name.lower() for r in config.get("reviewers", []))
+
+
+def _load_authorized_approvers() -> dict:
+    """Load authorized approvers from config."""
+    try:
+        with open("config/authorized_approvers.json") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {"approvers": []}
+
+
+def _is_cro_approver(name: str) -> bool:
+    """Check if name is a CRO (Chief Risk Officer) authorized to approve."""
+    if not name or not name.strip():
+        return False
+    config = _load_authorized_approvers()
+    approver = next(
+        (a for a in config.get("approvers", []) if a["name"].lower() == name.lower()),
+        None
+    )
+    return approver is not None and approver.get("role") == "cro"
+
+
+def _identity_sidebar() -> None:
+    """Persistent reviewer identity, used as `actor` for every gate decision.
+
+    Rendered once per run so the same identity carries across Gates 1-3
+    without re-entry; Gate 4's named approval record is a separate, explicit
+    confirmation and does not read from this field.
+    """
+    st.sidebar.markdown("**Reviewer identity**")
+    typed = st.sidebar.text_input(
+        "Your name (used to attribute gate decisions)",
+        value=st.session_state.get("current_user", ""),
+        key="identity_input",
+    )
+    st.session_state["current_user"] = typed.strip()
+    if st.session_state["current_user"]:
+        if _is_authorized_reviewer(st.session_state["current_user"]):
+            st.sidebar.success(f"✓ Acting as: {st.session_state['current_user']}")
+        else:
+            st.sidebar.error(f"⚠ '{st.session_state['current_user']}' is not authorized to review.")
+            st.sidebar.caption("Contact your supervisor to be added to authorized_reviewers.json")
+    else:
+        st.sidebar.caption("Enter your name to unlock gate decisions.")
 
 
 def _verdict_banner(verdict: str, label: str) -> None:
@@ -281,8 +343,6 @@ def screen_1_upload() -> None:
         format_func=lambda value: value.upper() if value in {"cro", "cfo"} else value.title(),
         key="file_role",
     )
-    reviewer_name = st.text_input("Reviewer full name (for Gates 1–3)", key="reviewer_input")
-
     context_col1, context_col2, context_col3 = st.columns(3)
     entity = context_col1.text_input("Entity", key="file_entity")
     period = context_col2.text_input("Period", placeholder="2025-Q4", key="file_period")
@@ -381,7 +441,7 @@ def screen_1_upload() -> None:
     context_summary = [
         ("Workbook", "Filename", effective_name),
         ("Workbook", "Description", description.strip() or "Not supplied"),
-        ("Review", "Reviewer", reviewer_name.strip() or "Not supplied"),
+        ("Review", "Reviewer", st.session_state.get("current_user", "") or "Not supplied"),
         ("Review", "Role", role.upper() if role in {"cro", "cfo"} else role.title()),
         ("Workbook", "Entity", entity.strip() or "Not supplied"),
         ("Workbook", "Period", period.strip() or "Not supplied"),
@@ -430,10 +490,6 @@ def screen_1_upload() -> None:
     if not description.strip():
         st.error("Please describe what this file does.")
         return
-    if not reviewer_name.strip():
-        st.error("Please enter the reviewer’s full name for Gates 1–3.")
-        return
-
     try:
         reference_figures = (
             build_reference_figures(
@@ -465,18 +521,27 @@ def screen_1_upload() -> None:
         st.error(str(exc))
         return
 
+    current_user = st.session_state.get('current_user', 'unknown')
+    if not current_user or current_user == 'unknown':
+        st.error("Please enter your name in the sidebar to proceed.")
+        return
+    if not _is_authorized_reviewer(current_user):
+        st.error(f"'{current_user}' is not authorized to review files.")
+        return
+
     try:
         # No temporary file: the bytes confirmed above are the bytes parsed.
         # Writing them to disk first would reintroduce a mutable reference
         # between confirmation and parsing.
         with st.spinner("Parsing workbook and detecting findings…"):
+            print(f"Gate 1 called by {current_user}")
             report_id, parsed_file, findings = _orchestrator().run(
                 workbook_bytes,
                 file_context,
                 reference_figures,
                 expected_workbook_hash=workbook_hash,
                 context_confirmed=gate1_confirmed,
-                actor=reviewer_name.strip(),
+                actor=current_user,
             )
     except WorkbookIdentityError as exc:
         st.error(str(exc))
@@ -502,7 +567,6 @@ def screen_1_upload() -> None:
     st.session_state.reconciliation_result = None
     st.session_state.mapping_decisions = {}
     st.session_state.reference_figures = reference_figures
-    st.session_state.reviewer_name = reviewer_name.strip()
     st.session_state.reviewer_role = role
     st.session_state.context_match_verdict = _orchestrator().get_context_match_verdict(report_id)
     st.session_state.final_report = None
@@ -641,12 +705,20 @@ def screen_2_findings_review() -> None:
     if not st.button("Submit all decisions", disabled=not ready, type="primary"):
         return
 
+    current_user = st.session_state.get('current_user', 'unknown')
+    if not current_user or current_user == 'unknown':
+        st.error("Please enter your name in the sidebar to proceed.")
+        return
+    if not _is_authorized_reviewer(current_user):
+        st.error(f"'{current_user}' is not authorized to review files.")
+        return
+
     decided_findings = [
         finding.model_copy(
             update={
                 "human_decision": decisions[finding.finding_id]["decision"],
                 "human_reason": decisions[finding.finding_id].get("reason") or None,
-                "decided_by": st.session_state.reviewer_name,
+                "decided_by": current_user,
                 "decided_at": datetime.now(timezone.utc),
             }
         )
@@ -654,11 +726,12 @@ def screen_2_findings_review() -> None:
     ]
     try:
         with st.spinner("Reconstructing the selected outputs…"):
+            print(f"Gate 2 called by {current_user}")
             _, result = _orchestrator().submit_gate2_decisions(
                 st.session_state.report_id,
                 decided_findings,
                 selected_outputs,
-                actor=st.session_state.reviewer_name,
+                actor=current_user,
             )
     except ChainIntegrityError as exc:
         _chain_integrity_error(exc)
@@ -782,9 +855,10 @@ def screen_3_reconciliation() -> None:
         if st.button("Retry report preparation", type="primary", disabled=not retry_ready):
             try:
                 with st.spinner("Retrying documentation and report preparation…"):
+                    current_user = st.session_state.get('current_user', 'unknown')
                     report = _orchestrator().prepare_report(
                         st.session_state.report_id,
-                        actor=st.session_state.reviewer_name,
+                        actor=current_user,
                         use_ai_documentation=bool(retry_use_ai),
                         ai_transmission_acknowledged=retry_acknowledged,
                     )
@@ -853,6 +927,7 @@ def screen_3_reconciliation() -> None:
     )
     _sync_mapping_edit_selections(result)
     mapping_decisions = _mapping_decision_models(result)
+    current_user = st.session_state.get('current_user', 'unknown')
     try:
         internal_verdict, external_verdict, preview = _orchestrator().preview_gate3_decisions(
             st.session_state.report_id,
@@ -862,7 +937,7 @@ def screen_3_reconciliation() -> None:
             internal_absolute_threshold=internal_absolute,
             external_pct_threshold=external_pct_percent / 100,
             external_absolute_threshold=external_absolute,
-            actor=st.session_state.reviewer_name,
+            actor=current_user,
         )
     except ChainIntegrityError as exc:
         _chain_integrity_error(exc)
@@ -901,6 +976,7 @@ def screen_3_reconciliation() -> None:
             )
         _render_mapping_cards(result)
         mapping_decisions = _mapping_decision_models(result)
+        current_user = st.session_state.get('current_user', 'unknown')
         try:
             internal_verdict, external_verdict, preview = (
                 _orchestrator().preview_gate3_decisions(
@@ -911,7 +987,7 @@ def screen_3_reconciliation() -> None:
                     internal_absolute_threshold=internal_absolute,
                     external_pct_threshold=external_pct_percent / 100,
                     external_absolute_threshold=external_absolute,
-                    actor=st.session_state.reviewer_name,
+                    actor=current_user,
                 )
             )
         except ChainIntegrityError as exc:
@@ -982,8 +1058,17 @@ def screen_3_reconciliation() -> None:
     if not st.button("Confirm reconciliation", disabled=disabled, type="primary"):
         return
 
+    current_user = st.session_state.get('current_user', 'unknown')
+    if not current_user or current_user == 'unknown':
+        st.error("Please enter your name in the sidebar to proceed.")
+        return
+    if not _is_authorized_reviewer(current_user):
+        st.error(f"'{current_user}' is not authorized to review files.")
+        return
+
     try:
         with st.spinner("Finalizing reconciliation and preparing report evidence…"):
+            print(f"Gate 3 called by {current_user}")
             internal_verdict, external_verdict, final_result = (
                 _orchestrator().submit_gate3_decisions(
                     st.session_state.report_id,
@@ -995,7 +1080,7 @@ def screen_3_reconciliation() -> None:
                     external_absolute_threshold=external_absolute,
                     internal_threshold_deviation_reason=internal_reason or None,
                     external_threshold_deviation_reason=external_reason or None,
-                    actor=st.session_state.reviewer_name,
+                    actor=current_user,
                     use_ai_documentation=bool(use_ai_documentation),
                     ai_transmission_acknowledged=ai_transmission_acknowledged,
                     acknowledge_incomplete=acknowledge_incomplete,
@@ -1069,26 +1154,29 @@ def screen_4_approval_record() -> None:
     approval_name = st.text_input("Your full name", key="approval_name")
     approval_role = st.text_input("Your role at the organisation", key="approval_role")
     if approval_name.strip():
-        if not _orchestrator().is_approver_registered(approval_name):
-            st.warning(
-                "This name isn’t in the registered approver list — you can still proceed, "
-                "but this will be flagged in the report evidence."
-            )
+        if _is_cro_approver(approval_name):
+            st.success(f"✓ {approval_name} is authorized to approve (CRO)")
+        else:
+            st.error(f"⚠ {approval_name} is not a CRO. Only Chief Risk Officers (CROs) can approve.")
         disclosure = _orchestrator().preview_independence_disclosure(
             st.session_state.report_id, approval_name.strip()
         )
         st.info(disclosure)
     else:
-        st.caption("Enter a name to preview the report’s independence disclosure.")
+        st.caption("Enter a CRO name to preview the report’s independence disclosure.")
 
     st.markdown(
         "**This confirms your typed identity and the timestamp. It is not a "
         "cryptographic or legal signature.**"
     )
-    ready = bool(approval_name.strip()) and bool(approval_role.strip())
+    ready = bool(approval_name.strip()) and bool(approval_role.strip()) and _is_cro_approver(approval_name)
     if not st.button(
         "Record approval and generate report", disabled=not ready, type="primary"
     ):
+        return
+
+    if not _is_cro_approver(approval_name):
+        st.error(f"Only CROs can approve. '{approval_name}' is not registered as a CRO.")
         return
 
     try:
@@ -1576,6 +1664,7 @@ def main() -> None:
     st.set_page_config(page_title="Excel Audit Agent", layout="wide")
     _load_environment()
     _init_state()
+    _identity_sidebar()
 
     # Always show landing and progress
     _landing_section()

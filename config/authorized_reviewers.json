@@ -1,0 +1,15 @@
+{
+  "_comment": [
+    "Authorized reviewers for Gates 1–3.",
+    "Only names in this list can proceed through the workflow.",
+    "This is a local registry, not authentication.",
+    "Anyone with write access to this file can add names."
+  ],
+  "reviewers": [
+    {
+      "name": "Isaac Shukla",
+      "role": "actuary",
+      "registered_at": "2026-09-17"
+    }
+  ]
+}
