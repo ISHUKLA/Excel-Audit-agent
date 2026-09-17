@@ -271,7 +271,7 @@ Running note, per the Diligence rules. Update it when you change a file.
 | [Dockerfile](Dockerfile) | AI-written | Step 13 Python 3.11 image, WeasyPrint libraries, and `/data` evidence volume, 2026-08-11 |
 | [.dockerignore](.dockerignore) | AI-written | Step 13 excludes secrets, databases, and local evidence volumes from image context, 2026-08-11 |
 | [.streamlit/secrets.toml.example](.streamlit/secrets.toml.example) | AI-written | Step 13 API-key placement and password-equivalent warning, 2026-08-11 |
-| [README.md](README.md) | AI-written | Step 13 local-first deployment posture, Docker volume instructions, gates, and plain limitations, 2026-08-11 |
+| [README.md](README.md) | AI-written | Step 13 local-first deployment posture, Docker volume instructions, gates, and plain limitations, 2026-08-11; implementation-aligned architecture diagram, 2026-09-17 |
 | [tests/test_deployment.py](tests/test_deployment.py) | AI-written | Step 13 image, secret, mounted-path, README-order, and limitation regressions, 2026-08-11 |
 | [tests/test_app.py](tests/test_app.py) | AI-written | Step 11 per-screen shell, export guard, vocabulary, and retry-message coverage, 2026-08-11 |
 | [tests/test_ui_inputs.py](tests/test_ui_inputs.py) | AI-written | Step 11 clean, duplicate, missing-column, and malformed reference-input coverage, 2026-08-11 |

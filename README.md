@@ -218,38 +218,83 @@ imperfect first-run evidence is preserved rather than rewritten.
 ## Architecture
 
 ```mermaid
-graph TB
-    User["User<br/>(Reviewer)"]
-    UI["Streamlit UI"]
-    Parser["Agent 1: Parser<br/>(openpyxl)"]
-    Anomaly["Agent 2: Anomaly Detector<br/>(rule-based)"]
-    Reconciliation["Agent 3: Reconciliation<br/>(Python vs Excel + Accounts)"]
-    Documentation["Agent 4: Documentation<br/>(Claude API)"]
-    AuditLog["Audit Log<br/>(SQLite, append-only)"]
-    Report["Report Generator<br/>(Jinja2 + WeasyPrint)"]
+flowchart TD
+    User["Human reviewer / approver"] <--> UI["Streamlit UI<br/>Presentation only: collect input and render state"]
+    UI <--> Orchestrator["Orchestrator<br/>Sole workflow controller; enforces stage order"]
 
-    User -->|Upload + Context| UI
-    UI -->|Gate 1: Confirm| Parser
-    Parser -->|Parsed file| Anomaly
-    Anomaly -->|Findings| UI
-    UI -->|Gate 2: Review findings| Reconciliation
-    Reconciliation -->|Verdicts + mappings| UI
-    UI -->|Gate 3: Set materiality + choose AI| Documentation
-    Documentation -.->|"Optional: tab summaries<br/>(reviewer may decline)"| Report
-    UI -->|Gate 4: Record approval| Report
-    Report -->|PDF| User
+    subgraph Workflow["Orchestrator-controlled workflow"]
+        direction TB
+        Gate1["Gate 1 — Context confirmation<br/>Confirm exact workbook bytes/hash, file context,<br/>reviewer identity, and supplied reference context"]
+        Parser["Agent 1 — Parser<br/>Formula + cached value, metadata,<br/>and dependency graphs"]
+        Anomaly["Agent 2 — Anomaly detection<br/>Deterministic and rule-based"]
+        Gate2["Gate 2 — Findings review<br/>Disposition every finding and designate<br/>authoritative output cells"]
 
-    Parser -.->|Log events| AuditLog
-    Anomaly -.->|Log events| AuditLog
-    Reconciliation -.->|Log events| AuditLog
-    Documentation -.->|Log events| AuditLog
-    UI -.->|Log events| AuditLog
+        Pass1["Agent 3 — Pass 1<br/>Internal consistency:<br/>Excel cached values vs Python reconstruction"]
+        Internal["Internal verdict<br/>Remains separate"]
+        References{"Reference figures supplied?"}
+        Pass2["Agent 3 — Pass 2<br/>Accounts reconciliation:<br/>Python outputs vs supplied accounts<br/>Mapping proposals only"]
+        External["External verdict<br/>Remains separate"]
+        NotPerformed["External verdict: not performed<br/>Explicitly reported; Pass 2 is not run"]
+        Incomplete["Incomplete path<br/>Partial reconstruction, stale/unknown evidence,<br/>or unmatched/unmapped populations"]
+        SeparateResults["Internal and external results<br/>Presented side by side; never merged"]
 
-    style Gate1 fill:#e1f5ff
-    style Gate2 fill:#e1f5ff
-    style Gate3 fill:#e1f5ff
-    style Gate4 fill:#e1f5ff
+        Gate3["Gate 3 — Reconciliation sign-off<br/>Human-set thresholds and mapping dispositions;<br/>explicit per-report AI-use choice"]
+        Gate3Blocked["Downstream preparation blocked<br/>A block cannot be bypassed;<br/>incomplete requires explicit acknowledgement"]
+
+        Traceability["Build traceability index<br/>Traced, partially traced, unmapped,<br/>and not traceable entries remain visible"]
+        AIDecision["Record per-report AI-use decision<br/>Before any external AI call; not a fifth gate"]
+        Minimize["Data minimization + transmission manifest<br/>Before any external AI call"]
+        Documentation["Agent 4 — Optional AI documentation<br/>The only external AI caller"]
+        NoAI["AI documentation declined<br/>No external call; deterministic completion continues"]
+        Assemble["Assemble report model and evidence<br/>Not yet a PDF"]
+
+        Gate4["Gate 4 — Named approval record<br/>Canonical name and role derived from local CRO registry<br/>Local identity confirmation, not authentication"]
+        Approved["AuditReport with complete<br/>named approval record"]
+        PDFBlocked["PDF remains blocked<br/>Until Gate 4 is complete"]
+
+        Gate1 --> Parser --> Anomaly --> Gate2 --> Pass1 --> Internal --> References
+        References -->|Yes| Pass2 --> External --> SeparateResults
+        References -->|No| NotPerformed --> SeparateResults
+        Internal --> SeparateResults
+        Pass1 -.->|Partial or stale/unknown evidence| Incomplete
+        Pass2 -.->|Unmatched or unmapped population| Incomplete
+        Incomplete --> SeparateResults
+        SeparateResults --> Gate3
+        Gate3 -->|Pass/warn, or incomplete acknowledged| Traceability --> AIDecision
+        Gate3 -.->|Block, or incomplete not acknowledged| Gate3Blocked --> PDFBlocked
+        AIDecision -->|Use AI| Minimize --> Documentation --> Assemble
+        AIDecision -->|Decline AI| NoAI --> Assemble
+        Assemble --> Gate4
+        Gate4 -->|Complete named approval record| Approved
+        Gate4 -.->|Missing or invalid registry match| PDFBlocked
+    end
+
+    Orchestrator --> Gate1
+    Approved -->|Returned through orchestrator| UI
+    UI -->|Invoke only with approved report + audit rows| Report["Report generator<br/>Gate 4 approval guard + Jinja2/WeasyPrint<br/>Translation & Reconciliation Report (PDF)"]
+    Report -->|PDF bytes for download| UI
+
+    subgraph Evidence["Durable evidence and recovery"]
+        direction TB
+        State["State snapshots<br/>Durable pipeline recovery points"]
+        AuditLog["SQLite audit log<br/>Append-only and hash-chained; tamper-evident"]
+        Registry["Local authorized-approvers registry"]
+    end
+
+    Orchestrator -.->|Persist state at controlled transitions| State
+    State -.->|Commit snapshot hash| AuditLog
+    AuditLog -.->|Verify the complete chain before recovery| State
+    State -.->|Restore verified state| Orchestrator
+    Orchestrator -.->|Workflow, mapping, and AI-use events| AuditLog
+    Gate1 -.->|Decision| AuditLog
+    Gate2 -.->|Decision| AuditLog
+    Gate3 -.->|Separate verdicts and thresholds| AuditLog
+    Gate4 -.->|Named approval record| AuditLog
+    Documentation -.->|Manifest and request/response hashes; no raw response| AuditLog
+    Registry --> Gate4
 ```
+
+The UI never invokes an agent or generates evidence directly; it sends human inputs to the orchestrator and renders validated outputs. Agent 3 emits separately labelled `excel_vs_python` and `python_vs_accounts` lines, and Gate 3 recomputes and records separate `internal_verdict` and `external_verdict` values. Supplying no reference figures skips only Pass 2 and produces an explicit `not_performed` external verdict; it does not skip Gate 3. An `incomplete` result remains incomplete even when the reviewer acknowledges it so the workflow can continue.
 
 ---
 
