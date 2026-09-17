@@ -8,11 +8,40 @@ are enforced at the gate layer, not here — app.py only calls and renders.
 
 import json
 import os
+import sys
 from datetime import datetime, timezone
 from typing import Optional
 
-import pandas as pd
 import streamlit as st
+
+
+def _python_runtime_error(version_info=None, executable=None) -> Optional[str]:
+    """Return an actionable startup error for an unsupported interpreter."""
+    version_info = version_info or sys.version_info
+    if tuple(version_info[:2]) >= (3, 11):
+        return None
+
+    patch = version_info[2] if len(version_info) > 2 else 0
+    executable = executable or sys.executable
+    return (
+        "Python 3.11 or newer is required. "
+        f"This Streamlit process is using Python {version_info[0]}.{version_info[1]}.{patch} "
+        f"from {executable}. Create and activate a Python 3.11 or 3.13 virtual "
+        "environment, install requirements.txt, and restart Streamlit."
+    )
+
+
+def _enforce_supported_python(version_info=None, executable=None) -> None:
+    """Stop Streamlit before Python 3.10+ application modules are imported."""
+    error = _python_runtime_error(version_info, executable)
+    if error is not None:
+        st.error(error)
+        st.stop()
+
+
+_enforce_supported_python()
+
+import pandas as pd
 from dotenv import load_dotenv
 
 from agents.orchestrator import Orchestrator, PipelineStateError

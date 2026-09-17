@@ -7,6 +7,7 @@ import runpy
 import pytest
 from streamlit.testing.v1 import AppTest
 
+import app as app_module
 import agents.orchestrator as orchestrator_module
 from agents.orchestrator import Orchestrator
 from app import _effective_workbook_bytes, _pdf_error_message, _preparation_error_message, _workbook_identity_panel
@@ -24,6 +25,45 @@ ORCHESTRATOR_FIXTURES = runpy.run_path(str(PROJECT_ROOT / "tests" / "test_orches
 
 def _initial_app():
     return AppTest.from_file(str(APP_PATH)).run(timeout=20)
+
+
+def test_python_runtime_guard_accepts_the_supported_boundary(monkeypatch):
+    errors = []
+    stops = []
+    monkeypatch.setattr(app_module.st, "error", errors.append)
+    monkeypatch.setattr(app_module.st, "stop", lambda: stops.append(True))
+
+    app_module._enforce_supported_python((3, 11, 0), "/test/python3.11")
+
+    assert errors == []
+    assert stops == []
+
+
+def test_python_runtime_guard_stops_with_actionable_legacy_version_message(monkeypatch):
+    errors = []
+
+    def stop():
+        raise RuntimeError("streamlit stopped")
+
+    monkeypatch.setattr(app_module.st, "error", errors.append)
+    monkeypatch.setattr(app_module.st, "stop", stop)
+
+    with pytest.raises(RuntimeError, match="streamlit stopped"):
+        app_module._enforce_supported_python((3, 9, 6), "/test/python3.9")
+
+    assert len(errors) == 1
+    assert "Python 3.11 or newer is required" in errors[0]
+    assert "Python 3.9.6" in errors[0]
+    assert "/test/python3.9" in errors[0]
+    assert "install requirements.txt" in errors[0]
+
+
+def test_python_runtime_guard_runs_before_python_310_application_imports():
+    source = APP_PATH.read_text(encoding="utf-8")
+
+    assert source.index("_enforce_supported_python()") < source.index(
+        "from agents.orchestrator import"
+    )
 
 
 class _CountingMessagesAPI:
