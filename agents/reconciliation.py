@@ -16,12 +16,14 @@ creates an AccountMapping with is_approved=False. There is no code path here
 that sets it True.
 """
 
+from __future__ import annotations
+
 import ast
 import math
 import operator
 import re
 from decimal import Decimal
-from typing import Optional
+from typing import Optional, Union
 
 from openpyxl.utils import column_index_from_string, get_column_letter
 from openpyxl.utils.cell import coordinate_from_string
@@ -2026,7 +2028,7 @@ _EVALUATORS = {
 
 def _evaluate(
     formula: str, own_ref: str, values: dict, warnings: list[str]
-) -> Optional[float | bool]:
+) -> Optional[Union[float, bool]]:
     """Compute a supported formula from its already-resolved dependencies.
 
     Function calls are unwrapped innermost-out: `_INNERMOST_CALL_PATTERN`

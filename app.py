@@ -6,9 +6,11 @@ the non-UI modules. Authorization checks (reviewer and CRO registry validation)
 are enforced at the gate layer, not here — app.py only calls and renders.
 """
 
+import io
 import json
 import os
 import sys
+import zipfile
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -213,6 +215,24 @@ def _effective_workbook_bytes(uploaded_file) -> tuple[Optional[bytes], str, str]
     return None, "Not uploaded", "none"
 
 
+def _is_xlsb(workbook_bytes: bytes) -> bool:
+    """True if these bytes are a binary .xlsb workbook, not .xlsx/.xlsm.
+
+    .xlsb uses the same outer zip container as .xlsx/.xlsm but stores its
+    workbook part as binary (xl/workbook.bin) rather than XML
+    (xl/workbook.xml). openpyxl can open the zip but cannot parse the binary
+    part inside it, so this is sniffed and rejected with a clear message
+    before ever reaching the parser — the alternative is a confusing
+    zip/XML-level exception surfacing from deep inside agents/parser.py.
+    """
+    try:
+        with zipfile.ZipFile(io.BytesIO(workbook_bytes)) as archive:
+            names = archive.namelist()
+    except zipfile.BadZipFile:
+        return False
+    return "xl/workbook.bin" in names and "xl/workbook.xml" not in names
+
+
 _SOURCE_LABELS = {"upload": "Uploaded file", "demo": "Demonstration case", "none": "None"}
 
 
@@ -329,7 +349,9 @@ def screen_1_upload() -> None:
             except Exception as e:
                 st.error(f"Could not load case: {e}")
 
-    uploaded_file = st.file_uploader("Upload Excel file", type=["xlsx"], key="workbook_upload")
+    uploaded_file = st.file_uploader(
+        "Upload Excel file", type=["xlsx", "xlsm", "xlsb"], key="workbook_upload"
+    )
     description = st.text_area("Describe what this file does", key="file_description")
     role = st.selectbox(
         "Role",
@@ -431,6 +453,15 @@ def screen_1_upload() -> None:
 
     effective_bytes, effective_name, effective_source = _effective_workbook_bytes(uploaded_file)
 
+    if effective_bytes is not None and _is_xlsb(effective_bytes):
+        st.error(
+            f"'{effective_name}' is a binary .xlsb workbook. Formulas cannot be read "
+            "reliably from this format, so it cannot be audited as-is. In Excel, use "
+            "File → Save As → Excel Workbook (.xlsx) or Macro-Enabled Workbook "
+            "(.xlsm), then re-upload."
+        )
+        return
+
     st.subheader("Gate 1 — Confirm context before parsing")
     context_summary = [
         ("Workbook", "Filename", effective_name),
@@ -472,7 +503,7 @@ def screen_1_upload() -> None:
         return
 
     if effective_bytes is None:
-        st.error("Please upload an .xlsx file or load a demonstration case.")
+        st.error("Please upload an .xlsx or .xlsm file or load a demonstration case.")
         return
 
     # These are exactly the bytes and hash shown and confirmed above — never
@@ -1280,6 +1311,30 @@ def screen_5_report() -> None:
         else:
             st.error("Fail — evidence integrity check failed: " + "; ".join(errors))
 
+    # Flight Recorder: Governance pipeline execution map
+    if st.session_state.get("show_flight_recorder", True):
+        st.markdown("---")
+        st.subheader("Pipeline Execution Map (Governance Flight Recorder)")
+        try:
+            from ui.flight_recorder import display_flight_recorder
+            from core.audit_log import AuditLog
+
+            audit_log = AuditLog('audit.db')
+            display_flight_recorder(audit_log, report.report_id)
+
+            if st.session_state.get("show_evidence_details", False):
+                st.info(
+                    "Evidence details expanded. Collapse them via the 'Show Evidence Details' "
+                    "toggle in the sidebar for a more compact view."
+                )
+        except Exception as e:
+            st.error(f"Could not load flight recorder: {e}")
+    else:
+        st.info(
+            "Flight recorder hidden. Enable 'Show Flight Recorder' in the sidebar "
+            "to view the governance pipeline execution map."
+        )
+
 
 def _numeric_cells_for_tab(parsed_file: ParsedFile, tab: str) -> list[dict]:
     prefix = f"{tab}!"
@@ -1680,6 +1735,26 @@ def main() -> None:
     _load_environment()
     _init_state()
     _identity_sidebar()
+
+    # Flight Recorder toggles (read-only governance visualization)
+    st.session_state.setdefault("show_flight_recorder", True)
+    st.session_state.setdefault("show_evidence_details", False)
+
+    show_flight_recorder = st.sidebar.checkbox(
+        "Show Flight Recorder",
+        value=st.session_state.show_flight_recorder,
+        key="toggle_flight_recorder",
+        help="Display the governance pipeline execution map"
+    )
+    st.session_state.show_flight_recorder = show_flight_recorder
+
+    show_evidence_details = st.sidebar.checkbox(
+        "Show Evidence Details",
+        value=st.session_state.show_evidence_details,
+        key="toggle_evidence_details",
+        help="Expand all node cards to show hashes, rules, and event details"
+    )
+    st.session_state.show_evidence_details = show_evidence_details
 
     # Always show landing and progress
     _landing_section()

@@ -128,6 +128,26 @@ A matched lookup cell (from any of these four functions) that holds text, rather
 
 ---
 
+## Governance Flight Recorder
+
+After your audit completes (Gate 4), the **Governance Flight Recorder** displays a live execution map showing the complete sequence of decisions, transformations, and evidence flows across the 9-node governance pipeline.
+
+**What the Flight Recorder shows:**
+- **7 pipeline nodes**: Gate 1 (context), Anomaly Detector, Gate 2 (findings), Reconciliation (internal & external), Gate 3 (verdict), Optional AI documentation, Gate 4 (approval), and PDF export
+- **Authority at each node**: which human (qualified actuary or CRO), deterministic agent, or bounded AI made each decision
+- **Evidence in and out**: what data entered and left each stage (workbook hash, findings count, verdicts, etc.)
+- **Status indicators**: complete (green), waiting (yellow), blocked (red), locked (gray), or incomplete (orange)
+- **Hash fingerprints**: cryptographic SHA256 hashes for every event, enabling auditors to verify chain integrity against `audit.db`
+- **Governance rules**: what each node is allowed and prohibited to do, enforcing segregation of duties
+
+**Cascading locks:** If Gate 3 blocks (e.g., due to reconciliation failure), all downstream nodes lock automatically — Gate 4 cannot approve and the PDF cannot export until the issue is resolved.
+
+**Tamper-evident audit chain:** All events are hash-chained. If any event is modified, the chain detects the change and refuses recovery. See [docs/FLIGHT_RECORDER.md](docs/FLIGHT_RECORDER.md) for details on how tamper-evidence works and [scripts/demo_tamper_detection.py](scripts/demo_tamper_detection.py) for a live demonstration.
+
+**Use the sidebar toggles** to show or hide the flight recorder, and expand evidence details to see hashes and rules. Auditors use the flight recorder to trace each decision and verify no step was skipped or overridden.
+
+---
+
 ## Five-Minute Demonstration
 
 1. **Start the application.**
@@ -527,6 +547,7 @@ Backups are an operational necessity, not merely good practice.
 
 ## Known Limitations
 
+- **Only .xlsx and .xlsm workbooks are supported.** Both are OOXML (zip/XML) containers that openpyxl reads directly, capturing formula and cached value together per cell. `.xlsb` (Excel Binary Workbook) is rejected at upload with a message asking for a `.xlsx`/`.xlsm` re-save: it uses the same outer zip container but stores its workbook part as binary (BIFF12), which cannot be parsed for formula text — only cached values — and would force `CellRecord.formula` to `None` on genuine formula cells, silently breaking the formula-plus-cached-value guarantee every other format upholds. Legacy `.xls` is not supported at all.
 - **No independent reviewer enforced.** The same person can complete all four gates.
 - **No application-level authentication.** Gate 4 provides a visible local identity confirmation by matching a typed name to the authorized-approvers file and deriving the stored role from that entry. It does not authenticate who typed the name.
 - **Audit log is tamper-evident, not tamper-proof.** Someone with file access can modify `audit.db`; verification detects this after the fact.
