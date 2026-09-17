@@ -184,7 +184,7 @@ All demonstration workbooks are entirely synthetic. No real client, policyholder
 **Case 5: Supported formula demonstration**
 - File: `demo/workbooks/case_5_supported_formula_demonstration.xlsx`
 - Reference figures: `demo/reference_figures/case_5_reference_figures.csv`
-- What it shows: A user-facing workbook with one designated output for every function in the live 20-function catalogue. All 20 supported outputs reconstruct completely and reconcile after the human approves each proposed mapping. A separate scope-boundary tab proves that approximate lookup and `OFFSET` remain explicitly partial and incomplete.
+- What it shows: A user-facing workbook with one designated output for every function in the live 26-function catalogue. All 26 supported outputs reconstruct completely and reconcile after the human approves each proposed mapping. A separate scope-boundary tab proves that approximate lookup and `OFFSET` remain explicitly partial and incomplete.
 
 **Case 6: Reserve stress and solvency impact**
 - File: `demo/workbooks/case_6_reserve_stress_business_impact.xlsx`

@@ -1,4 +1,4 @@
-"""Persistent progress indicator for the five-gate pipeline."""
+"""Persistent progress indicator for the four-gate pipeline."""
 
 import streamlit as st
 
@@ -6,13 +6,13 @@ import streamlit as st
 def progress_indicator() -> None:
     """Render a persistent progress indicator in the sidebar.
 
-    Shows real-time progress through the five gates, driven by actual backend state.
+    Shows real-time progress through four human decision gates plus report availability.
     States:
     1. ⏳ Context confirmation — st.session_state.gate1_context_confirmed
     2. 📋 Findings reviewed — all findings have human_decision
     3. 📊 Reconciliation completed — internal_verdict is not None
     4. ✍️ Named approval recorded — approval_name is not empty
-    5. 📄 Report available — pdf_bytes is not None
+    (Report available — pdf_bytes is not None — is a status, not a gate)
     """
     st.sidebar.markdown("## Pipeline Progress")
 
