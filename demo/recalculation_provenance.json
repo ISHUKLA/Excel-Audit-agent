@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-09-18T12:38:43.330435+00:00",
+  "generated_at": "2026-09-18T16:06:53.637030+00:00",
   "purpose": "One-time, build-time recalculation of synthetic test fixtures and competition demonstration workbooks, so their workbook calc mode can be genuinely and accurately declared 'automatic' (with fullCalcOnLoad set) rather than left as 'unknown'. This is a fixture-generation activity performed on repository-controlled synthetic files; it is not part of the running application and is not invoked by the automated test suite.",
   "engine_family": "libreoffice",
-  "engine_version": "LibreOfficeDev 26.8.0.0.alpha0 2c87e51eeaa2b413ff4ae097b2705eea1995d8e5",
+  "engine_version": "LibreOffice 26.2.5.2 cd7284b4cbbfeb507e630c1aac019f4157393acb",
   "executable_path": "/Users/coralieroland/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override/soffice",
   "operating_system": "macOS-26.6.2-x86_64-i386-64bit-Mach-O",
   "architecture": "x86_64",
@@ -165,14 +165,14 @@
     },
     {
       "relative_path": "demo/workbooks/case_5_supported_formula_demonstration.xlsx",
-      "pre_recalculation_sha256": "50ad1273e7fa0b235a9bd957c1a18b016432d28f14b78bc398713f1115725958",
-      "post_recalculation_sha256": "e1454e99ae71f9ede3dd285bc79c25bf55d0e62e3c20cb479d18df58a0b5f884",
-      "formula_manifest_sha256_before": "6cc8854f24b3262b034ed2cc995b16859319adf637565ff657c34e6f3fe35a15",
-      "formula_manifest_sha256_after": "6cc8854f24b3262b034ed2cc995b16859319adf637565ff657c34e6f3fe35a15",
+      "pre_recalculation_sha256": "d71383a73f28e1bfd05e633adb6d2de60b19501eeb8a4b59371424c60c2f5ddf",
+      "post_recalculation_sha256": "ed80be1ef874cfc24e0c2bc1ae281a19dfb6985e96de08306a1838293023986c",
+      "formula_manifest_sha256_before": "874c1b810896eeaee8d78e0ea6dc729382b26fd33f62c1aa5068dc981bf0d581",
+      "formula_manifest_sha256_after": "874c1b810896eeaee8d78e0ea6dc729382b26fd33f62c1aa5068dc981bf0d581",
       "formula_manifest_note": "LibreOffice may normalize formula syntax while preserving the formula targets and independently verified cached numeric results.",
       "calculation_mode_after": "automatic",
-      "formula_count_before": 64,
-      "formula_count_after": 64,
+      "formula_count_before": 68,
+      "formula_count_after": 68,
       "tab_names_unchanged": true,
       "named_ranges_unchanged": true,
       "has_vba_unchanged": true,
@@ -181,8 +181,343 @@
       "cached_value_comparison_tolerance": 1e-08,
       "cached_formula_value_changes": [
         {
+          "cell_ref": "Assumptions!B15",
+          "before": null,
+          "after": true
+        },
+        {
+          "cell_ref": "Assumptions!B16",
+          "before": null,
+          "after": false
+        },
+        {
+          "cell_ref": "Calculations!B10",
+          "before": null,
+          "after": 2600
+        },
+        {
+          "cell_ref": "Calculations!B11",
+          "before": null,
+          "after": 2500
+        },
+        {
+          "cell_ref": "Calculations!B12",
+          "before": null,
+          "after": 310000
+        },
+        {
+          "cell_ref": "Calculations!B13",
+          "before": null,
+          "after": 200000
+        },
+        {
+          "cell_ref": "Calculations!B14",
+          "before": null,
+          "after": 3
+        },
+        {
+          "cell_ref": "Calculations!B15",
+          "before": null,
+          "after": 4
+        },
+        {
+          "cell_ref": "Calculations!B16",
+          "before": null,
+          "after": 2500
+        },
+        {
+          "cell_ref": "Calculations!B17",
+          "before": null,
+          "after": 87500
+        },
+        {
+          "cell_ref": "Calculations!B18",
+          "before": null,
+          "after": 70000
+        },
+        {
+          "cell_ref": "Calculations!B19",
+          "before": null,
+          "after": 125000
+        },
+        {
+          "cell_ref": "Calculations!B20",
+          "before": null,
+          "after": 80000
+        },
+        {
+          "cell_ref": "Calculations!B21",
+          "before": null,
+          "after": 1.08
+        },
+        {
+          "cell_ref": "Calculations!B22",
+          "before": null,
+          "after": 2
+        },
+        {
+          "cell_ref": "Calculations!B23",
+          "before": null,
+          "after": 1.08
+        },
+        {
+          "cell_ref": "Calculations!B24",
+          "before": null,
+          "after": 1
+        },
+        {
+          "cell_ref": "Calculations!B25",
+          "before": null,
+          "after": 1
+        },
+        {
+          "cell_ref": "Calculations!B26",
+          "before": null,
+          "after": 760400
+        },
+        {
+          "cell_ref": "Calculations!B27",
+          "before": null,
+          "after": -230.858547913394
+        },
+        {
+          "cell_ref": "Calculations!B28",
+          "before": null,
+          "after": 1.08
+        },
+        {
+          "cell_ref": "Calculations!B29",
+          "before": null,
+          "after": 1.08
+        },
+        {
+          "cell_ref": "Calculations!B30",
+          "before": null,
+          "after": 45351
+        },
+        {
+          "cell_ref": "Calculations!B31",
+          "before": null,
+          "after": 45351
+        },
+        {
+          "cell_ref": "Calculations!B32",
+          "before": null,
+          "after": 5
+        },
+        {
+          "cell_ref": "Calculations!B33",
+          "before": null,
+          "after": 1.0027397260274
+        },
+        {
+          "cell_ref": "Calculations!B34",
+          "before": null,
+          "after": 125000
+        },
+        {
+          "cell_ref": "Calculations!B35",
+          "before": null,
+          "after": 65000
+        },
+        {
+          "cell_ref": "Calculations!B4",
+          "before": null,
+          "after": 740000
+        },
+        {
+          "cell_ref": "Calculations!B5",
+          "before": null,
+          "after": 2900
+        },
+        {
+          "cell_ref": "Calculations!B6",
+          "before": null,
+          "after": 12
+        },
+        {
+          "cell_ref": "Calculations!B7",
+          "before": null,
+          "after": 2501
+        },
+        {
+          "cell_ref": "Calculations!B8",
+          "before": null,
+          "after": -2500.6
+        },
+        {
+          "cell_ref": "Calculations!B9",
+          "before": null,
+          "after": -2500.5
+        },
+        {
+          "cell_ref": "Outputs!C10",
+          "before": null,
+          "after": 2600
+        },
+        {
+          "cell_ref": "Outputs!C11",
+          "before": null,
+          "after": 2500
+        },
+        {
+          "cell_ref": "Outputs!C12",
+          "before": null,
+          "after": 310000
+        },
+        {
+          "cell_ref": "Outputs!C13",
+          "before": null,
+          "after": 200000
+        },
+        {
+          "cell_ref": "Outputs!C14",
+          "before": null,
+          "after": 3
+        },
+        {
+          "cell_ref": "Outputs!C15",
+          "before": null,
+          "after": 4
+        },
+        {
+          "cell_ref": "Outputs!C16",
+          "before": null,
+          "after": 2500
+        },
+        {
+          "cell_ref": "Outputs!C17",
+          "before": null,
+          "after": 87500
+        },
+        {
+          "cell_ref": "Outputs!C18",
+          "before": null,
+          "after": 70000
+        },
+        {
+          "cell_ref": "Outputs!C19",
+          "before": null,
+          "after": 125000
+        },
+        {
+          "cell_ref": "Outputs!C20",
+          "before": null,
+          "after": 80000
+        },
+        {
+          "cell_ref": "Outputs!C21",
+          "before": null,
+          "after": 1.08
+        },
+        {
+          "cell_ref": "Outputs!C22",
+          "before": null,
+          "after": 2
+        },
+        {
+          "cell_ref": "Outputs!C23",
+          "before": null,
+          "after": 1.08
+        },
+        {
+          "cell_ref": "Outputs!C24",
+          "before": null,
+          "after": 1
+        },
+        {
+          "cell_ref": "Outputs!C25",
+          "before": null,
+          "after": 1
+        },
+        {
+          "cell_ref": "Outputs!C26",
+          "before": null,
+          "after": 760400
+        },
+        {
+          "cell_ref": "Outputs!C27",
+          "before": null,
+          "after": -230.858547913394
+        },
+        {
+          "cell_ref": "Outputs!C28",
+          "before": null,
+          "after": 1.08
+        },
+        {
+          "cell_ref": "Outputs!C29",
+          "before": null,
+          "after": 1.08
+        },
+        {
+          "cell_ref": "Outputs!C30",
+          "before": null,
+          "after": 45351
+        },
+        {
+          "cell_ref": "Outputs!C31",
+          "before": null,
+          "after": 45351
+        },
+        {
+          "cell_ref": "Outputs!C32",
+          "before": null,
+          "after": 5
+        },
+        {
+          "cell_ref": "Outputs!C33",
+          "before": null,
+          "after": 1.0027397260274
+        },
+        {
+          "cell_ref": "Outputs!C34",
+          "before": null,
+          "after": 125000
+        },
+        {
+          "cell_ref": "Outputs!C35",
+          "before": null,
+          "after": 65000
+        },
+        {
+          "cell_ref": "Outputs!C4",
+          "before": null,
+          "after": 740000
+        },
+        {
+          "cell_ref": "Outputs!C5",
+          "before": null,
+          "after": 2900
+        },
+        {
+          "cell_ref": "Outputs!C6",
+          "before": null,
+          "after": 12
+        },
+        {
+          "cell_ref": "Outputs!C7",
+          "before": null,
+          "after": 2501
+        },
+        {
+          "cell_ref": "Outputs!C8",
+          "before": null,
+          "after": -2500.6
+        },
+        {
+          "cell_ref": "Outputs!C9",
+          "before": null,
+          "after": -2500.5
+        },
+        {
+          "cell_ref": "Scope Boundary!B4",
+          "before": null,
+          "after": 1.08
+        },
+        {
           "cell_ref": "Scope Boundary!B5",
-          "before": "OFFSET is not implemented. reference=80000, rows=1, cols=0, height=undefined, width=undefined",
+          "before": null,
           "after": 110000
         }
       ],
@@ -217,11 +552,13 @@
         "Outputs!C30": 45351,
         "Outputs!C31": 45351,
         "Outputs!C32": 5,
-        "Outputs!C33": 1.0027397260273974
+        "Outputs!C33": 1.0027397260273974,
+        "Outputs!C34": 125000.0,
+        "Outputs!C35": 65000.0
       },
       "authoring_tool": "@oai/artifact-tool 2.8.59",
       "recalculation_engine": "LibreOffice",
-      "engine_version": "LibreOfficeDev 26.8.0.0.alpha0 2c87e51eeaa2b413ff4ae097b2705eea1995d8e5",
+      "engine_version": "LibreOffice 26.2.5.2 cd7284b4cbbfeb507e630c1aac019f4157393acb",
       "microsoft_excel_tested": false,
       "verification_result": "pass"
     }
@@ -265,8 +602,8 @@
     {
       "canonical_path": "demo/workbooks/case_5_supported_formula_demonstration.xlsx",
       "output_pack_path": "outputs/ai2_2026_demo_pack_20260824/case_5_supported_formula_demonstration.xlsx",
-      "canonical_sha256": "e1454e99ae71f9ede3dd285bc79c25bf55d0e62e3c20cb479d18df58a0b5f884",
-      "output_pack_sha256": "e1454e99ae71f9ede3dd285bc79c25bf55d0e62e3c20cb479d18df58a0b5f884",
+      "canonical_sha256": "ed80be1ef874cfc24e0c2bc1ae281a19dfb6985e96de08306a1838293023986c",
+      "output_pack_sha256": "ed80be1ef874cfc24e0c2bc1ae281a19dfb6985e96de08306a1838293023986c",
       "hashes_match": true
     }
   ],

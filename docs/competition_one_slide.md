@@ -23,7 +23,7 @@ bridged to a signed general-ledger credit balance — the kind of
 actuarial-to-finance handoff that is usually reconciled by hand.
 
 **Technical evidence.**
-- 494 automated tests passed on the submitted commit, locally and in GitHub CI on Python 3.11 and 3.13.
+- 496 automated tests passed on the submitted commit (tagged `submission`, `c88e5af`), locally and in GitHub CI on Python 3.11 and 3.13 (CI run [33202206806](https://github.com/ISHUKLA/Excel-Audit-agent/actions/runs/33202206806)). The test count on `main` has grown since; this figure is pinned to the submission, not the current branch — see the [`Test Status and CI`](../README.md#test-status-and-ci) section of the README for the current count.
 - An append-only, hash-chained audit log (tamper-evident, not tamper-proof).
 - A stale/unknown calculation status that can never silently produce a pass,
   under any threshold — including a zero delta.

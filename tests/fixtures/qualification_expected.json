@@ -17,7 +17,9 @@
     "INDEX",
     "INT",
     "MATCH",
+    "MAX",
     "MAXIFS",
+    "MIN",
     "MINIFS",
     "NETWORKDAYS",
     "NPV",
@@ -47,6 +49,30 @@
       "cell": "Qualification!B4"
     },
     {
+      "case_id": "max_mixed_range",
+      "formula": "=MAX(Inputs!$B$4:$B$8)",
+      "expected_value": 20.0,
+      "expected_status": "complete",
+      "expected_verdict": "pass",
+      "functions": [
+        "MAX"
+      ],
+      "purpose": "Blank cell excluded from consideration, not treated as 0",
+      "cell": "Qualification!B5"
+    },
+    {
+      "case_id": "min_mixed_range",
+      "formula": "=MIN(Inputs!$B$4:$B$8)",
+      "expected_value": -5.0,
+      "expected_status": "complete",
+      "expected_verdict": "pass",
+      "functions": [
+        "MIN"
+      ],
+      "purpose": "Blank cell excluded from consideration, not treated as 0",
+      "cell": "Qualification!B6"
+    },
+    {
       "case_id": "abs_negative",
       "formula": "=ABS(Inputs!$B$6)",
       "expected_value": 5.0,
@@ -56,7 +82,7 @@
         "ABS"
       ],
       "purpose": "",
-      "cell": "Qualification!B5"
+      "cell": "Qualification!B7"
     },
     {
       "case_id": "int_negative",
@@ -68,7 +94,7 @@
         "INT"
       ],
       "purpose": "",
-      "cell": "Qualification!B6"
+      "cell": "Qualification!B8"
     },
     {
       "case_id": "round_positive_half",
@@ -80,7 +106,7 @@
         "ROUND"
       ],
       "purpose": "Excel half away from zero",
-      "cell": "Qualification!B7"
+      "cell": "Qualification!B9"
     },
     {
       "case_id": "round_negative_half",
@@ -92,7 +118,7 @@
         "ROUND"
       ],
       "purpose": "Excel half away from zero",
-      "cell": "Qualification!B8"
+      "cell": "Qualification!B10"
     },
     {
       "case_id": "roundup_negative",
@@ -104,7 +130,7 @@
         "ROUNDUP"
       ],
       "purpose": "",
-      "cell": "Qualification!B9"
+      "cell": "Qualification!B11"
     },
     {
       "case_id": "rounddown_negative",
@@ -116,7 +142,7 @@
         "ROUNDDOWN"
       ],
       "purpose": "",
-      "cell": "Qualification!B10"
+      "cell": "Qualification!B12"
     },
     {
       "case_id": "ceiling_positive",
@@ -128,7 +154,7 @@
         "CEILING"
       ],
       "purpose": "",
-      "cell": "Qualification!B11"
+      "cell": "Qualification!B13"
     },
     {
       "case_id": "floor_positive",
@@ -140,7 +166,7 @@
         "FLOOR"
       ],
       "purpose": "",
-      "cell": "Qualification!B12"
+      "cell": "Qualification!B14"
     },
     {
       "case_id": "sumif_text",
@@ -152,7 +178,7 @@
         "SUMIF"
       ],
       "purpose": "",
-      "cell": "Qualification!B13"
+      "cell": "Qualification!B15"
     },
     {
       "case_id": "sumifs_text_region",
@@ -164,7 +190,7 @@
         "SUMIFS"
       ],
       "purpose": "",
-      "cell": "Qualification!B14"
+      "cell": "Qualification!B16"
     },
     {
       "case_id": "countif_text",
@@ -176,7 +202,7 @@
         "COUNTIF"
       ],
       "purpose": "",
-      "cell": "Qualification!B15"
+      "cell": "Qualification!B17"
     },
     {
       "case_id": "countifs_boolean",
@@ -188,7 +214,7 @@
         "COUNTIFS"
       ],
       "purpose": "TRUE() boolean call in a criteria function",
-      "cell": "Qualification!B16"
+      "cell": "Qualification!B18"
     },
     {
       "case_id": "averageif_blank_zero",
@@ -200,7 +226,7 @@
         "AVERAGEIF"
       ],
       "purpose": "A literal zero contributes to the denominator",
-      "cell": "Qualification!B17"
+      "cell": "Qualification!B19"
     },
     {
       "case_id": "averageifs_text_region",
@@ -212,7 +238,7 @@
         "AVERAGEIFS"
       ],
       "purpose": "",
-      "cell": "Qualification!B18"
+      "cell": "Qualification!B20"
     },
     {
       "case_id": "minifs_text",
@@ -224,7 +250,7 @@
         "MINIFS"
       ],
       "purpose": "",
-      "cell": "Qualification!B19"
+      "cell": "Qualification!B21"
     },
     {
       "case_id": "maxifs_text",
@@ -236,7 +262,7 @@
         "MAXIFS"
       ],
       "purpose": "",
-      "cell": "Qualification!B20"
+      "cell": "Qualification!B22"
     },
     {
       "case_id": "if_true_literal",
@@ -248,7 +274,7 @@
         "IF"
       ],
       "purpose": "",
-      "cell": "Qualification!B21"
+      "cell": "Qualification!B23"
     },
     {
       "case_id": "if_false_literal",
@@ -260,7 +286,7 @@
         "IF"
       ],
       "purpose": "",
-      "cell": "Qualification!B22"
+      "cell": "Qualification!B24"
     },
     {
       "case_id": "if_true_call",
@@ -272,7 +298,7 @@
         "IF"
       ],
       "purpose": "",
-      "cell": "Qualification!B23"
+      "cell": "Qualification!B25"
     },
     {
       "case_id": "if_false_call",
@@ -284,7 +310,7 @@
         "IF"
       ],
       "purpose": "",
-      "cell": "Qualification!B24"
+      "cell": "Qualification!B26"
     },
     {
       "case_id": "vlookup_exact",
@@ -296,7 +322,7 @@
         "VLOOKUP"
       ],
       "purpose": "",
-      "cell": "Qualification!B25"
+      "cell": "Qualification!B27"
     },
     {
       "case_id": "match_exact",
@@ -308,7 +334,7 @@
         "MATCH"
       ],
       "purpose": "",
-      "cell": "Qualification!B26"
+      "cell": "Qualification!B28"
     },
     {
       "case_id": "index_scalar",
@@ -320,7 +346,7 @@
         "INDEX"
       ],
       "purpose": "",
-      "cell": "Qualification!B27"
+      "cell": "Qualification!B29"
     },
     {
       "case_id": "index_match_nested",
@@ -333,7 +359,7 @@
         "MATCH"
       ],
       "purpose": "",
-      "cell": "Qualification!B28"
+      "cell": "Qualification!B30"
     },
     {
       "case_id": "nested_round_sumif",
@@ -346,7 +372,7 @@
         "SUMIF"
       ],
       "purpose": "",
-      "cell": "Qualification!B29"
+      "cell": "Qualification!B31"
     },
     {
       "case_id": "cross_tab_range",
@@ -358,7 +384,7 @@
         "SUM"
       ],
       "purpose": "",
-      "cell": "Qualification!B30"
+      "cell": "Qualification!B32"
     },
     {
       "case_id": "ordinary_arithmetic",
@@ -368,7 +394,7 @@
       "expected_verdict": "pass",
       "functions": [],
       "purpose": "",
-      "cell": "Qualification!B31"
+      "cell": "Qualification!B33"
     },
     {
       "case_id": "vlookup_approximate_unsupported",
@@ -380,7 +406,7 @@
         "VLOOKUP"
       ],
       "purpose": "Approximate lookup must fail closed",
-      "cell": "Qualification!B32"
+      "cell": "Qualification!B34"
     },
     {
       "case_id": "match_approximate_unsupported",
@@ -392,7 +418,7 @@
         "MATCH"
       ],
       "purpose": "Approximate MATCH must fail closed",
-      "cell": "Qualification!B33"
+      "cell": "Qualification!B35"
     },
     {
       "case_id": "index_array_unsupported",
@@ -404,7 +430,7 @@
         "INDEX"
       ],
       "purpose": "Array result must not be silently reduced to a scalar",
-      "cell": "Qualification!B34"
+      "cell": "Qualification!B36"
     },
     {
       "case_id": "offset_unsupported",
@@ -414,7 +440,7 @@
       "expected_verdict": "incomplete",
       "functions": [],
       "purpose": "Function outside the catalogue",
-      "cell": "Qualification!B35"
+      "cell": "Qualification!B37"
     },
     {
       "case_id": "and_all_true",
@@ -427,7 +453,7 @@
         "IF"
       ],
       "purpose": "",
-      "cell": "Qualification!B36"
+      "cell": "Qualification!B38"
     },
     {
       "case_id": "and_one_false",
@@ -440,7 +466,7 @@
         "IF"
       ],
       "purpose": "",
-      "cell": "Qualification!B37"
+      "cell": "Qualification!B39"
     },
     {
       "case_id": "or_one_true",
@@ -453,7 +479,7 @@
         "OR"
       ],
       "purpose": "",
-      "cell": "Qualification!B38"
+      "cell": "Qualification!B40"
     },
     {
       "case_id": "or_all_false",
@@ -466,7 +492,7 @@
         "OR"
       ],
       "purpose": "",
-      "cell": "Qualification!B39"
+      "cell": "Qualification!B41"
     },
     {
       "case_id": "sumproduct_2d",
@@ -478,7 +504,7 @@
         "SUMPRODUCT"
       ],
       "purpose": "",
-      "cell": "Qualification!B40"
+      "cell": "Qualification!B42"
     },
     {
       "case_id": "npv_cash_flow",
@@ -490,7 +516,7 @@
         "NPV"
       ],
       "purpose": "Excel convention: first flow at period 1, not 0",
-      "cell": "Qualification!B41"
+      "cell": "Qualification!B43"
     },
     {
       "case_id": "choose_index_1",
@@ -502,7 +528,7 @@
         "CHOOSE"
       ],
       "purpose": "",
-      "cell": "Qualification!B42"
+      "cell": "Qualification!B44"
     },
     {
       "case_id": "choose_index_2",
@@ -514,7 +540,7 @@
         "CHOOSE"
       ],
       "purpose": "",
-      "cell": "Qualification!B43"
+      "cell": "Qualification!B45"
     },
     {
       "case_id": "xlookup_exact",
@@ -526,7 +552,7 @@
         "XLOOKUP"
       ],
       "purpose": "Exact numeric XLOOKUP, recalculated through LibreOffice",
-      "cell": "Qualification!B44"
+      "cell": "Qualification!B46"
     },
     {
       "case_id": "date_leap_day",
@@ -538,7 +564,7 @@
         "DATE"
       ],
       "purpose": "Leap-day construction as an Excel serial date",
-      "cell": "Qualification!B45"
+      "cell": "Qualification!B47"
     },
     {
       "case_id": "edate_month_end_clamp",
@@ -551,7 +577,7 @@
         "EDATE"
       ],
       "purpose": "January month-end clamps to the 2024 leap day",
-      "cell": "Qualification!B46"
+      "cell": "Qualification!B48"
     },
     {
       "case_id": "networkdays_inclusive_week",
@@ -564,7 +590,7 @@
         "NETWORKDAYS"
       ],
       "purpose": "Inclusive Monday-to-Sunday working-day count",
-      "cell": "Qualification!B47"
+      "cell": "Qualification!B49"
     },
     {
       "case_id": "yearfrac_actual_365_leap_year",
@@ -577,7 +603,7 @@
         "YEARFRAC"
       ],
       "purpose": "Actual/365 basis across the 2024 leap year",
-      "cell": "Qualification!B48"
+      "cell": "Qualification!B50"
     }
   ],
   "error_evidence": [

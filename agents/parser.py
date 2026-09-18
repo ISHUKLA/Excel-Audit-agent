@@ -31,7 +31,7 @@ from core.workbook_identity import sha256_bytes
 
 _TAB_REF_PATTERN = re.compile(r"'([^']+)'!|([A-Za-z_][A-Za-z0-9_.]*)!")
 _NUMBER_LIKE_PATTERN = re.compile(r"^-?[\d,]+\.?\d*%?$")
-_ERROR_VALUES = {"#REF!", "#DIV/0!", "#NAME?", "#VALUE!", "#N/A", "#NULL!", "#NUM!"}
+_ERROR_VALUES = {"#REF!", "#DIV/0!", "#NAME?", "#VALUE!", "#N/A", "#NULL!", "#NUM!", "#CALC!"}
 
 # A cell reference, optionally sheet-qualified, optionally a range.
 # The lookarounds keep function names out: "SUM(" is followed by "(", and

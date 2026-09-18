@@ -70,6 +70,18 @@ def qualification_cases() -> list[dict]:
 
     return [
         _case("sum_mixed_range", "=SUM(Inputs!$B$4:$B$8)", 25.0, purpose="Blank/text ignored; zero retained"),
+        _case(
+            "max_mixed_range",
+            "=MAX(Inputs!$B$4:$B$8)",
+            20.0,
+            purpose="Blank cell excluded from consideration, not treated as 0",
+        ),
+        _case(
+            "min_mixed_range",
+            "=MIN(Inputs!$B$4:$B$8)",
+            -5.0,
+            purpose="Blank cell excluded from consideration, not treated as 0",
+        ),
         _case("abs_negative", "=ABS(Inputs!$B$6)", 5.0),
         _case("int_negative", "=INT(-1.2)", -2.0),
         _case("round_positive_half", "=ROUND(2.5,0)", 3.0, purpose="Excel half away from zero"),

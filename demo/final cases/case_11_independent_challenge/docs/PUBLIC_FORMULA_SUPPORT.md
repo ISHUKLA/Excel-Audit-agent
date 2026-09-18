@@ -6,14 +6,14 @@ not every formula that Excel or LibreOffice can calculate.
 
 ## Supported
 
-Plain arithmetic with cell references and these 30 functions:
+Plain arithmetic with cell references and these 32 functions:
 
 | Family | Functions |
 |---|---|
 | Basic numeric | `ABS`, `INT` |
 | Rounding | `ROUND`, `ROUNDUP`, `ROUNDDOWN`, `CEILING`, `FLOOR` |
 | Conditional and aggregate | `SUM`, `SUMIF`, `SUMIFS`, `COUNTIF`, `COUNTIFS`, `AVERAGEIF`, `AVERAGEIFS`, `IF` |
-| Criteria min/max | `MINIFS`, `MAXIFS` |
+| Plain and criteria min/max | `MAX`, `MIN`, `MINIFS`, `MAXIFS` |
 | Exact lookup | `VLOOKUP`, `MATCH`, `INDEX` |
 | Logical | `AND`, `OR` |
 | Array product | `SUMPRODUCT` |

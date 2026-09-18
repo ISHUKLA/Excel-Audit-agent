@@ -391,6 +391,84 @@ def test_a_blank_cell_inside_a_sum_is_zero_and_warned_about():
 
 
 # ---------------------------------------------------------------------------
+# Group D extension — plain MAX/MIN
+# ---------------------------------------------------------------------------
+
+
+def test_max_over_a_simple_range():
+    cells = {
+        "Provisions!C1": cell("Provisions!C1", value=10.0),
+        "Provisions!C2": cell("Provisions!C2", value=40.0),
+        "Provisions!C3": cell("Provisions!C3", value=-5.0),
+        "Provisions!C4": cell("Provisions!C4", formula="=MAX(C1:C3)", value=40.0),
+    }
+    graph = {"Provisions!C4": ["Provisions!C1", "Provisions!C2", "Provisions!C3"]}
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!C4"]).lines[0]
+    assert line.target_value == 40.0
+
+
+def test_min_over_a_simple_range():
+    cells = {
+        "Provisions!C1": cell("Provisions!C1", value=10.0),
+        "Provisions!C2": cell("Provisions!C2", value=40.0),
+        "Provisions!C3": cell("Provisions!C3", value=-5.0),
+        "Provisions!C4": cell("Provisions!C4", formula="=MIN(C1:C3)", value=-5.0),
+    }
+    graph = {"Provisions!C4": ["Provisions!C1", "Provisions!C2", "Provisions!C3"]}
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!C4"]).lines[0]
+    assert line.target_value == -5.0
+
+
+def test_max_excludes_a_blank_cell_rather_than_treating_it_as_zero():
+    """Unlike SUM, a blank cell is excluded from MAX's candidate set — if it
+    were treated as 0 (SUM's convention), an all-negative range would
+    incorrectly report a maximum of 0."""
+    cells = {
+        "Provisions!C1": cell("Provisions!C1", value=-10.0),
+        "Provisions!C2": cell("Provisions!C2", value=None),
+        "Provisions!C3": cell("Provisions!C3", value=-40.0),
+        "Provisions!C4": cell("Provisions!C4", formula="=MAX(C1:C3)", value=-10.0),
+    }
+    graph = {"Provisions!C4": ["Provisions!C1", "Provisions!C2", "Provisions!C3"]}
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!C4"]).lines[0]
+    assert line.target_value == -10.0
+
+
+def test_min_excludes_a_text_cell_from_the_range():
+    cells = {
+        "Provisions!C1": cell("Provisions!C1", value=10.0),
+        "Provisions!C2": cell("Provisions!C2", value="not numeric"),
+        "Provisions!C3": cell("Provisions!C3", value=5.0),
+        "Provisions!C4": cell("Provisions!C4", formula="=MIN(C1:C3)", value=5.0),
+    }
+    graph = {"Provisions!C4": ["Provisions!C1", "Provisions!C2", "Provisions!C3"]}
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!C4"]).lines[0]
+    assert line.target_value == 5.0
+
+
+def test_max_of_an_all_blank_range_is_zero_matching_excel():
+    cells = {
+        "Provisions!C1": cell("Provisions!C1", value=None),
+        "Provisions!C2": cell("Provisions!C2", value=None),
+        "Provisions!C3": cell("Provisions!C3", formula="=MAX(C1:C2)", value=0.0),
+    }
+    graph = {"Provisions!C3": ["Provisions!C1", "Provisions!C2"]}
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!C3"]).lines[0]
+    assert line.target_value == 0.0
+
+
+def test_max_mixes_a_scalar_literal_with_a_range():
+    cells = {
+        "Provisions!C1": cell("Provisions!C1", value=10.0),
+        "Provisions!C2": cell("Provisions!C2", value=20.0),
+        "Provisions!C3": cell("Provisions!C3", formula="=MAX(C1:C2,100)", value=100.0),
+    }
+    graph = {"Provisions!C3": ["Provisions!C1", "Provisions!C2"]}
+    line = run_reconciliation(parsed(cells, graph), ["Provisions!C3"]).lines[0]
+    assert line.target_value == 100.0
+
+
+# ---------------------------------------------------------------------------
 # Group J — date functions (DATE, EDATE, NETWORKDAYS, YEARFRAC)
 # ---------------------------------------------------------------------------
 

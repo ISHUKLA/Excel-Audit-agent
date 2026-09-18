@@ -165,6 +165,23 @@ def test_cached_error_value_is_classified_not_swallowed(tmp_path):
     assert cell.error_type == "#REF!"
 
 
+def test_calc_error_value_is_classified_not_swallowed(tmp_path):
+    """#CALC! is a dynamic-array-era error (a spill that can't resolve), not
+    one of the seven classic error values — it must be classified the same
+    way, not silently read as ordinary text."""
+    path = str(tmp_path / "calc_error.xlsx")
+    wb = openpyxl.Workbook()
+    sheet = wb.active
+    sheet.title = "Provisions"
+    sheet["B1"] = "#CALC!"
+    wb.save(path)
+
+    cell = parse_workbook(_bytes(path)).cells["Provisions!B1"]
+    assert cell.data_type == "error"
+    assert cell.is_error is True
+    assert cell.error_type == "#CALC!"
+
+
 def test_number_stored_as_text_stays_text_and_earns_a_warning(tmp_path):
     """The parser reports what it found. Deciding "1,234" was really a number
     would silently repair a defect in the source workbook."""

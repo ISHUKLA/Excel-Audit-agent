@@ -57,6 +57,13 @@ ArgRole = Literal[
 # another function's argument shape.
 FUNCTION_ARG_SPECS: dict[str, list[ArgRole]] = {
     "SUM": ["range"],
+    # MAX/MIN — variadic like SUM (see its comment above: this catalogue
+    # records argument SHAPE, not arity). Unlike SUM, a blank/non-numeric
+    # cell inside the range is skipped rather than treated as 0 (Excel's own
+    # MAX/MIN behavior); see agents/reconciliation.py's _max_evaluator and
+    # _min_evaluator.
+    "MAX": ["range"],
+    "MIN": ["range"],
     "ABS": ["value"],
     "INT": ["value"],
     # Group B — rounding family. ROUND/ROUNDUP/ROUNDDOWN's second argument is

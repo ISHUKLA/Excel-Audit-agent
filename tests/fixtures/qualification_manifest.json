@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "qualified_at": "2026-09-18T12:29:32.148951+00:00",
+  "qualified_at": "2026-09-18T15:49:21.189438+00:00",
   "recalculation_engine": "LibreOffice",
-  "engine_version": "LibreOfficeDev 26.8.0.0.alpha0 2c87e51eeaa2b413ff4ae097b2705eea1995d8e5",
+  "engine_version": "LibreOffice 26.2.5.2 cd7284b4cbbfeb507e630c1aac019f4157393acb",
   "microsoft_excel_tested": false,
   "workbook": "tests/fixtures/qualification_workbook.xlsx",
-  "sha256": "9887bbc8a737cb8a9c55a81c2adef5a67635d11f8fd107387f4ea2ea43fdae69",
+  "sha256": "00a62f263fbe3108980e1216a065b5074ebd166babb9765bdcb78f3c590dca07",
   "generation_command": "python scripts/generate_qualification_workbook.py",
   "recalculation_command": "bash scripts/recalculate_with_libreoffice.sh",
   "supported_functions": [
@@ -24,7 +24,9 @@
     "INDEX",
     "INT",
     "MATCH",
+    "MAX",
     "MAXIFS",
+    "MIN",
     "MINIFS",
     "NETWORKDAYS",
     "NPV",
@@ -42,152 +44,158 @@
   ],
   "formula_manifest": {
     "ABS": [
-      "Qualification!B5"
+      "Qualification!B7"
     ],
     "AND": [
-      "Qualification!B36",
-      "Qualification!B37"
+      "Qualification!B38",
+      "Qualification!B39"
     ],
     "AVERAGEIF": [
-      "Qualification!B17"
+      "Qualification!B19"
     ],
     "AVERAGEIFS": [
-      "Qualification!B18"
+      "Qualification!B20"
     ],
     "CEILING": [
-      "Qualification!B11"
+      "Qualification!B13"
     ],
     "CHOOSE": [
-      "Qualification!B42",
-      "Qualification!B43"
+      "Qualification!B44",
+      "Qualification!B45"
     ],
     "COUNTIF": [
-      "Qualification!B15"
+      "Qualification!B17"
     ],
     "COUNTIFS": [
-      "Qualification!B16"
+      "Qualification!B18"
     ],
     "DATE": [
-      "Qualification!B45",
-      "Qualification!B46",
-      "Qualification!B47",
       "Qualification!B47",
       "Qualification!B48",
-      "Qualification!B48"
+      "Qualification!B49",
+      "Qualification!B49",
+      "Qualification!B50",
+      "Qualification!B50"
     ],
     "EDATE": [
-      "Qualification!B46"
+      "Qualification!B48"
     ],
     "FALSE": [
       "Inputs!D5",
       "Inputs!D7",
-      "Qualification!B22",
       "Qualification!B24",
-      "Qualification!B25",
-      "Qualification!B37",
-      "Qualification!B38",
-      "Qualification!B38",
+      "Qualification!B26",
+      "Qualification!B27",
       "Qualification!B39",
-      "Qualification!B39",
-      "Qualification!B39"
+      "Qualification!B40",
+      "Qualification!B40",
+      "Qualification!B41",
+      "Qualification!B41",
+      "Qualification!B41"
     ],
     "FLOOR": [
-      "Qualification!B12"
+      "Qualification!B14"
     ],
     "IF": [
-      "Qualification!B21",
-      "Qualification!B22",
       "Qualification!B23",
       "Qualification!B24",
-      "Qualification!B36",
-      "Qualification!B37",
+      "Qualification!B25",
+      "Qualification!B26",
       "Qualification!B38",
-      "Qualification!B39"
+      "Qualification!B39",
+      "Qualification!B40",
+      "Qualification!B41"
     ],
     "INDEX": [
-      "Qualification!B27",
-      "Qualification!B28",
-      "Qualification!B34"
+      "Qualification!B29",
+      "Qualification!B30",
+      "Qualification!B36"
     ],
     "INT": [
-      "Qualification!B6"
+      "Qualification!B8"
     ],
     "MATCH": [
-      "Qualification!B26",
       "Qualification!B28",
-      "Qualification!B33"
+      "Qualification!B30",
+      "Qualification!B35"
+    ],
+    "MAX": [
+      "Qualification!B5"
     ],
     "MAXIFS": [
-      "Qualification!B20"
+      "Qualification!B22"
+    ],
+    "MIN": [
+      "Qualification!B6"
     ],
     "MINIFS": [
-      "Qualification!B19"
+      "Qualification!B21"
     ],
     "NA": [
       "Errors!B4"
     ],
     "NETWORKDAYS": [
-      "Qualification!B47"
+      "Qualification!B49"
     ],
     "NPV": [
-      "Qualification!B41"
+      "Qualification!B43"
     ],
     "OFFSET": [
-      "Qualification!B35"
+      "Qualification!B37"
     ],
     "OR": [
-      "Qualification!B38",
-      "Qualification!B39"
+      "Qualification!B40",
+      "Qualification!B41"
     ],
     "ROUND": [
-      "Qualification!B29",
-      "Qualification!B7",
-      "Qualification!B8"
-    ],
-    "ROUNDDOWN": [
-      "Qualification!B10"
-    ],
-    "ROUNDUP": [
+      "Qualification!B10",
+      "Qualification!B31",
       "Qualification!B9"
     ],
+    "ROUNDDOWN": [
+      "Qualification!B12"
+    ],
+    "ROUNDUP": [
+      "Qualification!B11"
+    ],
     "SUM": [
-      "Qualification!B30",
+      "Qualification!B32",
       "Qualification!B4"
     ],
     "SUMIF": [
-      "Qualification!B13",
-      "Qualification!B29"
+      "Qualification!B15",
+      "Qualification!B31"
     ],
     "SUMIFS": [
-      "Qualification!B14"
+      "Qualification!B16"
     ],
     "SUMPRODUCT": [
-      "Qualification!B40"
+      "Qualification!B42"
     ],
     "TRUE": [
       "Inputs!D4",
       "Inputs!D6",
       "Inputs!D8",
-      "Qualification!B16",
-      "Qualification!B21",
+      "Qualification!B18",
       "Qualification!B23",
-      "Qualification!B32",
-      "Qualification!B36",
-      "Qualification!B36",
-      "Qualification!B36",
-      "Qualification!B37",
-      "Qualification!B37",
-      "Qualification!B38"
+      "Qualification!B25",
+      "Qualification!B34",
+      "Qualification!B38",
+      "Qualification!B38",
+      "Qualification!B38",
+      "Qualification!B39",
+      "Qualification!B39",
+      "Qualification!B40"
     ],
     "VLOOKUP": [
-      "Qualification!B25",
-      "Qualification!B32"
+      "Qualification!B27",
+      "Qualification!B34"
     ],
     "XLOOKUP": [
-      "Qualification!B44"
+      "Qualification!B46"
     ],
     "YEARFRAC": [
-      "Qualification!B48"
+      "Qualification!B50"
     ]
   },
   "all_formula_cells": {
@@ -202,50 +210,52 @@
     "Inputs!D6": "=TRUE()",
     "Inputs!D7": "=FALSE()",
     "Inputs!D8": "=TRUE()",
-    "Qualification!B10": "=ROUNDDOWN(-1.29,1)",
-    "Qualification!B11": "=CEILING(2.1,0.5)",
-    "Qualification!B12": "=FLOOR(2.9,0.5)",
-    "Qualification!B13": "=SUMIF(Inputs!$A$4:$A$8,\"Motor\",Inputs!$B$4:$B$8)",
-    "Qualification!B14": "=SUMIFS(Inputs!$B$4:$B$8,Inputs!$A$4:$A$8,\"Motor\",Inputs!$C$4:$C$8,\"North\")",
-    "Qualification!B15": "=COUNTIF(Inputs!$A$4:$A$8,\"Motor\")",
-    "Qualification!B16": "=COUNTIFS(Inputs!$A$4:$A$8,\"Motor\",Inputs!$D$4:$D$8,TRUE())",
-    "Qualification!B17": "=AVERAGEIF(Inputs!$A$4:$A$8,\"Motor\",Inputs!$B$4:$B$8)",
-    "Qualification!B18": "=AVERAGEIFS(Inputs!$B$4:$B$8,Inputs!$A$4:$A$8,\"Motor\",Inputs!$C$4:$C$8,\"North\")",
-    "Qualification!B19": "=_xlfn.MINIFS(Inputs!$B$4:$B$8,Inputs!$A$4:$A$8,\"Motor\")",
-    "Qualification!B20": "=_xlfn.MAXIFS(Inputs!$B$4:$B$8,Inputs!$A$4:$A$8,\"Motor\")",
-    "Qualification!B21": "=IF(TRUE(),11,22)",
-    "Qualification!B22": "=IF(FALSE(),11,22)",
+    "Qualification!B10": "=ROUND(-2.5,0)",
+    "Qualification!B11": "=ROUNDUP(-1.21,1)",
+    "Qualification!B12": "=ROUNDDOWN(-1.29,1)",
+    "Qualification!B13": "=CEILING(2.1,0.5)",
+    "Qualification!B14": "=FLOOR(2.9,0.5)",
+    "Qualification!B15": "=SUMIF(Inputs!$A$4:$A$8,\"Motor\",Inputs!$B$4:$B$8)",
+    "Qualification!B16": "=SUMIFS(Inputs!$B$4:$B$8,Inputs!$A$4:$A$8,\"Motor\",Inputs!$C$4:$C$8,\"North\")",
+    "Qualification!B17": "=COUNTIF(Inputs!$A$4:$A$8,\"Motor\")",
+    "Qualification!B18": "=COUNTIFS(Inputs!$A$4:$A$8,\"Motor\",Inputs!$D$4:$D$8,TRUE())",
+    "Qualification!B19": "=AVERAGEIF(Inputs!$A$4:$A$8,\"Motor\",Inputs!$B$4:$B$8)",
+    "Qualification!B20": "=AVERAGEIFS(Inputs!$B$4:$B$8,Inputs!$A$4:$A$8,\"Motor\",Inputs!$C$4:$C$8,\"North\")",
+    "Qualification!B21": "=_xlfn.MINIFS(Inputs!$B$4:$B$8,Inputs!$A$4:$A$8,\"Motor\")",
+    "Qualification!B22": "=_xlfn.MAXIFS(Inputs!$B$4:$B$8,Inputs!$A$4:$A$8,\"Motor\")",
     "Qualification!B23": "=IF(TRUE(),11,22)",
     "Qualification!B24": "=IF(FALSE(),11,22)",
-    "Qualification!B25": "=VLOOKUP(\"Property\",Inputs!$E$4:$F$6,2,FALSE())",
-    "Qualification!B26": "=MATCH(\"Liability\",Inputs!$E$4:$E$6,0)",
-    "Qualification!B27": "=INDEX(Inputs!$F$4:$F$6,2)",
-    "Qualification!B28": "=INDEX(Inputs!$F$4:$F$6,MATCH(\"Liability\",Inputs!$E$4:$E$6,0))",
-    "Qualification!B29": "=ROUND(SUMIF(Inputs!$A$4:$A$8,\"Motor\",Inputs!$B$4:$B$8),2)",
-    "Qualification!B30": "=SUM('Cross Tab'!$B$3:$B$5)",
-    "Qualification!B31": "=(Inputs!$B$4+Inputs!$B$5)*2/3",
-    "Qualification!B32": "=VLOOKUP(\"Property\",Inputs!$E$4:$F$6,2,TRUE())",
-    "Qualification!B33": "=MATCH(\"Property\",Inputs!$E$4:$E$6,1)",
-    "Qualification!B34": "=INDEX(Inputs!$B$4:$B$8,0)",
-    "Qualification!B35": "=OFFSET(Inputs!$B$4,1,0)",
-    "Qualification!B36": "=IF(AND(TRUE(),TRUE(),TRUE()),1,0)",
-    "Qualification!B37": "=IF(AND(TRUE(),FALSE(),TRUE()),1,0)",
-    "Qualification!B38": "=IF(OR(FALSE(),TRUE(),FALSE()),1,0)",
-    "Qualification!B39": "=IF(OR(FALSE(),FALSE(),FALSE()),1,0)",
+    "Qualification!B25": "=IF(TRUE(),11,22)",
+    "Qualification!B26": "=IF(FALSE(),11,22)",
+    "Qualification!B27": "=VLOOKUP(\"Property\",Inputs!$E$4:$F$6,2,FALSE())",
+    "Qualification!B28": "=MATCH(\"Liability\",Inputs!$E$4:$E$6,0)",
+    "Qualification!B29": "=INDEX(Inputs!$F$4:$F$6,2)",
+    "Qualification!B30": "=INDEX(Inputs!$F$4:$F$6,MATCH(\"Liability\",Inputs!$E$4:$E$6,0))",
+    "Qualification!B31": "=ROUND(SUMIF(Inputs!$A$4:$A$8,\"Motor\",Inputs!$B$4:$B$8),2)",
+    "Qualification!B32": "=SUM('Cross Tab'!$B$3:$B$5)",
+    "Qualification!B33": "=(Inputs!$B$4+Inputs!$B$5)*2/3",
+    "Qualification!B34": "=VLOOKUP(\"Property\",Inputs!$E$4:$F$6,2,TRUE())",
+    "Qualification!B35": "=MATCH(\"Property\",Inputs!$E$4:$E$6,1)",
+    "Qualification!B36": "=INDEX(Inputs!$B$4:$B$8,0)",
+    "Qualification!B37": "=OFFSET(Inputs!$B$4,1,0)",
+    "Qualification!B38": "=IF(AND(TRUE(),TRUE(),TRUE()),1,0)",
+    "Qualification!B39": "=IF(AND(TRUE(),FALSE(),TRUE()),1,0)",
     "Qualification!B4": "=SUM(Inputs!$B$4:$B$8)",
-    "Qualification!B40": "=SUMPRODUCT(Inputs!$B$4:$B$6,Inputs!$F$4:$F$6)",
-    "Qualification!B41": "=NPV(0.1,-1000,300,300,300)",
-    "Qualification!B42": "=CHOOSE(1,10,20,30)",
-    "Qualification!B43": "=CHOOSE(2,10,20,30)",
-    "Qualification!B44": "=_xlfn.XLOOKUP(\"Property\",Inputs!$E$4:$E$6,Inputs!$F$4:$F$6,,0,1)",
-    "Qualification!B45": "=DATE(2024,2,29)",
-    "Qualification!B46": "=EDATE(DATE(2024,1,31),1)",
-    "Qualification!B47": "=NETWORKDAYS(DATE(2024,1,1),DATE(2024,1,7))",
-    "Qualification!B48": "=YEARFRAC(DATE(2024,1,1),DATE(2025,1,1),3)",
-    "Qualification!B5": "=ABS(Inputs!$B$6)",
-    "Qualification!B6": "=INT(-1.2)",
-    "Qualification!B7": "=ROUND(2.5,0)",
-    "Qualification!B8": "=ROUND(-2.5,0)",
-    "Qualification!B9": "=ROUNDUP(-1.21,1)"
+    "Qualification!B40": "=IF(OR(FALSE(),TRUE(),FALSE()),1,0)",
+    "Qualification!B41": "=IF(OR(FALSE(),FALSE(),FALSE()),1,0)",
+    "Qualification!B42": "=SUMPRODUCT(Inputs!$B$4:$B$6,Inputs!$F$4:$F$6)",
+    "Qualification!B43": "=NPV(0.1,-1000,300,300,300)",
+    "Qualification!B44": "=CHOOSE(1,10,20,30)",
+    "Qualification!B45": "=CHOOSE(2,10,20,30)",
+    "Qualification!B46": "=_xlfn.XLOOKUP(\"Property\",Inputs!$E$4:$E$6,Inputs!$F$4:$F$6,,0,1)",
+    "Qualification!B47": "=DATE(2024,2,29)",
+    "Qualification!B48": "=EDATE(DATE(2024,1,31),1)",
+    "Qualification!B49": "=NETWORKDAYS(DATE(2024,1,1),DATE(2024,1,7))",
+    "Qualification!B5": "=MAX(Inputs!$B$4:$B$8)",
+    "Qualification!B50": "=YEARFRAC(DATE(2024,1,1),DATE(2025,1,1),3)",
+    "Qualification!B6": "=MIN(Inputs!$B$4:$B$8)",
+    "Qualification!B7": "=ABS(Inputs!$B$6)",
+    "Qualification!B8": "=INT(-1.2)",
+    "Qualification!B9": "=ROUND(2.5,0)"
   }
 }

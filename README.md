@@ -56,7 +56,7 @@ This tool automates the legwork — parsing the spreadsheet, reconstructing its 
 
 ## Supported Formula Catalogue
 
-The reconstruction engine supports 30 functions across ten groups:
+The reconstruction engine supports 32 functions across ten groups:
 
 **Group A — Basic arithmetic (2 functions)**
 - `ABS` — absolute value
@@ -79,7 +79,9 @@ The reconstruction engine supports 30 functions across ten groups:
 - `AVERAGEIFS` — average with multiple criteria
 - `IF` — conditional branching on comparison expressions
 
-**Group D — Min/Max with criteria (2 functions)**
+**Group D — Min/Max, plain and with criteria (4 functions)**
+- `MAX` — largest numeric value across one or more ranges/values (blank and non-numeric cells are excluded from consideration, not treated as zero — this differs from `SUM`'s blank-as-zero convention; returns `0` if no numeric value is found at all, matching Excel's own `MAX()` on an all-blank/all-text range)
+- `MIN` — smallest numeric value across one or more ranges/values (same blank/non-numeric exclusion and all-blank fallback as `MAX`)
 - `MINIFS` — minimum of matching numeric cells
 - `MAXIFS` — maximum of matching numeric cells
 
@@ -232,9 +234,10 @@ case. Each implemented case includes the recalculated workbook, applicable
 reference CSV, explicit expected results, complete formula inventory, SHA-256
 manifest and a verification guide.
 
-Cases 7a–11 are listed in Streamlit's **Load a demonstration case** dropdown.
-Cases 7a–10 load their synthetic artifacts through the normal four-gate journey;
-Case 11 displays its protocol-only status and does not load a workbook.
+Cases 7a–11 and 14 are listed in Streamlit's **Load a demonstration case**
+dropdown. Cases 7a–10 and 14 load their synthetic artifacts through the normal
+four-gate journey; Case 11 displays its protocol-only status and does not load a
+workbook.
 
 Case 11 is protocol-only: no challenge workbook has been authored or inspected
 by the developer. Its independent-author brief, frozen public formula scope,
@@ -242,6 +245,11 @@ sealed-results protocol, first-run checklist, scorecard and evidence tools are
 in [`demo/final cases/case_11_independent_challenge/`](<demo/final cases/case_11_independent_challenge/>).
 The challenge must be performed against a separately frozen and tagged release;
 imperfect first-run evidence is preserved rather than rewritten.
+
+**Case 14: stale board pack after an assumption change**
+- Workbook: `demo/final cases/case_14_stale_board_pack/workbooks/case_14_stale_board_pack.xlsx`
+- Reference figures: `demo/final cases/case_14_stale_board_pack/reference_figures/case_14_stale_gl_extract.csv`
+- What it shows: the file was recalculated with a `1.042` tail factor, then `Assumptions!C14` was changed to `1.061` and calculation mode was set to manual without refreshing formula caches. The board still sees EUR 41.7m closing IBNR; reconstruction from current inputs produces EUR 51.0m, a EUR 9.3m difference. `Board Summary!B4` also proves a zero delta cannot pass on stale evidence. Internal and external verdicts are both `incomplete`; leaving the explicit acknowledgement unchecked stops at Gate 3 and keeps Gate 4 and PDF export unavailable. This controls calculation freshness only and does not opine on the factor, reserve adequacy, or reserving methodology.
 
 ---
 

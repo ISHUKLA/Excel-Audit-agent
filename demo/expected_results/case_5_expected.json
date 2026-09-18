@@ -39,7 +39,9 @@
     "Outputs!C30",
     "Outputs!C31",
     "Outputs!C32",
-    "Outputs!C33"
+    "Outputs!C33",
+    "Outputs!C34",
+    "Outputs!C35"
   ],
   "formula_cases": [
     {
@@ -341,6 +343,26 @@
       "expected_value": 1.0027397260273974,
       "expected_status": "complete",
       "expected_verdict": "pass"
+    },
+    {
+      "case_id": "FML-031",
+      "cell": "Outputs!C34",
+      "calculation_cell": "Calculations!B34",
+      "label": "Maximum claim estimate",
+      "primary_function": "MAX",
+      "expected_value": 125000.0,
+      "expected_status": "complete",
+      "expected_verdict": "pass"
+    },
+    {
+      "case_id": "FML-032",
+      "cell": "Outputs!C35",
+      "calculation_cell": "Calculations!B35",
+      "label": "Minimum claim estimate",
+      "primary_function": "MIN",
+      "expected_value": 65000.0,
+      "expected_status": "complete",
+      "expected_verdict": "pass"
     }
   ],
   "unsupported_boundary_cells": [
@@ -357,14 +379,14 @@
     4
   ],
   "pdf_available_after_gate4": true,
-  "reference_control_total": 2471404.364192,
+  "reference_control_total": 2661404.364192,
   "workbook_path": "demo/workbooks/case_5_supported_formula_demonstration.xlsx",
   "reference_csv_path": "demo/reference_figures/case_5_reference_figures.csv",
-  "sha256": "e1454e99ae71f9ede3dd285bc79c25bf55d0e62e3c20cb479d18df58a0b5f884",
+  "sha256": "ed80be1ef874cfc24e0c2bc1ae281a19dfb6985e96de08306a1838293023986c",
   "recalculation_engine": "LibreOffice",
   "engine_version": "LibreOfficeDev 26.8.0.0.alpha0 2c87e51eeaa2b413ff4ae097b2705eea1995d8e5",
   "microsoft_excel_tested": false,
-  "formula_cell_count": 64,
+  "formula_cell_count": 68,
   "formula_count_by_function": {
     "ABS": 1,
     "AND": 1,
@@ -381,7 +403,9 @@
     "INDEX": 1,
     "INT": 1,
     "MATCH": 2,
+    "MAX": 1,
     "MAXIFS": 1,
+    "MIN": 1,
     "MINIFS": 1,
     "NETWORKDAYS": 1,
     "NPV": 1,
@@ -414,7 +438,9 @@
     "INDEX",
     "INT",
     "MATCH",
+    "MAX",
     "MAXIFS",
+    "MIN",
     "MINIFS",
     "NETWORKDAYS",
     "NPV",
@@ -430,5 +456,5 @@
     "XLOOKUP",
     "YEARFRAC"
   ],
-  "generated_at": "2026-09-18T12:38:42.320832+00:00"
+  "generated_at": "2026-09-18T16:06:50.878920+00:00"
 }

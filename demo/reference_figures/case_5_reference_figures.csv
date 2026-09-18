@@ -29,3 +29,5 @@ FML-027,Leap-day Excel serial,45351,debit,Synthetic formula control extract,Case
 FML-028,Month-end date shift,45351,debit,Synthetic formula control extract,Case 5 formula row 28
 FML-029,Inclusive working days,5,debit,Synthetic formula control extract,Case 5 formula row 29
 FML-030,Leap-year actual/365 fraction,1.00274,debit,Synthetic formula control extract,Case 5 formula row 30
+FML-031,Maximum claim estimate,125000,debit,Synthetic formula control extract,Case 5 formula row 31
+FML-032,Minimum claim estimate,65000,debit,Synthetic formula control extract,Case 5 formula row 32

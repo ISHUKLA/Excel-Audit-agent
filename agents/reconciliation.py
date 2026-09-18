@@ -772,6 +772,57 @@ def _sum_evaluator(args_text: str, own_tab: str, values: dict, warnings: list[st
     return total
 
 
+def _max_evaluator(
+    args_text: str, own_tab: str, values: dict, warnings: list[str], own_ref: str
+) -> Optional[float]:
+    """MAX(value_or_range, ...) — the largest numeric value across all
+    arguments. Unlike SUM, a blank or non-numeric cell is SKIPPED rather
+    than treated as 0 — this matches Excel's own MAX, which only ever
+    compares numbers actually present, not a padded-with-zero range. If no
+    numeric value is found at all, returns 0.0 (Excel's own MAX() convention
+    for an all-blank/all-text range)."""
+    best = None
+    for argument in args_text.split(","):
+        argument = argument.strip()
+        try:
+            candidate = float(argument)
+            best = candidate if best is None else max(best, candidate)
+            continue
+        except ValueError:
+            pass
+        for key in _references_in(argument, own_tab):
+            value = values.get(key)
+            if value is None or isinstance(value, bool) or not isinstance(value, (int, float)):
+                continue
+            best = value if best is None else max(best, value)
+    return best if best is not None else 0.0
+
+
+def _min_evaluator(
+    args_text: str, own_tab: str, values: dict, warnings: list[str], own_ref: str
+) -> Optional[float]:
+    """MIN(value_or_range, ...) — the smallest numeric value across all
+    arguments. Same blank/non-numeric skip behavior as MAX (see its
+    docstring) — a blank cell is excluded from consideration, not treated
+    as a candidate 0. If no numeric value is found at all, returns 0.0
+    (Excel's own MIN() convention for an all-blank/all-text range)."""
+    best = None
+    for argument in args_text.split(","):
+        argument = argument.strip()
+        try:
+            candidate = float(argument)
+            best = candidate if best is None else min(best, candidate)
+            continue
+        except ValueError:
+            pass
+        for key in _references_in(argument, own_tab):
+            value = values.get(key)
+            if value is None or isinstance(value, bool) or not isinstance(value, (int, float)):
+                continue
+            best = value if best is None else min(best, value)
+    return best if best is not None else 0.0
+
+
 def _abs_evaluator(
     args_text: str, own_tab: str, values: dict, warnings: list[str], own_ref: str
 ) -> Optional[float]:
@@ -2130,6 +2181,8 @@ def _npv_evaluator(
 # unnoticed.
 _EVALUATORS = {
     "SUM": _sum_evaluator,
+    "MAX": _max_evaluator,
+    "MIN": _min_evaluator,
     "ABS": _abs_evaluator,
     "INT": _int_evaluator,
     "ROUND": _round_evaluator,
