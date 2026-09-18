@@ -222,6 +222,7 @@ These apply to every prompt, every session.
 | 11 | Streamlit interface (output designation, mapping approval cards, approval-record screen, verify-chain button) | 6–10 |
 | 12 | End-to-end test (mapping approval, bidirectional completeness, context mismatch, tamper detection, restart recovery) | all |
 | 13 | Docker + deploy (local-first posture, `audit.db` as a mounted volume) | 12 passes |
+| 14 | Agent 2 — Negative reserve bounds heuristic (reserve-context keyword match on tab/named range, reinsurance-term suppression, warning severity) | 5 |
 
 ---
 
@@ -256,4 +257,5 @@ Running note, per the Diligence rules. Update it when you change a file.
 | Recommendation 3, Phase E1 — recalculation evidence and engine-policy foundation (`core/recalculation_policy.py`, `core/models.py` four new models, `config/recalculation_engines.json`, `tests/test_recalculation_policy.py`, focused tests in `test_models.py`) | AI-written | Candidate LibreOffice profile with approvals-only runtime gating, policy loader with exact-bytes hash and fail-closed fallback, models for profiles/policy/evidence with comprehensive validation, 2026-08-21 |
 | Recommendation 3, Phase E3 — recalculation engine adapter and integration (`core/recalculation.py`, `tests/test_recalculation.py`, `tests/test_recalculation_qualification.py`) | AI-written | Engine-neutral adapter interface + LibreOffice subprocess implementation + preflight validation + formula inventory/manifest + output verification + RecalculationService 12-step orchestrator requiring approved profiles; unit tests with fake adapters only; synthetic workbook qualification setup with stale-cache preconditions, 2026-08-21 |
 | [agents/documentation.py](agents/documentation.py) | AI-written | Commit `21b4dbd`: extract text blocks by type instead of indexing `content[0]` |
-| CLAUDE.md | AI-written | This file, 2026-08-10; "Current state vs. the standard" gap list re-verified as closed, 2026-08-15 |
+| Step 14 — negative reserve bounds heuristic (`agents/anomaly_detector.py`, `tests/test_negative_reserve_bounds.py`, `tests/test_competition_cases_7_8.py`) | AI-written | `_detect_negative_reserve_bounds`: flags a formula cell with a negative cached value in a reserve/provision/liability/technical/ultimate context (tab or covering named range, never bare `cell_ref`), suppressed when the formula carries a reinsurance-related term; severity `warning`; known false positive on the Case 7 IFRS17 fixture (`Reserve Summary!B7`) documented in its test rather than hidden, 2026-09-18 |
+| CLAUDE.md | AI-written | This file, 2026-08-10; "Current state vs. the standard" gap list re-verified as closed, 2026-08-15; Step 14 build-order row and provenance entry added, 2026-09-18 |

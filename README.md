@@ -621,6 +621,25 @@ See [CLAUDE.md](CLAUDE.md) for the full development methodology, rule set, and b
 
 ---
 
+## Actuarial Domain Heuristics
+
+Beyond the four structural checks under "Detect anomalies" above (hardcoded literals, excluded `SUM` rows, cross-tab inconsistencies, circular references), Agent 2 also carries a small, deliberately growing set of heuristics aimed at patterns specific to actuarial and financial reserve calculations — the kind of thing a general-purpose spreadsheet linter has no reason to know about.
+
+**Implemented**
+
+- **Negative reserve bounds.** Flags a formula cell with a negative cached value when its tab, or a named range covering the cell, carries a reserve/provision/liability/technical/ultimate keyword — unless the formula itself mentions a reinsurance-related term (reinsurance, ceded, recovery, salvage, subrogation), in which case a negative value is an expected outcome (e.g. a net-of-reinsurance credit) rather than a sign error. Severity is `warning`, not `blocker`, deliberately: this heuristic surfaces a symptom worth a human's attention, not a confirmed defect, and it will and does produce false positives against real actuarial models — a structurally negative component (a netted receivable, a contra-liability) is flagged exactly like a genuine sign-flip bug, because keyword matching cannot tell the two apart. That distinction is Gate 2's job, not this heuristic's. See [`agents/anomaly_detector.py`](agents/anomaly_detector.py)'s `_detect_negative_reserve_bounds`.
+
+**Roadmap for heuristics**
+
+Named here because they came up while scoping the heuristic above, not because any has a scoped implementation yet:
+
+- **Triangle monotonicity.** A cumulative development triangle (paid or incurred claims) is expected not to decrease along a diagonal under most conventional treatments — but checking that requires first agreeing on how a triangle is even recognised in an arbitrary worksheet layout, which is a larger question than the check itself.
+- **Discount-rate consistency.** Comparing the discount rate applied across tabs needs a way to locate "the rate" without a keyword convention as reliable as "reserve" — a rate can sit in a raw cell, a named range, or embedded as an argument to financial calculations, and conflating these locations risks either false positives or missing the real inconsistency.
+- **Inflation indexation gaps.** Detecting a cohort or period that was never indexed for inflation assumes a specific structural pattern (a base value multiplied by a compounding factor) that hasn't yet been confirmed to hold across enough real workbooks to justify a general rule.
+- **Time-series continuity.** Flagging a missing period in an otherwise regular series (a gap in monthly/quarterly/annual columns) needs a period-detection convention this tool doesn't have yet — column headers are free text, not a typed date axis.
+
+---
+
 ## Roadmap
 
 The current release (v1.0.0) ships the four-gate pipeline, local-first deployment, and an audit log with hash-chain verification. Post-MVP scope includes:

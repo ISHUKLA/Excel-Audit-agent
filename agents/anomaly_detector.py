@@ -45,6 +45,9 @@ _RANGE_PATTERN = re.compile(r"^([A-Za-z]+)(\d+):([A-Za-z]+)(\d+)$")
 
 _DEFINITION_PATTERN = re.compile(r"^'?([^'!]+)'?!(.+)$")
 
+_RESERVE_CONTEXT_KEYWORDS = ("reserve", "provision", "liability", "technical", "ultimate")
+_REINSURANCE_KEYWORDS = ("reinsurance", "ceded", "recovery", "salvage", "subrogation")
+
 
 def _references_cell(
     formula: str, *, own_tab: str, target_tab: str, target_cell: str
@@ -76,6 +79,7 @@ def detect_anomalies(parsed_file: ParsedFile) -> list[AnomalyFinding]:
     findings.extend(_detect_cross_tab_inconsistencies(parsed_file))
     findings.extend(_detect_excluded_sum_rows(parsed_file))
     findings.extend(_detect_circular_references(parsed_file))
+    findings.extend(_detect_negative_reserve_bounds(parsed_file))
 
     findings.sort(key=lambda finding: _SEVERITY_RANK[finding.severity])
     for index, finding in enumerate(findings, start=1):
@@ -408,6 +412,86 @@ def _detect_circular_references(parsed_file: ParsedFile) -> list[AnomalyFinding]
                     else f"Cell refers to itself: {cycle[0]}"
                 ),
                 raw_value=" -> ".join(path),
+            )
+        )
+    return findings
+
+
+# ---------------------------------------------------------------------------
+# 5. negative reserve bounds
+# ---------------------------------------------------------------------------
+
+
+def _matches_any_keyword(text: str, keywords: tuple[str, ...]) -> bool:
+    lowered = text.lower()
+    return any(keyword in lowered for keyword in keywords)
+
+
+def _named_ranges_covering_cell(parsed_file: ParsedFile, tab: str, cell_ref: str) -> list[str]:
+    """Every named range (unqualified name) whose definition covers this exact
+    cell, directly or as part of a range. A bare cell_ref like "B12" never
+    contains a word, so context keywords are matched against these names and
+    the tab name — never against cell_ref itself."""
+    covering = []
+    normalized_target = _normalize(cell_ref)
+    for scoped_key, definition in parsed_file.named_ranges.items():
+        scope, sep, name = scoped_key.partition("::")
+        if not sep:
+            continue
+        match = _DEFINITION_PATTERN.match(definition.replace("$", ""))
+        if not match:
+            continue
+        range_tab, ref = match.group(1), match.group(2)
+        if range_tab != tab:
+            continue
+        if ":" in ref:
+            start, end = ref.split(":", 1)
+            expanded = _expand_range(_normalize(start), _normalize(end)) or []
+            if normalized_target in expanded:
+                covering.append(name)
+        elif _normalize(ref) == normalized_target:
+            covering.append(name)
+    return covering
+
+
+def _detect_negative_reserve_bounds(parsed_file: ParsedFile) -> list[AnomalyFinding]:
+    """A formula cell in a reserve/provision/liability context whose cached
+    value is negative, unless the formula itself is reinsurance-related.
+
+    Context is matched against the tab name and any named range covering the
+    cell (see `_named_ranges_covering_cell`), not the bare cell_ref. A formula
+    mentioning reinsurance/ceded/recovery/salvage/subrogation can legitimately
+    net negative, so that case is not flagged.
+
+    Severity is "warning", not "blocker": a negative reserve value is a
+    symptom worth a human's attention, not a confirmed defect — CLAUDE.md's
+    distinction between "the numbers don't match" and "I'm not confident this
+    is even the right comparison" applies here to the sign check itself.
+    """
+    findings = []
+    for tab, cell_ref, formula in _formulas(parsed_file):
+        record = parsed_file.cells[f"{tab}!{cell_ref}"]
+        value = record.cached_value
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            continue
+        if value >= 0:
+            continue
+        context_names = [tab] + _named_ranges_covering_cell(parsed_file, tab, cell_ref)
+        if not any(_matches_any_keyword(name, _RESERVE_CONTEXT_KEYWORDS) for name in context_names):
+            continue
+        if _matches_any_keyword(formula, _REINSURANCE_KEYWORDS):
+            continue
+        findings.append(
+            AnomalyFinding(
+                finding_id="",
+                severity="warning",
+                tab=tab,
+                cell_ref=cell_ref,
+                description=(
+                    f"Negative cached value {value} in a reserve/provision context "
+                    "formula, with no reinsurance-related term found in the formula"
+                ),
+                raw_value=formula,
             )
         )
     return findings
