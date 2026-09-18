@@ -149,6 +149,22 @@ FUNCTION_ARG_SPECS: dict[str, list[ArgRole]] = {
     # The selected value resolving to text is unsupported, the same
     # architectural wall as VLOOKUP/INDEX/XLOOKUP.
     "CHOOSE": ["index", "value", "value"],
+    # Group J — date arithmetic. Serial-number in, serial-number (or day
+    # count) out, so every one of these fits the existing arithmetic
+    # evaluator shape with no CellRecord change. Year/month/day and
+    # start/end date arguments are marked "value" rather than a new
+    # structural role, deliberately — a hardcoded valuation date is exactly
+    # the kind of assumption the anomaly detector should still be able to
+    # flag, the same way SUMIF's criteria literal is deliberately still
+    # flagged (see the SUMIF comment above). `months` is likewise "value":
+    # a hardcoded policy-term length in months is a business figure.
+    # NETWORKDAYS' optional third argument (holidays) is a "range"; YEARFRAC's
+    # optional third argument (basis, 0-4) is a "flag" — a mode switch, same
+    # role as VLOOKUP's range_lookup.
+    "DATE": ["value", "value", "value"],
+    "EDATE": ["value", "value"],
+    "NETWORKDAYS": ["value", "value", "range"],
+    "YEARFRAC": ["value", "value", "flag"],
 }
 
 SUPPORTED_FUNCTIONS = frozenset(FUNCTION_ARG_SPECS)

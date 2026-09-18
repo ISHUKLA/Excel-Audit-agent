@@ -54,7 +54,7 @@ This tool automates the legwork — parsing the spreadsheet, reconstructing its 
 
 ## Supported Formula Catalogue
 
-The reconstruction engine supports 26 functions across nine groups:
+The reconstruction engine supports 30 functions across ten groups:
 
 **Group A — Basic arithmetic (2 functions)**
 - `ABS` — absolute value
@@ -102,6 +102,12 @@ A matched lookup cell (from any of these four functions) that holds text, rather
 **Group I — Index-based selection (1 function)**
 - `CHOOSE` — returns one of N values based on a 1-based integer index (fractional indices truncate toward zero; only the selected value is evaluated, matching Excel's lazy evaluation; a selected value resolving to text is unsupported, the same architectural constraint as VLOOKUP/INDEX/XLOOKUP)
 
+**Group J — Date arithmetic (4 functions)**
+- `DATE` — returns the Excel serial date number from year, month, day integers (out-of-range month/day roll over into adjacent year/month, matching Excel's behavior)
+- `EDATE` — returns a date shifted by whole months (day-of-month clamps to target month's last day when the starting day doesn't exist in the target month, matching Excel)
+- `NETWORKDAYS` — returns the count of Mon-Fri working days between two dates, excluding an optional range of holidays
+- `YEARFRAC` — returns the fraction of a year between two dates, with five supported day-count basis conventions (0: US 30/360 [default], 1: actual/actual, 2: actual/360, 3: actual/365, 4: European 30/360)
+
 ### Implementation notes
 
 **Group F (AND, OR):** All arguments evaluated (no short-circuit) for full verification. Fixed IF/AND/OR condition-evaluation bug: unresolvable conditions now properly unsupported instead of silently guessed as False.
@@ -114,7 +120,7 @@ A matched lookup cell (from any of these four functions) that holds text, rather
 
 **Group E extended:** XLOOKUP joins VLOOKUP/MATCH/INDEX for exact-match lookup. All four share the "matched text is unsupported" architectural constraint.
 
-**Out of scope:** array formulas (including CSE array formulas and dynamic-array spill behavior) remain unsupported at every group.
+**Out of scope:** array formulas (including CSE array formulas and dynamic-array spill behavior) remain unsupported at every group. A direct reference to an actual date-formatted cell (from a value, not a formula) resolves as text for now — this means DATE/EDATE/NETWORKDAYS/YEARFRAC work with `DATE()` formula results and serial-number literals, but not direct date-column references. Also out of scope, but in the [Roadmap](#roadmap): `OFFSET`/`INDIRECT` and text functions (`CONCATENATE`, `SUBSTITUTE`, `FIND`, etc.).
 
 ---
 
@@ -621,7 +627,7 @@ The current release (v1.0.0) ships the four-gate pipeline, local-first deploymen
 
 - **Hosted operation with real authentication.** Application-level access control for multi-user deployments.
 - **Performance benchmarks on real workbooks.** Testing against production files of varying size and formula complexity.
-- **Extended formula support.** Approximate lookups, array formulas, dynamic arrays and other constructs currently marked unsupported.
+- **Extended formula support.** Approximate lookups, array formulas, dynamic arrays and other constructs currently marked unsupported, plus common actuarial formulas currently out of scope: `OFFSET`/`INDIRECT` (dynamic references — require rethinking the static dependency graph the reconstruction engine builds today) and text functions such as `CONCATENATE`/`SUBSTITUTE`/`FIND` (require a string-typed cell value alongside the existing numeric one). Date-formatted cell references (sourced from a value rather than a `DATE()` formula or serial number) are also a candidate for a future step.
 - **Configurable data minimization.** Allow administrators to set their own policies for what is sent to the LLM.
 - **Batch mode.** Process multiple workbooks in a single run without the Streamlit UI.
 

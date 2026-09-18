@@ -391,6 +391,100 @@ def test_a_blank_cell_inside_a_sum_is_zero_and_warned_about():
 
 
 # ---------------------------------------------------------------------------
+# Group J — date functions (DATE, EDATE, NETWORKDAYS, YEARFRAC)
+# ---------------------------------------------------------------------------
+
+
+def test_date_literal_date_literal_arguments():
+    cells = {"Output!A1": cell("Output!A1", formula="=DATE(2024,1,15)", value=45306.0)}
+    graph = {"Output!A1": []}
+    line = run_reconciliation(parsed(cells, graph), ["Output!A1"]).lines[0]
+    assert line.target_value == 45306.0
+
+
+def test_date_out_of_range_month_rolls_over():
+    cells = {"Output!A1": cell("Output!A1", formula="=DATE(2024,13,1)", value=45658.0)}
+    graph = {"Output!A1": []}
+    line = run_reconciliation(parsed(cells, graph), ["Output!A1"]).lines[0]
+    # DATE(2024,13,1) == DATE(2025,1,1)
+    assert line.target_value == 45658.0
+
+
+def test_edate_adds_months_to_a_serial():
+    cells = {
+        "Output!A1": cell("Output!A1", formula="=DATE(2024,1,31)", value=45322.0),
+        "Output!B1": cell("Output!B1", formula="=EDATE(A1,1)", value=45351.0),
+    }
+    graph = {"Output!A1": [], "Output!B1": ["Output!A1"]}
+    line = run_reconciliation(parsed(cells, graph), ["Output!B1"]).lines[0]
+    # Jan 31 + 1 month clamps to Feb 29 (leap year)
+    assert line.target_value == 45351.0
+
+
+def test_edate_negative_months_goes_backward():
+    cells = {
+        "Output!A1": cell("Output!A1", formula="=DATE(2024,3,31)", value=45381.0),
+        "Output!B1": cell("Output!B1", formula="=EDATE(A1,-1)", value=45351.0),
+    }
+    graph = {"Output!A1": [], "Output!B1": ["Output!A1"]}
+    line = run_reconciliation(parsed(cells, graph), ["Output!B1"]).lines[0]
+    # Mar 31 - 1 month clamps to Feb 29 (leap year)
+    assert line.target_value == 45351.0
+
+
+def test_networkdays_counts_working_days_no_holidays():
+    cells = {
+        "Output!A1": cell("Output!A1", formula="=DATE(2024,1,1)", value=45292.0),
+        "Output!B1": cell("Output!B1", formula="=DATE(2024,1,5)", value=45296.0),
+        "Output!C1": cell("Output!C1", formula="=NETWORKDAYS(A1,B1)", value=5.0),
+    }
+    graph = {"Output!A1": [], "Output!B1": [], "Output!C1": ["Output!A1", "Output!B1"]}
+    line = run_reconciliation(parsed(cells, graph), ["Output!C1"]).lines[0]
+    # Jan 1-5, 2024 (Mon-Fri) = 5 working days
+    assert line.target_value == 5.0
+
+
+def test_networkdays_with_holiday_range():
+    cells = {
+        "Output!A1": cell("Output!A1", formula="=DATE(2024,1,1)", value=45292.0),
+        "Output!B1": cell("Output!B1", formula="=DATE(2024,1,5)", value=45296.0),
+        "Output!H1": cell("Output!H1", formula="=DATE(2024,1,2)", value=45293.0),
+        "Output!C1": cell("Output!C1", formula="=NETWORKDAYS(A1,B1,H1)", value=4.0),
+    }
+    graph = {
+        "Output!A1": [],
+        "Output!B1": [],
+        "Output!H1": [],
+        "Output!C1": ["Output!A1", "Output!B1", "Output!H1"],
+    }
+    line = run_reconciliation(parsed(cells, graph), ["Output!C1"]).lines[0]
+    # Jan 1-5, 2024 with Jan 2 (Tue) as holiday = 4 working days
+    assert line.target_value == 4.0
+
+
+def test_yearfrac_basis_0_us_30_360():
+    cells = {
+        "Output!A1": cell("Output!A1", formula="=DATE(2024,1,1)", value=45292.0),
+        "Output!B1": cell("Output!B1", formula="=DATE(2025,1,1)", value=45657.0),
+        "Output!C1": cell("Output!C1", formula="=YEARFRAC(A1,B1,0)", value=1.0),
+    }
+    graph = {"Output!A1": [], "Output!B1": [], "Output!C1": ["Output!A1", "Output!B1"]}
+    line = run_reconciliation(parsed(cells, graph), ["Output!C1"]).lines[0]
+    assert line.target_value == 1.0
+
+
+def test_yearfrac_basis_3_actual_365():
+    cells = {
+        "Output!A1": cell("Output!A1", formula="=DATE(2024,1,1)", value=45292.0),
+        "Output!B1": cell("Output!B1", formula="=DATE(2024,1,31)", value=45322.0),
+        "Output!C1": cell("Output!C1", formula="=YEARFRAC(A1,B1,3)", value=30 / 365),
+    }
+    graph = {"Output!A1": [], "Output!B1": [], "Output!C1": ["Output!A1", "Output!B1"]}
+    line = run_reconciliation(parsed(cells, graph), ["Output!C1"]).lines[0]
+    assert abs(line.target_value - (30 / 365)) < 1e-9
+
+
+# ---------------------------------------------------------------------------
 # catalogue / evaluator parity guard
 # ---------------------------------------------------------------------------
 

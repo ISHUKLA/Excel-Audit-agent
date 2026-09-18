@@ -22,6 +22,7 @@ import ast
 import math
 import operator
 import re
+from datetime import date
 from decimal import Decimal
 from typing import Optional, Union
 
@@ -35,6 +36,13 @@ from rapidfuzz import fuzz
 from agents.comparison import ComparisonError, coerce_to_boolean, evaluate_criteria
 from agents.parser import _CELL_REF_PATTERN, _expand_range, _normalize
 from core.accounting import signed_reference_amount
+from core.excel_dates import (
+    add_months,
+    date_from_excel_serial,
+    excel_serial_from_date,
+    networkdays as _networkdays_kernel,
+    yearfrac as _yearfrac_kernel,
+)
 from core.formula_catalogue import SUPPORTED_FUNCTIONS as _SUPPORTED_FUNCTIONS
 from core.numeric_utils import (
     NumericUtilsError,
@@ -1908,6 +1916,130 @@ def _sumproduct_evaluator(
 # ---------------------------------------------------------------------------
 
 
+def _date_evaluator(
+    args_text: str, own_tab: str, values: dict, warnings: list[str], own_ref: str
+) -> Optional[float]:
+    """DATE(year, month, day) — returns the Excel serial date number.
+
+    All three arguments must resolve to numeric values (year, month, day
+    integers). Out-of-range month/day roll over into adjacent year/month,
+    matching Excel's documented DATE behavior.
+    """
+    parts = _split_function_args(args_text)
+    if len(parts) != 3:
+        return None
+    year = _resolve_and_eval_expr(parts[0], own_tab, values)
+    month = _resolve_and_eval_expr(parts[1], own_tab, values)
+    day = _resolve_and_eval_expr(parts[2], own_tab, values)
+    if year is None or month is None or day is None:
+        return None
+    try:
+        return excel_serial_from_date(int(year), int(month), int(day))
+    except (ValueError, OverflowError):
+        return None
+
+
+def _edate_evaluator(
+    args_text: str, own_tab: str, values: dict, warnings: list[str], own_ref: str
+) -> Optional[float]:
+    """EDATE(start_date, months) — returns a date shifted by whole months.
+
+    start_date must resolve to a numeric Excel serial date. A reference to
+    an actual date-formatted cell resolves as text and fails closed as
+    unsupported (per the narrow-scope decision — direct date-cell references
+    are not supported, only serial-number literals or DATE() formula results).
+    months is a numeric integer (can be negative).
+    """
+    split = _split_two_args(args_text)
+    if split is None:
+        return None
+    start_serial = _resolve_and_eval_expr(split[0], own_tab, values)
+    months = _resolve_and_eval_expr(split[1], own_tab, values)
+    if start_serial is None or months is None:
+        return None
+    try:
+        start_date = date_from_excel_serial(start_serial)
+        new_date = add_months(start_date, int(months))
+        return excel_serial_from_date(new_date.year, new_date.month, new_date.day)
+    except (ValueError, OverflowError):
+        return None
+
+
+def _networkdays_evaluator(
+    args_text: str, own_tab: str, values: dict, warnings: list[str], own_ref: str
+) -> Optional[float]:
+    """NETWORKDAYS(start, end, [holidays]) — count of Mon-Fri working days.
+
+    start and end must both resolve to numeric Excel serial dates (same
+    limitation as EDATE — date-formatted cell references are not supported).
+    holidays is an optional range of date serial numbers to exclude; a range
+    that doesn't exist, or arguments that don't resolve to serials, fail
+    closed as unsupported.
+    """
+    parts = _split_function_args(args_text)
+    if len(parts) < 2 or len(parts) > 3:
+        return None
+    start_serial = _resolve_and_eval_expr(parts[0], own_tab, values)
+    end_serial = _resolve_and_eval_expr(parts[1], own_tab, values)
+    if start_serial is None or end_serial is None:
+        return None
+    try:
+        start_date = date_from_excel_serial(start_serial)
+        end_date = date_from_excel_serial(end_serial)
+    except (ValueError, OverflowError):
+        return None
+
+    holidays_set = frozenset()
+    if len(parts) == 3:
+        table = _expand_table_rows(parts[2].strip(), own_tab)
+        if table is not None:
+            for row in table:
+                for ref in row:
+                    val = values.get(ref)
+                    if isinstance(val, (int, float)):
+                        try:
+                            holidays_set |= {date_from_excel_serial(val)}
+                        except (ValueError, OverflowError):
+                            pass
+
+    return float(_networkdays_kernel(start_date, end_date, holidays_set))
+
+
+def _yearfrac_evaluator(
+    args_text: str, own_tab: str, values: dict, warnings: list[str], own_ref: str
+) -> Optional[float]:
+    """YEARFRAC(start, end, [basis]) — fraction of a year between two dates.
+
+    start and end must resolve to numeric Excel serial dates. basis is an
+    optional integer 0-4 (defaults to 0); unsupported basis values fail closed.
+    Same date-cell reference limitation as EDATE/NETWORKDAYS.
+    """
+    parts = _split_function_args(args_text)
+    if len(parts) < 2 or len(parts) > 3:
+        return None
+    start_serial = _resolve_and_eval_expr(parts[0], own_tab, values)
+    end_serial = _resolve_and_eval_expr(parts[1], own_tab, values)
+    if start_serial is None or end_serial is None:
+        return None
+    try:
+        start_date = date_from_excel_serial(start_serial)
+        end_date = date_from_excel_serial(end_serial)
+    except (ValueError, OverflowError):
+        return None
+
+    basis = 0
+    if len(parts) == 3:
+        basis_val = _resolve_and_eval_expr(parts[2], own_tab, values)
+        if basis_val is None:
+            return None
+        basis = int(basis_val)
+
+    try:
+        return _yearfrac_kernel(start_date, end_date, basis)
+    except ValueError:
+        return None
+
+
 def _npv_evaluator(
     args_text: str, own_tab: str, values: dict, warnings: list[str], own_ref: str
 ) -> Optional[float]:
@@ -2023,6 +2155,10 @@ _EVALUATORS = {
     "SUMPRODUCT": _sumproduct_evaluator,
     "NPV": _npv_evaluator,
     "CHOOSE": _choose_evaluator,
+    "DATE": _date_evaluator,
+    "EDATE": _edate_evaluator,
+    "NETWORKDAYS": _networkdays_evaluator,
+    "YEARFRAC": _yearfrac_evaluator,
 }
 
 
