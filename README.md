@@ -1,5 +1,7 @@
 # Excel Translation & Reconciliation Assistant (Glass box)
 
+[![CI](https://github.com/ISHUKLA/Excel-Audit-agent/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ISHUKLA/Excel-Audit-agent/actions/workflows/ci.yml)
+
 *A human-governed agentic AI tool for reviewing actuarial and financial spreadsheets.*
 
 **[▶ Watch the demo video](https://www.youtube.com/watch?v=bvdnjimTNCQ)** · **[▶ Run the solution here](#local-setup)**
@@ -473,9 +475,9 @@ pytest tests/test_parser.py -v
 
 The current pass count is deliberately not hardcoded here. Run `python3 -m pytest tests/ -v -rsx -p no:cacheprovider`, or inspect the linked CI run for the exact result associated with a commit.
 
-[![CI](https://github.com/ISHUKLA/Excel-Audit-agent/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ISHUKLA/Excel-Audit-agent/actions/workflows/ci.yml)
+Every push runs three independent checks: a secret-leak scan (gitleaks), the full test suite on Python 3.11 and 3.13, and a Docker build with a container health-check. All three must pass before `main` moves.
 
-CI runs the full suite on Python 3.11 (matching the Docker runtime) and Python 3.13 on every push and pull request to `main`, plus a Docker build-and-health-check smoke test. The badge above and the numbers it links to reflect GitHub's own record of those runs; they are evidence only after a workflow run has actually completed on `main` — a local `pytest` pass reported in this file is not GitHub CI evidence on its own.
+The badge at the top of this file and the numbers it links to reflect GitHub's own record of those runs; they are evidence only after a workflow run has actually completed on `main` — a local `pytest` pass reported in this file is not GitHub CI evidence on its own.
 
 The test suite covers:
 - Clean workbooks and messy input (blank tabs, broken formulas, inconsistent labels).
@@ -649,6 +651,7 @@ The current release (v1.0.0) ships the four-gate pipeline, local-first deploymen
 - **Extended formula support.** Approximate lookups, array formulas, dynamic arrays and other constructs currently marked unsupported, plus common actuarial formulas currently out of scope: `OFFSET`/`INDIRECT` (dynamic references — require rethinking the static dependency graph the reconstruction engine builds today) and text functions such as `CONCATENATE`/`SUBSTITUTE`/`FIND` (require a string-typed cell value alongside the existing numeric one). Date-formatted cell references (sourced from a value rather than a `DATE()` formula or serial number) are also a candidate for a future step.
 - **Configurable data minimization.** Allow administrators to set their own policies for what is sent to the LLM.
 - **Batch mode.** Process multiple workbooks in a single run without the Streamlit UI.
+- **External data source connections.** Reconciliation currently reads a structured CSV you supply — a deliberate choice, not a limitation we overlooked: it keeps the trust boundary explicit (you control exactly what enters the comparison) and avoids storing database credentials alongside workbook evidence. A live PostgreSQL/Snowflake connector is a reasonable next step, but it changes the security model — credential storage, network access from a local-first tool, query-injection surface — enough that it deserves its own design pass rather than a bolt-on.
 
 ---
 
