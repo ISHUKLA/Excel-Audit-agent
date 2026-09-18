@@ -10,6 +10,8 @@
     "CHOOSE",
     "COUNTIF",
     "COUNTIFS",
+    "DATE",
+    "EDATE",
     "FLOOR",
     "IF",
     "INDEX",
@@ -17,6 +19,7 @@
     "MATCH",
     "MAXIFS",
     "MINIFS",
+    "NETWORKDAYS",
     "NPV",
     "OR",
     "ROUND",
@@ -27,7 +30,8 @@
     "SUMIFS",
     "SUMPRODUCT",
     "VLOOKUP",
-    "XLOOKUP"
+    "XLOOKUP",
+    "YEARFRAC"
   ],
   "cases": [
     {
@@ -523,6 +527,57 @@
       ],
       "purpose": "Exact numeric XLOOKUP, recalculated through LibreOffice",
       "cell": "Qualification!B44"
+    },
+    {
+      "case_id": "date_leap_day",
+      "formula": "=DATE(2024,2,29)",
+      "expected_value": 45351.0,
+      "expected_status": "complete",
+      "expected_verdict": "pass",
+      "functions": [
+        "DATE"
+      ],
+      "purpose": "Leap-day construction as an Excel serial date",
+      "cell": "Qualification!B45"
+    },
+    {
+      "case_id": "edate_month_end_clamp",
+      "formula": "=EDATE(DATE(2024,1,31),1)",
+      "expected_value": 45351.0,
+      "expected_status": "complete",
+      "expected_verdict": "pass",
+      "functions": [
+        "DATE",
+        "EDATE"
+      ],
+      "purpose": "January month-end clamps to the 2024 leap day",
+      "cell": "Qualification!B46"
+    },
+    {
+      "case_id": "networkdays_inclusive_week",
+      "formula": "=NETWORKDAYS(DATE(2024,1,1),DATE(2024,1,7))",
+      "expected_value": 5.0,
+      "expected_status": "complete",
+      "expected_verdict": "pass",
+      "functions": [
+        "DATE",
+        "NETWORKDAYS"
+      ],
+      "purpose": "Inclusive Monday-to-Sunday working-day count",
+      "cell": "Qualification!B47"
+    },
+    {
+      "case_id": "yearfrac_actual_365_leap_year",
+      "formula": "=YEARFRAC(DATE(2024,1,1),DATE(2025,1,1),3)",
+      "expected_value": 1.0027397260273974,
+      "expected_status": "complete",
+      "expected_verdict": "pass",
+      "functions": [
+        "DATE",
+        "YEARFRAC"
+      ],
+      "purpose": "Actual/365 basis across the 2024 leap year",
+      "cell": "Qualification!B48"
     }
   ],
   "error_evidence": [

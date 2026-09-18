@@ -25,3 +25,7 @@ FML-023,Weighted claim estimate,760400,debit,Synthetic formula control extract,C
 FML-024,Present value of periodic cash flows,230.858548,credit,Synthetic formula control extract,Case 5 formula row 24
 FML-025,Selected scenario risk factor,1.08,debit,Synthetic formula control extract,Case 5 formula row 25
 FML-026,Exact product factor via XLOOKUP,1.08,debit,Synthetic formula control extract,Case 5 formula row 26
+FML-027,Leap-day Excel serial,45351,debit,Synthetic formula control extract,Case 5 formula row 27
+FML-028,Month-end date shift,45351,debit,Synthetic formula control extract,Case 5 formula row 28
+FML-029,Inclusive working days,5,debit,Synthetic formula control extract,Case 5 formula row 29
+FML-030,Leap-year actual/365 fraction,1.00274,debit,Synthetic formula control extract,Case 5 formula row 30

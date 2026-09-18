@@ -168,14 +168,14 @@ Gate 1 context:
 | Period | 2025-Q4 | 2025-Q4 |
 | Currency | EUR | EUR |
 | Basis | Synthetic formula control demonstration | Synthetic formula control demonstration |
-| Signed net control total | – | 1,620,523.06 |
+| Signed net control total | – | 2,471,404.36 |
 
-At Gate 2, select every cell in `Outputs!C4:C29`. Each row has a unique label and account number so the external reconciliation remains one-to-one. At Gate 3, review and approve all 26 proposed mappings and select the internal and external materiality thresholds. The output table demonstrates every function in the live formula catalogue: `SUM`, `ABS`, `INT`, `ROUND`, `ROUNDUP`, `ROUNDDOWN`, `CEILING`, `FLOOR`, `SUMIF`, `SUMIFS`, `COUNTIF`, `COUNTIFS`, `AVERAGEIF`, `AVERAGEIFS`, `MINIFS`, `MAXIFS`, `IF`, exact `VLOOKUP`, exact `MATCH`, `INDEX` including nested `INDEX/MATCH`, `AND`, `OR`, `SUMPRODUCT`, `NPV`, `CHOOSE`, and exact `XLOOKUP`.
+At Gate 2, select every cell in `Outputs!C4:C33`. Each row has a unique label and account number so the external reconciliation remains one-to-one. At Gate 3, review and approve all 30 proposed mappings and select the internal and external materiality thresholds. The output table demonstrates every function in the live formula catalogue: `SUM`, `ABS`, `INT`, `ROUND`, `ROUNDUP`, `ROUNDDOWN`, `CEILING`, `FLOOR`, `SUMIF`, `SUMIFS`, `COUNTIF`, `COUNTIFS`, `AVERAGEIF`, `AVERAGEIFS`, `MINIFS`, `MAXIFS`, `IF`, exact `VLOOKUP`, exact `MATCH`, `INDEX` including nested `INDEX/MATCH`, `AND`, `OR`, `SUMPRODUCT`, `NPV`, `CHOOSE`, exact `XLOOKUP`, `DATE`, `EDATE`, `NETWORKDAYS`, and `YEARFRAC`.
 
 Expected outcomes:
 
 - Anomaly findings: none.
-- All 20 designated formula outputs reconstruct completely with zero deltas.
+- All 30 designated formula outputs reconstruct completely with zero deltas.
 - Blank cells and numeric zero remain distinct in the input data.
 - Positive and negative rounding examples match the independently recorded expected values.
 - Every proposed mapping starts with `is_approved=False`; suggested confidence never approves a mapping.

@@ -6,7 +6,7 @@ not every formula that Excel or LibreOffice can calculate.
 
 ## Supported
 
-Plain arithmetic with cell references and these 26 functions:
+Plain arithmetic with cell references and these 30 functions:
 
 | Family | Functions |
 |---|---|
@@ -20,6 +20,7 @@ Plain arithmetic with cell references and these 26 functions:
 | Time value of money | `NPV` |
 | Index-based selection | `CHOOSE` |
 | Exact lookup extension | `XLOOKUP` |
+| Date arithmetic | `DATE`, `EDATE`, `NETWORKDAYS`, `YEARFRAC` |
 
 Cross-tab references and nested supported functions are accepted. `ROUND` uses
 Excel-style half-away-from-zero behaviour; `INT` floors toward negative
@@ -31,6 +32,11 @@ with `match_type=0`. `INDEX` must return one scalar cell. `XLOOKUP` is supported
 only for exact match mode and a scalar numeric result. `SUMPRODUCT` requires
 matching range dimensions. `NPV` uses Excel's period-one convention for periodic
 cash flows. Lookup results used in reconstruction must be numeric.
+
+`EDATE`, `NETWORKDAYS` and `YEARFRAC` accept Excel serial dates, including
+results returned by `DATE`. A direct reference to a date-formatted value cell
+is outside the current reconstruction scope. `NETWORKDAYS` supports an optional
+holiday range. `YEARFRAC` supports basis values 0 through 4.
 
 ## Explicitly outside this published scope
 
@@ -48,6 +54,6 @@ spreadsheet value is not relabelled as verified. The author should include both
 in-scope and out-of-scope behaviour; do not redesign the challenge to maximise
 the supported percentage.
 
-This handout is generated from the same 26-function scope represented in
+This handout is generated from the same 30-function scope represented in
 `core/formula_catalogue.py`; that source file remains authoritative if a frozen
 release and this handout ever disagree.

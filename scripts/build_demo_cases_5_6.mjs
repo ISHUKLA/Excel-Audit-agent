@@ -182,8 +182,8 @@ async function buildCase5() {
 
   const portfolioWeights = [0.90, 1.05, 1.10, 0.95, 1.00, 1.15, 0.85, 1.08];
 
-  inputs.getRange("A1:I1").values = [["Synthetic portfolio inputs"]];
-  inputs.getRange("A2:I2").values = [[
+  inputs.getRange("A1").values = [["Synthetic portfolio inputs"]];
+  inputs.getRange("A2").values = [[
     "All records and amounts are fictional. Blank optional reserves and explicit zeros are intentional.",
   ]];
   inputs.getRange("A3:I3").values = [[
@@ -193,7 +193,7 @@ async function buildCase5() {
   inputs.getRange("A4:H11").values = inputRows;
   inputs.getRange("I4:I11").values = portfolioWeights.map((value) => [value]);
 
-  assumptions.getRange("A1:C1").values = [["Formula demonstration assumptions"]];
+  assumptions.getRange("A1").values = [["Formula demonstration assumptions"]];
   assumptions.getRange("A3:C3").values = [["Input", "Value", "Use"]];
   assumptions.getRange("A4:C14").values = [
     ["Selected product", selectedProduct, "Criteria and lookup tests"],
@@ -215,7 +215,7 @@ async function buildCase5() {
     ["Boolean function used in the nested IF control"],
   ];
 
-  lookups.getRange("A1:B1").values = [["Synthetic product lookup"]];
+  lookups.getRange("A1").values = [["Synthetic product lookup"]];
   lookups.getRange("A3:B3").values = [["Product", "Risk factor"]];
   lookups.getRange("A4:B6").values = [
     ["Motor", factorByProduct.Motor],
@@ -230,6 +230,18 @@ async function buildCase5() {
     ["Scenario 1 factor", 0.95, "CHOOSE control"],
     ["Scenario 2 factor", 1.08, "CHOOSE control"],
     ["Scenario 3 factor", 1.15, "CHOOSE control"],
+  ];
+  assumptions.getRange("A21:C30").values = [
+    ["Date start year", 2024, "DATE, EDATE, NETWORKDAYS and YEARFRAC controls"],
+    ["Leap-day month", 2, "DATE control"],
+    ["Leap-day number", 29, "DATE control"],
+    ["January month", 1, "EDATE, NETWORKDAYS and YEARFRAC controls"],
+    ["January month-end day", 31, "EDATE control"],
+    ["Whole-month shift", 1, "EDATE control"],
+    ["Period start day", 1, "NETWORKDAYS and YEARFRAC controls"],
+    ["Period end day", 7, "NETWORKDAYS control"],
+    ["Date end year", 2025, "YEARFRAC control"],
+    ["YEARFRAC basis", 3, "Actual/365 convention"],
   ];
 
   const cases = [
@@ -389,6 +401,30 @@ async function buildCase5() {
       expected: factorByProduct[selectedProduct],
       meaning: "Retrieves a numeric exact-match factor with XLOOKUP.",
     },
+    {
+      id: "FML-027", label: "Leap-day Excel serial", primary: "DATE",
+      formula: "=DATE(Assumptions!$B$21,Assumptions!$B$22,Assumptions!$B$23)",
+      expected: 45351,
+      meaning: "Constructs the 2024 leap day as an Excel serial date.",
+    },
+    {
+      id: "FML-028", label: "Month-end date shift", primary: "EDATE",
+      formula: "=EDATE(DATE(Assumptions!$B$21,Assumptions!$B$24,Assumptions!$B$25),Assumptions!$B$26)",
+      expected: 45351,
+      meaning: "Shifts January month-end to the 2024 leap day.",
+    },
+    {
+      id: "FML-029", label: "Inclusive working days", primary: "NETWORKDAYS",
+      formula: "=NETWORKDAYS(DATE(Assumptions!$B$21,Assumptions!$B$24,Assumptions!$B$27),DATE(Assumptions!$B$21,Assumptions!$B$24,Assumptions!$B$28))",
+      expected: 5,
+      meaning: "Counts Monday-to-Friday working days in an inclusive calendar week.",
+    },
+    {
+      id: "FML-030", label: "Leap-year actual/365 fraction", primary: "YEARFRAC",
+      formula: "=YEARFRAC(DATE(Assumptions!$B$21,Assumptions!$B$24,Assumptions!$B$27),DATE(Assumptions!$B$29,Assumptions!$B$24,Assumptions!$B$27),Assumptions!$B$30)",
+      expected: 366 / 365,
+      meaning: "Measures the 2024 leap year using the actual/365 convention.",
+    },
   ];
 
   const exercised = new Set(cases.flatMap((item) => {
@@ -403,8 +439,8 @@ async function buildCase5() {
     throw new Error(`Case 5 catalogue mismatch. Missing: ${missing}; unexpected: ${unexpected}`);
   }
 
-  calculations.getRange("A1:D1").values = [["Supported formula calculations"]];
-  calculations.getRange("A2:D2").values = [[
+  calculations.getRange("A1").values = [["Supported formula calculations"]];
+  calculations.getRange("A2").values = [[
     "Each row is a separate synthetic financial control. Formula inputs remain visible on the supporting tabs.",
   ]];
   calculations.getRange("A3:D3").values = [["Output label", "Calculated result", "Primary function", "Business meaning"]];
@@ -413,8 +449,8 @@ async function buildCase5() {
   calculations.getRange(`B4:B${lastRow}`).formulas = cases.map((item) => [item.formula]);
   calculations.getRange(`C4:D${lastRow}`).values = cases.map((item) => [item.primary, item.meaning]);
 
-  outputs.getRange("A1:F1").values = [["Case 5: supported formula demonstration"]];
-  outputs.getRange("A2:F2").values = [[
+  outputs.getRange("A1").values = [["Case 5: supported formula demonstration"]];
+  outputs.getRange("A2").values = [[
     "Select all cells in column C below at Gate 2. Each calculation should reconstruct completely.",
   ]];
   outputs.getRange("A3:F3").values = [["Control account", "Authoritative output", "Result", "Primary function", "Expected status", "Output cell"]];
@@ -423,8 +459,8 @@ async function buildCase5() {
   outputs.getRange(`D4:E${lastRow}`).values = cases.map((item) => [item.primary, "complete / pass"]);
   outputs.getRange(`F4:F${lastRow}`).values = cases.map((_, index) => [`Outputs!C${index + 4}`]);
 
-  boundary.getRange("A1:C1").values = [["Deliberately unsupported boundary examples"]];
-  boundary.getRange("A2:C2").values = [[
+  boundary.getRange("A1").values = [["Deliberately unsupported boundary examples"]];
+  boundary.getRange("A2").values = [[
     "These cells are not part of the successful Gate 2 output set. Selecting either must return partial and incomplete.",
   ]];
   boundary.getRange("A3:C3").values = [["Boundary", "Cached workbook result", "Expected reconstruction"]];
@@ -438,7 +474,7 @@ async function buildCase5() {
   ];
   boundary.getRange("C4:C5").values = [["partial / incomplete"], ["partial / incomplete"]];
 
-  guide.getRange("A1:C1").values = [["Case 5 demonstration guide"]];
+  guide.getRange("A1").values = [["Case 5 demonstration guide"]];
   guide.getRange("A3:C8").values = [
     ["Scope", `All ${supportedFunctions.length} functions declared supported by the production formula catalogue.`, null],
     ["Synthetic data", "All entities, accounts and amounts are fictional.", null],
@@ -475,11 +511,15 @@ async function buildCase5() {
   outputs.getRange(`C4:C${lastRow}`).format.font = { name: FONT, size: 10, color: DARK };
   calculations.getRange(`B4:B${lastRow}`).format.numberFormat = currencyFormat;
   calculations.getRange(`B4:B${lastRow}`).format.font = { name: FONT, size: 10, color: FORMULA_GREEN };
+  outputs.getRange("C30:C32").format.numberFormat = "#,##0";
+  calculations.getRange("B30:B32").format.numberFormat = "#,##0";
+  outputs.getRange("C33").format.numberFormat = "0.000000";
+  calculations.getRange("B33").format.numberFormat = "0.000000";
   inputs.getRange("E4:H11").format.numberFormat = currencyFormat;
   inputs.getRange("I4:I11").format.numberFormat = precisePercentageFormat;
   inputs.getRange("A4:I11").format.borders = { preset: "inside", style: "thin", color: "#E5E7EB" };
-  assumptions.getRange("B4:B20").format.fill = INPUT_YELLOW;
-  assumptions.getRange("B4:B20").format.font = { name: FONT, size: 10, color: INPUT_BLUE };
+  assumptions.getRange("B4:B30").format.fill = INPUT_YELLOW;
+  assumptions.getRange("B4:B30").format.font = { name: FONT, size: 10, color: INPUT_BLUE };
   assumptions.getRange("B17:B20").format.numberFormat = precisePercentageFormat;
   lookups.getRange("B4:B6").format.fill = INPUT_YELLOW;
   lookups.getRange("B4:B6").format.font = { name: FONT, size: 10, color: INPUT_BLUE };
@@ -501,7 +541,7 @@ async function buildCase5() {
     Outputs: `A1:F${lastRow}`,
     Calculations: `A1:D${lastRow}`,
     Inputs: "A1:I11",
-    Assumptions: "A1:C20",
+    Assumptions: "A1:C30",
     Lookups: "A1:E7",
     "Scope Boundary": "A1:C5",
     "Demo Guide": "A1:C15",

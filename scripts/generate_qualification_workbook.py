@@ -178,6 +178,32 @@ def qualification_cases() -> list[dict]:
             1.2,
             purpose="Exact numeric XLOOKUP, recalculated through LibreOffice",
         ),
+        # Group J — date arithmetic.  Date-producing cases return Excel serial
+        # numbers so the expected values remain engine-independent evidence.
+        _case(
+            "date_leap_day",
+            "=DATE(2024,2,29)",
+            45351.0,
+            purpose="Leap-day construction as an Excel serial date",
+        ),
+        _case(
+            "edate_month_end_clamp",
+            "=EDATE(DATE(2024,1,31),1)",
+            45351.0,
+            purpose="January month-end clamps to the 2024 leap day",
+        ),
+        _case(
+            "networkdays_inclusive_week",
+            "=NETWORKDAYS(DATE(2024,1,1),DATE(2024,1,7))",
+            5.0,
+            purpose="Inclusive Monday-to-Sunday working-day count",
+        ),
+        _case(
+            "yearfrac_actual_365_leap_year",
+            "=YEARFRAC(DATE(2024,1,1),DATE(2025,1,1),3)",
+            366.0 / 365.0,
+            purpose="Actual/365 basis across the 2024 leap year",
+        ),
     ]
 
 

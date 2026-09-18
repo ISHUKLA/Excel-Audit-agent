@@ -13,9 +13,9 @@ module does not special-case it. Only dates in January/February 1900 would
 be off by one day from real Excel, a gap no actuarial workbook in practice
 will ever hit, so it is left undocumented in code rather than special-cased.
 
-Nothing in this module is wired into the formula-reconstruction catalogue
-yet — see tests/test_excel_dates.py for standalone validation, matching the
-pattern core/numeric_utils.py established for Group B.
+The production formula-reconstruction catalogue uses these kernels for Group J.
+Standalone boundary coverage remains in tests/test_excel_dates.py, while the
+qualification workbook exercises the same functions through the production path.
 """
 
 import calendar
