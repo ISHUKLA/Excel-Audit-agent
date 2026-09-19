@@ -152,10 +152,11 @@ def display_chain_verification(
     if st.button("🔓 Revert and Unlock?", key="revert_unlock_chain"):
         st.error(
             "❌ Recovery refused: the chain is broken and cannot be repaired.\n\n"
-            "The hash chain is tamper-evident, not tamper-proof — it makes a "
-            "modification detectable after the fact, but nothing here can undo "
-            "it, identify who made it, or restore trust in rows after the "
-            "break. Nothing has been altered in response to this click."
+            "The hash chain is tamper-evident, not tamper-proof — it detects "
+            "protected-field changes and in-sequence removal or reordering, but "
+            "needs an external checkpoint to detect tail or whole-file truncation. "
+            "Nothing here can undo a change, identify who made it, or restore trust "
+            "in rows after the break. Nothing has been altered in response to this click."
         )
 
 

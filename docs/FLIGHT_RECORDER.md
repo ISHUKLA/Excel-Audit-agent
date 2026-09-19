@@ -11,7 +11,7 @@ The flight recorder captures:
 - **Hash chain**: cryptographic fingerprints of every event for tamper detection
 - **Governance rules**: what each node is allowed and prohibited to do
 
-The flight recorder is **tamper-evident**: every event is hashed and chained to its predecessor. If any event is modified, the chain detects the change and refuses recovery. This is not tamper-proof (someone with file access can edit the database), but it is tamper-evident (any modification is detectable after the fact).
+The flight recorder is **tamper-evident**: protected event fields are hashed and each retained row is chained to its predecessor. Verification detects protected-field changes and removal or reordering within that retained sequence. It is not tamper-proof: someone with file access can edit the database, and without an externally retained checkpoint the chain cannot prove that its tail or the whole file was not truncated or replaced.
 
 ---
 
@@ -195,20 +195,21 @@ The audit trail is **tamper-evident**, not tamper-proof. This distinction is cri
 
 ### How Tamper-Evidence Works
 
-Every event in the audit log is recorded as a row in the `log_rows` table with these hash fields:
+Every event in the audit log uses these stored and derived hash values:
 
 - **payload_hash**: SHA256 of the event's payload (what happened)
 - **prev_row_hash**: hash of the previous event (commitment to order)
-- **row_hash**: SHA256(prev_row_hash + payload_hash + timestamp)
+- **event_hash** (derived during append and verification): SHA256 of canonical JSON containing `report_id`, `event_type`, `actor`, `timestamp`, and `payload_hash`
+- **row_hash**: SHA256(prev_row_hash + event_hash)
 
 This creates a **hash chain**: each row's hash depends on the previous row's hash.
 
 ```
-Event 1: payload_hash = H1, prev_row_hash = GENESIS, row_hash = R1
-Event 2: payload_hash = H2, prev_row_hash = R1,      row_hash = R2
-Event 3: payload_hash = H3, prev_row_hash = R2,      row_hash = R3
+Event 1: event_hash = E1, prev_row_hash = GENESIS, row_hash = R1
+Event 2: event_hash = E2, prev_row_hash = R1,      row_hash = R2
+Event 3: event_hash = E3, prev_row_hash = R2,      row_hash = R3
          ↑ ↑ ↑ ↑
-         If H3 changes, R3 becomes invalid
+         If a protected field changes, its event_hash and row_hash become invalid
          If R2 is deleted, Event 3's prev_row_hash no longer matches
          If events are reordered, prev_row_hash values no longer align
 ```
@@ -218,9 +219,10 @@ Event 3: payload_hash = H3, prev_row_hash = R2,      row_hash = R3
 When the pipeline loads a report, it runs **verify_chain()** to walk the entire log:
 
 1. Recompute each event's payload_hash from its payload_json
-2. Recompute each event's row_hash from prev_row_hash + payload_hash + timestamp
-3. Check that each event's prev_row_hash matches the previous event's row_hash
-4. If any mismatch is found, mark **chain_valid = False**
+2. Recompute each event's canonical event_hash from its identifying metadata and payload_hash
+3. Recompute each event's row_hash from prev_row_hash + event_hash
+4. Check that each event's prev_row_hash matches the previous retained event's row_hash
+5. If any mismatch is found, mark **chain_valid = False**
 
 If the chain is broken:
 - The flight recorder displays **✗ CHAIN BROKEN** in red
@@ -237,12 +239,12 @@ Someone with write access to `audit.db` **can**:
 - Reorder rows
 
 Someone with write access **cannot**:
-- Hide their changes from verify_chain()
-- Make a modified event's hash agree with its stored hash
-- Make a deleted event's predecessor hash agree with the next event's prev_row_hash
-- Continue the chain after tampering without knowing the previous row's hash (which is not stored separately)
+- Change a protected field without invalidating that retained row's stored hash
+- Delete or reorder a row inside the retained sequence without breaking a surviving link
 
-**This is the intended design.** The hash chain makes tampering detectable; it does not make `audit.db` unmodifiable by someone with file access. The audit is tamper-evident, meaning changes are visible afterward—not tamper-proof, meaning changes are prevented.
+Someone with write access **can** truncate the most recent rows or replace the entire database with an internally consistent shorter copy. `verify_chain()` alone cannot infer evidence that is no longer present. `record_checkpoint()` can append the current terminal row ID and hash to a separate JSONL file; when that file has been independently retained, `verify_against_checkpoint()` detects a missing or changed tail and reports that rows may have been removed after the checkpoint.
+
+**This is the intended design.** Protected-field changes and removal or reordering within the retained sequence are detectable. Tail or whole-file truncation is detectable only against an externally retained checkpoint. Neither control makes `audit.db` unmodifiable by someone with file access.
 
 ### Demo
 

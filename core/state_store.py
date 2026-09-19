@@ -67,9 +67,11 @@ class ChainIntegrityError(StateIntegrityError):
     guarantee for every row after it, across report boundaries. A corrupt row
     belonging to another report therefore refuses recovery of this one.
 
-    Tamper-EVIDENT, not tamper-proof. This detects disagreement; it does not
-    prevent anyone with write access to the file from causing it, does not
-    identify who did, and does not establish when.
+    Tamper-EVIDENT, not tamper-proof. This detects disagreement within the
+    retained chain; without an external checkpoint it cannot detect a
+    self-consistent tail or whole-file truncation. It does not prevent anyone
+    with write access from causing a change, identify who did it, or establish
+    when.
     """
 
 

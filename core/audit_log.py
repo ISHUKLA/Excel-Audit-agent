@@ -6,19 +6,23 @@ distinction between them matters:
   1. Database-level triggers reject UPDATE and DELETE on `log_rows`, so
      append-only holds even for writes that bypass this module.
   2. A global hash chain across every row, so that if someone with file access
-     removes those triggers — which they can — and then edits, deletes, or
-     reorders rows, `verify_chain()` will detect it afterwards.
+     removes those triggers — which they can — protected-field edits and
+     removal or reordering within the retained sequence are detected afterwards.
 
 Neither control makes `audit.db` physically unmodifiable by anyone who can write
-to the file. The first raises the effort required; the second makes the attempt
-visible after the fact. Describe it that way in code, in the UI, and in the
+to the file. The first raises the effort required; the second makes covered
+changes visible after the fact. Without an externally retained checkpoint, an
+internally consistent chain cannot prove that its tail or the whole database was
+not truncated or replaced. Describe it that way in code, in the UI, and in the
 report — never as "tamper-proof".
 """
 
 import hashlib
 import json
+import os
 import sqlite3
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Optional
 
 from core.models import AuditLogRow
@@ -40,6 +44,10 @@ class AuditContextError(ValueError):
     """Raised when log_event is called without the context the chain requires."""
 
 
+class AuditCheckpointError(ValueError):
+    """Raised when an external checkpoint cannot be safely recorded or read."""
+
+
 def _canonical_json(payload: dict) -> str:
     """Deterministic JSON, so the same payload always hashes to the same digest."""
     return json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
@@ -47,6 +55,27 @@ def _canonical_json(payload: dict) -> str:
 
 def _sha256(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _event_hash(
+    *,
+    report_id: str,
+    event_type: str,
+    actor: Optional[str],
+    timestamp: str,
+    payload_hash: str,
+) -> str:
+    """Hash one event's protected fields without ambiguous concatenation."""
+    canonical_event_json = _canonical_json(
+        {
+            "actor": actor,
+            "event_type": event_type,
+            "payload_hash": payload_hash,
+            "report_id": report_id,
+            "timestamp": timestamp,
+        }
+    )
+    return _sha256(canonical_event_json)
 
 
 class AuditLog:
@@ -137,7 +166,16 @@ class AuditLog:
             # read the same previous row_hash and fork the chain.
             conn.execute("BEGIN IMMEDIATE")
             prev_row_hash = self._last_row_hash(conn)
-            row_hash = _sha256(prev_row_hash + payload_hash + timestamp)
+            event_hash = _event_hash(
+                report_id=report_id,
+                event_type=event_type,
+                actor=actor,
+                timestamp=timestamp,
+                payload_hash=payload_hash,
+            )
+            # Both inputs are fixed-length SHA-256 hex digests, so this
+            # concatenation has an unambiguous boundary.
+            row_hash = _sha256(prev_row_hash + event_hash)
             cursor = conn.execute(
                 """
                 INSERT INTO log_rows (
@@ -199,18 +237,110 @@ class AuditLog:
         finally:
             conn.close()
 
+    def record_checkpoint(self, checkpoint_path: str) -> dict:
+        """Append the current terminal row identity to an external JSONL file.
+
+        The checkpoint is deliberately separate from SQLite. This prototype API
+        opens the file in append mode and never rewrites prior records; durable,
+        independently controlled storage of that file remains the operator's
+        responsibility.
+        """
+        if Path(checkpoint_path).resolve() == Path(self.db_path).resolve():
+            raise AuditCheckpointError(
+                "checkpoint path must be separate from the mutable audit database"
+            )
+
+        chain_ok, broken = self.verify_chain()
+        if not chain_ok:
+            raise AuditCheckpointError(
+                f"cannot checkpoint an internally invalid chain; broken rows: {broken}"
+            )
+
+        conn = self._connect()
+        try:
+            terminal = conn.execute(
+                "SELECT row_id, row_hash FROM log_rows ORDER BY row_id DESC LIMIT 1"
+            ).fetchone()
+        finally:
+            conn.close()
+
+        checkpoint = {
+            "last_row_id": terminal["row_id"] if terminal else 0,
+            "last_row_hash": terminal["row_hash"] if terminal else GENESIS_HASH,
+            "recorded_at": datetime.now(timezone.utc).isoformat(),
+        }
+        try:
+            with open(checkpoint_path, "a", encoding="utf-8") as checkpoint_file:
+                checkpoint_file.write(_canonical_json(checkpoint) + "\n")
+                checkpoint_file.flush()
+                os.fsync(checkpoint_file.fileno())
+        except OSError as exc:
+            raise AuditCheckpointError(
+                f"could not append external audit checkpoint: {exc}"
+            ) from exc
+        return checkpoint
+
+    def verify_against_checkpoint(self, checkpoint_path: str) -> tuple[bool, list[str]]:
+        """Verify internal integrity and the latest externally retained tail."""
+        chain_ok, broken = self.verify_chain()
+        if not chain_ok:
+            return False, [f"internal chain invalid at rows: {', '.join(broken)}"]
+
+        try:
+            with open(checkpoint_path, encoding="utf-8") as checkpoint_file:
+                records = [line.strip() for line in checkpoint_file if line.strip()]
+            if not records:
+                raise AuditCheckpointError("external checkpoint file is empty")
+            checkpoint = json.loads(records[-1])
+            if set(checkpoint) != {"last_row_id", "last_row_hash", "recorded_at"}:
+                raise AuditCheckpointError("external checkpoint has unexpected fields")
+            if not isinstance(checkpoint["last_row_id"], int) or checkpoint["last_row_id"] < 0:
+                raise AuditCheckpointError("external checkpoint last_row_id is invalid")
+            if not isinstance(checkpoint["last_row_hash"], str):
+                raise AuditCheckpointError("external checkpoint last_row_hash is invalid")
+        except (OSError, json.JSONDecodeError, AuditCheckpointError) as exc:
+            return False, [f"external checkpoint unavailable or invalid: {exc}"]
+
+        conn = self._connect()
+        try:
+            current_count = conn.execute(
+                "SELECT COUNT(*) AS n FROM log_rows"
+            ).fetchone()["n"]
+            terminal = conn.execute(
+                "SELECT row_id, row_hash FROM log_rows ORDER BY row_id DESC LIMIT 1"
+            ).fetchone()
+        finally:
+            conn.close()
+
+        current_row_id = terminal["row_id"] if terminal else 0
+        current_row_hash = terminal["row_hash"] if terminal else GENESIS_HASH
+        if (
+            current_count != checkpoint["last_row_id"]
+            or current_row_id != checkpoint["last_row_id"]
+            or current_row_hash != checkpoint["last_row_hash"]
+        ):
+            return False, [
+                "external checkpoint mismatch: rows may have been removed after "
+                f"the checkpoint (checkpoint row {checkpoint['last_row_id']}; "
+                f"current row count {current_count}; current terminal row "
+                f"{current_row_id})"
+            ]
+
+        return True, []
+
     def verify_chain(self) -> tuple[bool, list[str]]:
         """Walk the whole log and report any row whose hashes no longer agree.
 
         This DETECTS tampering after the fact. It does not PREVENT anyone with
         write access to `audit.db` from attempting it — they can edit a row, drop
-        a row, reorder rows, or remove the append-only triggers entirely. What
-        they cannot do is make those changes agree with the chain, because each
-        row's hash commits to the previous row's hash.
+        a row, reorder rows, or remove the append-only triggers entirely. Within
+        the retained sequence, each row's hash commits to its identifying
+        metadata, payload hash, and the previous row's hash. Tail truncation
+        requires comparison with an externally retained checkpoint to detect.
 
         Three ways a row is reported:
           - its payload_json no longer hashes to its stored payload_hash (edited)
-          - its row_hash is not sha256(prev_row_hash + payload_hash + timestamp)
+          - its row_hash does not commit to all protected event fields
           - its prev_row_hash is not the previous surviving row's row_hash
             (a row was deleted, or rows were reordered)
 
@@ -231,11 +361,16 @@ class AuditLog:
                 broken.append(row_id)
             elif row["prev_row_hash"] != expected_prev:
                 broken.append(row_id)
-            elif (
-                _sha256(row["prev_row_hash"] + row["payload_hash"] + row["timestamp"])
-                != row["row_hash"]
-            ):
-                broken.append(row_id)
+            else:
+                event_hash = _event_hash(
+                    report_id=row["report_id"],
+                    event_type=row["event_type"],
+                    actor=row["actor"],
+                    timestamp=row["timestamp"],
+                    payload_hash=row["payload_hash"],
+                )
+                if _sha256(row["prev_row_hash"] + event_hash) != row["row_hash"]:
+                    broken.append(row_id)
 
             # Follow the stored hash, not the recomputed one: a single altered
             # row should be reported once, not cascade into every row after it.

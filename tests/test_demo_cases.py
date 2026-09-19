@@ -160,7 +160,7 @@ def _run_case4_to_gate3_preview(orchestrator):
 
 def test_list_cases_returns_all_cases_in_chronological_order():
     cases = demo_cases.list_cases()
-    assert [c["number"] for c in cases] == [1, 2, 3, 4, 5, 6, "7a", "7b", 8, 9, 10, 11]
+    assert [c["number"] for c in cases] == [1, 2, 3, 4, 5, 6, "7a", "7b", 8, 9, 10, 11, 14]
 
 
 def test_every_loadable_listed_case_loads_and_case_11_remains_protocol_only():
@@ -235,6 +235,8 @@ def test_every_documented_asset_exists():
         DEMO_DIR / "final cases" / "case_9_life_pricing" / "workbooks" / "case_9_life_pricing_incomplete.xlsx",
         DEMO_DIR / "final cases" / "case_10_accounting_context" / "workbooks" / "case_10_accounting_context_failure.xlsx",
         DEMO_DIR / "final cases" / "case_11_independent_challenge" / "docs" / "README.md",
+        DEMO_DIR / "final cases" / "case_14_stale_board_pack" / "workbooks" / "case_14_stale_board_pack.xlsx",
+        DEMO_DIR / "final cases" / "case_14_stale_board_pack" / "reference_figures" / "case_14_stale_gl_extract.csv",
     ):
         assert path.exists(), path
 

@@ -3,7 +3,8 @@
 Provides synthetic cases for judges to evaluate the pipeline. Loading a case seeds
 the UI input fields only; the audit must still pass through all gates normally.
 Case 11 is listed for discoverability but remains protocol-only: it has no workbook
-and cannot be loaded into the audit pipeline.
+and cannot be loaded into the audit pipeline. Case 14 is a loadable calculation-
+freshness demonstration.
 """
 
 import pathlib
@@ -131,6 +132,16 @@ _CASES: dict[int | str, dict[str, object]] = {
         "protocol_only": True,
         "protocol_path": "final cases/case_11_independent_challenge/docs/README.md",
     },
+    14: {
+        "name": "Stale Board Pack After Assumption Change (incomplete)",
+        "workbook": "final cases/case_14_stale_board_pack/workbooks/case_14_stale_board_pack.xlsx",
+        "reference_csv": "final cases/case_14_stale_board_pack/reference_figures/case_14_stale_gl_extract.csv",
+        "entity": "Aurora General Insurance SA",
+        "period": "Q3:26",
+        "currency": "EUR",
+        "basis": "Synthetic general-insurance reserving demonstration",
+        "description": "Case 14: Board pack retains pre-change caches after a tail-factor update in manual calculation mode",
+    },
 }
 
 
@@ -138,8 +149,8 @@ def load_case(case_number: int | str) -> dict:
     """Load a demonstration case.
 
     Args:
-        case_number: 1–6, ``"7a"``, ``"7b"``, 8, 9, or 10. Case 11 is
-            protocol-only and raises ``ValueError``.
+        case_number: 1–6, ``"7a"``, ``"7b"``, 8–10, 11, or 14. Case 11 is
+            protocol-only and raises ``ValueError``; Case 14 is loadable.
 
     Returns:
         dict with keys:
@@ -153,7 +164,7 @@ def load_case(case_number: int | str) -> dict:
     """
     if case_number not in _CASES:
         raise ValueError(
-            f"Case {case_number} not found. Choose 1–6, 7a, 7b, 8, 9, 10, or 11."
+            f"Case {case_number} not found. Choose 1–6, 7a, 7b, 8, 9, 10, 11, or 14."
         )
 
     case_spec = _CASES[case_number]

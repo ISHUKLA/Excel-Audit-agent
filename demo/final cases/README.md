@@ -7,9 +7,9 @@ guardrails. They do not validate actuarial methodology, replace professional
 judgement, provide an audit opinion, or certify any number.
 
 All cases appear in Streamlit's **Load a demonstration case** dropdown. Cases
-7a–10 load their synthetic workbooks and applicable reference figures while
-preserving every gate. Case 11 appears as a protocol-only option and deliberately
-does not load a workbook.
+7a–10 and 14 load their synthetic workbooks and applicable reference figures
+while preserving every gate. Case 11 appears as a protocol-only option and
+deliberately does not load a workbook.
 
 | Case | Purpose | Expected internal / external endpoint |
 |---|---|---|
@@ -19,6 +19,7 @@ does not load a workbook.
 | 9 | Unsupported pricing functions | `incomplete` / `not_performed`; default demonstration stops at Gate 3 |
 | 10 | Matching numbers from an incompatible ledger | `pass` / `block`; zero mapped delta does not cure context |
 | 11 | Independent challenge protocol only | Not yet performed; no workbook authored here |
+| 14 | Manual calculation preserves the pre-change board pack | `incomplete` / `incomplete`; EUR 9.3m stale-cache difference and zero-delta control |
 
 ## Rebuild implemented cases
 

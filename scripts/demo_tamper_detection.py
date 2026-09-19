@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Demonstrate tamper-evidence detection in the audit log.
 
-Shows how the hash chain detects tampering and how the pipeline refuses recovery.
-The audit log is tamper-evident (detectable), not tamper-proof (unmodifiable).
+Shows how the hash chain detects a protected-field edit within the retained
+sequence and how the pipeline refuses recovery. The audit log is tamper-evident,
+not tamper-proof; this demo does not claim that an unanchored chain can detect
+tail or whole-file truncation.
 
 Usage:
     python scripts/demo_tamper_detection.py
@@ -257,9 +259,9 @@ def main() -> None:
     print("\n" + "="*70)
     print("AUDIT LOG TAMPER-EVIDENCE DEMONSTRATION")
     print("="*70)
-    print("\nThis script shows how the hash chain detects tampering.")
-    print("The audit log is tamper-EVIDENT (detectable after the fact),")
-    print("not tamper-PROOF (unmodifiable by someone with file access).")
+    print("\nThis script shows detection of a protected-field edit within the retained chain.")
+    print("The audit log is tamper-EVIDENT, not tamper-PROOF; without an")
+    print("external checkpoint, tail or whole-file truncation is not detectable.")
 
     # Step 1: Setup
     test_db, report_id = step_1_setup()

@@ -2,6 +2,7 @@
 distinctions the models exist to preserve cannot be collapsed by accident."""
 
 import hashlib
+import json
 from datetime import datetime, timezone
 
 import pytest
@@ -604,9 +605,19 @@ def test_non_edit_mapping_review_rejects_a_hidden_replacement():
 
 
 def _row_hash(prev_row_hash: str, payload_hash: str, timestamp: datetime) -> str:
-    return hashlib.sha256(
-        (prev_row_hash + payload_hash + timestamp.isoformat()).encode()
-    ).hexdigest()
+    canonical_event_json = json.dumps(
+        {
+            "actor": None,
+            "event_type": "gate_decision",
+            "payload_hash": payload_hash,
+            "report_id": "RPT-001",
+            "timestamp": timestamp.isoformat(),
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    event_hash = hashlib.sha256(canonical_event_json.encode()).hexdigest()
+    return hashlib.sha256((prev_row_hash + event_hash).encode()).hexdigest()
 
 
 def test_three_row_chain_each_hash_incorporates_the_previous():

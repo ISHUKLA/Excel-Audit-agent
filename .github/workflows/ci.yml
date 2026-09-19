@@ -58,8 +58,28 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run test suite
-        run: python -m pytest tests/ -v -rsx -p no:cacheprovider
+      - name: Run test suite with coverage
+        run: |
+          python -m pytest tests/ -v -rsx -p no:cacheprovider \
+            --cov=core --cov=agents --cov=report --cov-report=term \
+            | tee coverage_output.txt
+
+      - name: Publish coverage to step summary
+        if: always()
+        run: |
+          {
+            echo "### Coverage (Python ${{ matrix.python-version }})"
+            echo '```'
+            tail -40 coverage_output.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-py${{ matrix.python-version }}
+          path: coverage_output.txt
 
   docker-build:
     name: Docker Build & Smoke Test

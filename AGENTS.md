@@ -151,9 +151,11 @@ These apply to every prompt, every session.
     first, and no section uses "validated" of the underlying methodology or
     assumptions. Only a named human actuary can make that claim, outside this tool.
 14. Never call the audit log tamper-proof — call it **tamper-evident**. The hash
-    chain makes modification detectable after the fact; it does not make
-    `audit.db` unmodifiable by someone with file access. State that distinction
-    in code comments, UI copy, and the report.
+    chain detects protected-field changes and removal or reordering within the
+    retained sequence; tail or whole-file truncation requires an externally
+    retained checkpoint. It does not make `audit.db` unmodifiable by someone
+    with file access. State those boundaries in code comments, UI copy, and the
+    report.
 15. Never call Gate 4's output a "signature," and never an "attestation" either.
     Both were caught in review as overstatement — "attestation" names a specific
     formal service in accounting practice. Call it a **named approval record**:
@@ -287,4 +289,5 @@ Running note, per the Diligence rules. Update it when you change a file.
 | Group J qualification evidence refresh (`core/excel_dates.py`, `scripts/generate_qualification_workbook.py`, qualification fixtures, Case 5 generator/artifacts, Case 11 handout, README/demo documentation) | AI-written | Adds real-workbook and user-facing evidence for `DATE`, `EDATE`, `NETWORKDAYS`, and `YEARFRAC`; refreshes the 30-function evidence contracts through LibreOffice, 2026-09-18 |
 | Group D extension — plain MAX/MIN (`core/formula_catalogue.py`, `agents/reconciliation.py`, `scripts/generate_qualification_workbook.py`, qualification fixtures, Case 5 workbook/expected/reference evidence, `demo/recalculation_provenance.json`, Case 11 handout, README, `tests/test_reconciliation.py`) | AI-written | Adds `_max_evaluator`/`_min_evaluator`: variadic like `SUM`, but a blank or non-numeric cell is excluded from consideration rather than treated as 0 (Excel's own `MAX`/`MIN` behavior), falling back to `0.0` only when no numeric value is found at all; refreshes the qualification workbook (incidentally closing the pre-existing Group J qualification gap in the same LibreOffice pass) and Case 5's real-workbook evidence to the live 32-function catalogue, 2026-09-18 |
 | Case 14 calculation-freshness demonstration (`core/verdict_logic.py`, Case 14 fixtures/generator/docs, demo registry/UI tests, focused acceptance tests) | AI-written | Makes stale/unknown evidence an explicit pre-materiality `incomplete` condition and demonstrates old formula caches after an assumption edit in manual calculation mode, 2026-09-18 |
+| Audit metadata hash-chain closure and external checkpoint (`core/audit_log.py`, model/state/UI/report/documentation language, `tests/test_audit_log.py`, `tests/test_audit_log_metadata_tampering.py`, validation defect log) | AI-written | Canonical event hash protects report ID, event type, actor, timestamp, and payload hash; JSONL checkpoint detects tail truncation against an independently retained terminal record; documents the unanchored-chain limitation, 2026-09-19 |
 | AGENTS.md | AI-written | This file, 2026-08-10; Step 14, Group J, and Group D (MAX/MIN) evidence provenance entries added, 2026-09-18 |

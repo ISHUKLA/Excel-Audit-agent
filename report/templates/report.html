@@ -72,7 +72,7 @@
 <p class="definition"><strong>Local identity confirmation only - not authentication.</strong>
 The name and role below were resolved from the local authorized-approvers registry and captured with a timestamp.
 This is not a signature, an attestation engagement, or any other formal or legal instrument.</p>
-<p class="definition"><strong>Tamper-evident:</strong> Tamper-evident means any modification to the underlying log after the fact can be detected by re-verifying its hash chain - it does not mean the log file itself cannot be edited by someone with direct access to this machine.</p>
+<p class="definition"><strong>Tamper-evident:</strong> Tamper-evident means: (1) any change to a protected field within the retained chain — including actor, event type, timestamps, and decision content — is detectable by re-verifying the hash chain, and (2) removal or reordering of rows within the retained sequence is detectable. Without an externally retained checkpoint recorded after the fact, the chain cannot by itself prove that its most recent rows, or the database as a whole, were not later truncated or replaced. This log does not mean the underlying file cannot be edited by someone with direct access to this machine — it means such edits become detectable.</p>
 
 <table class="meta" aria-label="Report header">
   <tr><td>Filename</td><td>{{ report.file_context.filename }}</td></tr>
@@ -330,7 +330,7 @@ This is not a signature, an attestation engagement, or any other formal or legal
 </section>
 
 <h2>Section 7 - Audit trail and evidence integrity</h2>
-<p><strong>Tamper-evident:</strong> Tamper-evident means any modification to the underlying log after the fact can be detected by re-verifying its hash chain - it does not mean the log file itself cannot be edited by someone with direct access to this machine.</p>
+<p><strong>Tamper-evident:</strong> Tamper-evident means: (1) any change to a protected field within the retained chain — including actor, event type, timestamps, and decision content — is detectable by re-verifying the hash chain, and (2) removal or reordering of rows within the retained sequence is detectable. Without an externally retained checkpoint recorded after the fact, the chain cannot by itself prove that its most recent rows, or the database as a whole, were not later truncated or replaced. This log does not mean the underlying file cannot be edited by someone with direct access to this machine — it means such edits become detectable.</p>
 <p>{{ report.audit_log_verification_note }}</p>
 <p><strong>Gate 3 incomplete-result acknowledgement:</strong>
 {% if acknowledge_incomplete is sameas true %}Yes{% elif acknowledge_incomplete is sameas false %}No{% else %}Not recorded{% endif %}</p>

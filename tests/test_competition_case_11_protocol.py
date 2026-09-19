@@ -218,7 +218,7 @@ def test_tool_version_record_requires_clean_head_and_matching_existing_tag(tmp_p
 
 def test_implemented_case_manifests_verify_every_recorded_artifact_hash():
     manifests = sorted(COMPETITION.glob("case_*/manifests/*_manifest.json"))
-    assert len(manifests) == 5
+    assert len(manifests) == 6
     for manifest_path in manifests:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         assert _sha256(ROOT / manifest["workbook_file"]) == manifest["workbook_sha256"]

@@ -1,0 +1,3 @@
+account_number,label,amount,debit_credit,ledger_source,evidence_reference
+GL-210100,Opening reserve,65000000,debit,Synthetic Q3 board-pack booking extract,Q3-2026-OPEN
+GL-210900,Closing IBNR,41700000,debit,Synthetic Q3 board-pack booking extract,Q3-2026-CLOSE

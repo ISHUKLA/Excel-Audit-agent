@@ -36,15 +36,12 @@ def compute_verdict(
     An ambiguous match is capped at "warn": if nobody is certain these two
     figures are the same figure, agreement between them is not evidence.
 
-    Order of operations, in this order and no other: (1) the numeric
-    threshold verdict; (2) the ambiguity cap; (3) the freshness fail-closed
-    cap. Step 3 runs last and overrides both of the others: whenever
-    evidence_status is not "fresh", a verdict that would otherwise read
-    "pass" or "warn" is forced to "incomplete" — a zero delta, a zero-width
-    threshold, and a generous threshold all reach step 3 exactly the same way
-    everything else does, so none of them can buy back a pass. A "block"
-    verdict is left as "block": a genuine large numeric disagreement on top
-    of stale evidence is worth flagging as a block, not softened.
+    Evidence sufficiency is evaluated before materiality. Whenever
+    ``evidence_status`` is stale or unknown, the line is ``incomplete``
+    regardless of its delta or thresholds. The numerical values remain visible,
+    but the tool cannot use an unverified cache state to express a materiality
+    verdict. This is deliberately different from saying that the numbers agree:
+    it says the evidence needed to reach pass/warn/block is not current.
 
     PRECONDITION: `delta` is non-negative. Agent 3 computes it as
     abs(source - target), so this holds by construction. A signed delta passed
@@ -53,6 +50,8 @@ def compute_verdict(
     if completeness == "partial":
         return "incomplete"
     if delta is None or delta_pct is None:
+        return "incomplete"
+    if evidence_status != "fresh":
         return "incomplete"
     # Zero is inside even a zero-width tolerance: exact equality is a pass.
     # Keep the independent ambiguity cap because matching the wrong figures is
@@ -73,6 +72,4 @@ def compute_verdict(
         worse = pct_verdict if _ORDER[pct_verdict] >= _ORDER[abs_verdict] else abs_verdict
         raw = "warn" if (is_ambiguous_match and worse == "pass") else worse
 
-    if evidence_status != "fresh" and raw in ("pass", "warn"):
-        return "incomplete"
     return raw

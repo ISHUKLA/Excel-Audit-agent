@@ -662,14 +662,14 @@ def test_loading_case_4_displays_its_identity_and_correct_hash():
     assert expected_hash in code_values
 
 
-def test_demo_selector_lists_cases_7a_through_11_in_order():
+def test_demo_selector_lists_competition_cases_and_case_14_in_order():
     app = _initial_app()
     selector = next(s for s in app.selectbox if s.key == "demo_case_selector")
 
     competition_labels = [
         label
         for label in selector.options
-        if label.startswith(("Case 7", "Case 8", "Case 9", "Case 10", "Case 11"))
+        if label.startswith(("Case 7", "Case 8", "Case 9", "Case 10", "Case 11", "Case 14"))
     ]
     assert competition_labels == [
         "Case 7a: Clean IFRS 17 Cohort (pass)",
@@ -678,6 +678,7 @@ def test_demo_selector_lists_cases_7a_through_11_in_order():
         "Case 9: Life Pricing Incomplete Reconstruction (incomplete)",
         "Case 10: Wrong Accounting Context (block)",
         "Case 11: Independent Challenge (protocol only)",
+        "Case 14: Stale Board Pack After Assumption Change (incomplete)",
     ]
 
 

@@ -9,7 +9,7 @@ import sqlite3
 
 import pytest
 
-from core.audit_log import GENESIS_HASH, AuditContextError, AuditLog, _sha256
+from core.audit_log import GENESIS_HASH, AuditContextError, AuditLog, _event_hash, _sha256
 
 CONTEXT = {"workbook_hash": "a" * 64, "code_version": "0.1.0"}
 
@@ -62,7 +62,14 @@ def test_three_events_returned_in_insertion_order_and_correctly_chained(audit_lo
     assert rows[2]["prev_row_hash"] == rows[1]["row_hash"]
 
     for row in rows:
-        recomputed = _sha256(row["prev_row_hash"] + row["payload_hash"] + row["timestamp"])
+        event_hash = _event_hash(
+            report_id=row["report_id"],
+            event_type=row["event_type"],
+            actor=row["actor"],
+            timestamp=row["timestamp"],
+            payload_hash=row["payload_hash"],
+        )
+        recomputed = _sha256(row["prev_row_hash"] + event_hash)
         assert recomputed == row["row_hash"]
 
 

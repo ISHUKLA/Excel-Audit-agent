@@ -1,0 +1,32 @@
+{
+  "case_id": "case_14_stale_board_pack",
+  "case_version": "1.0.0",
+  "workbook_file": "demo/final cases/case_14_stale_board_pack/workbooks/case_14_stale_board_pack.xlsx",
+  "workbook_sha256": "9ad19bf32d29366f11227f7f8f5efeb3f4a721be43e8dca5725d3ffdba4dc3bb",
+  "reference_file": "demo/final cases/case_14_stale_board_pack/reference_figures/case_14_stale_gl_extract.csv",
+  "reference_sha256": "564ce0a5ead415ddf6c6d83850b9b16c481dde857b04b56f92af0d6f7c7c1632",
+  "expected_results_file": "demo/final cases/case_14_stale_board_pack/expected_results/case_14_stale_board_pack_expected.json",
+  "expected_results_sha256": "39069da4d3708f816bc0e0591b22934a70deb1f6a2968376ce716cbc66678b2b",
+  "formula_inventory_file": "demo/final cases/case_14_stale_board_pack/formula_inventories/case_14_stale_board_pack_formula_inventory.json",
+  "formula_inventory_sha256": "117e6522aa8ff13fe64ddd02cf06beaf6ba9a50babbb6d66b67208c25d3ce3c2",
+  "recalculation_engine": "LibreOffice",
+  "recalculation_engine_version": "LibreOfficeDev 26.8.0.0.alpha0 2c87e51eeaa2b413ff4ae097b2705eea1995d8e5",
+  "recalculated_before_assumption_edit_at_utc": "2026-09-18T16:25:23.683833+00:00",
+  "post_recalculation_ooxml_edit": {
+    "cell": "Assumptions!C14",
+    "old_value": 1.042,
+    "new_value": 1.061,
+    "calculation_mode": "manual",
+    "formula_caches_preserved": true
+  },
+  "python_version": "3.12.11",
+  "tool_git_commit": "e2c5f8f14a242a0fac1189a7f5e1f95b78b16163",
+  "tool_worktree_dirty_at_generation": true,
+  "formula_cell_count": 9,
+  "supported_formula_count": 9,
+  "unsupported_formula_count": 0,
+  "expected_internal_verdict": "incomplete",
+  "expected_external_verdict": "incomplete",
+  "expected_gate_block": 3,
+  "synthetic_data": true
+}

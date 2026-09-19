@@ -429,10 +429,11 @@ class LLMDataManifestEntry(BaseModel):
 class AuditLogRow(BaseModel):
     """One hash-chained entry in the tamper-evident log.
 
-    Tamper-EVIDENT, not tamper-proof. The chain makes after-the-fact
-    modification of the log detectable; it does not make the SQLite file
-    physically unmodifiable by anyone with write access to it. Keep that
-    distinction anywhere this model is used, in code and in user-facing copy.
+    Tamper-EVIDENT, not tamper-proof. The chain makes protected-field changes
+    and removal or reordering within the retained sequence detectable; an
+    external checkpoint is needed to detect tail or whole-file truncation. It
+    does not make the SQLite file physically unmodifiable by anyone with write
+    access to it. Keep that distinction in code and user-facing copy.
 
     event_type uses "report_approved", not "report_signed": Gate 4 produces a
     named approval record, and signature vocabulary is not used anywhere in
@@ -470,7 +471,7 @@ class AuditLogRow(BaseModel):
     payload_hash: str
     # The previous row's row_hash, or 64 zeros for the first row in a chain.
     prev_row_hash: str
-    # sha256(prev_row_hash + payload_hash + timestamp)
+    # sha256(prev_row_hash + sha256(canonical protected-event JSON))
     row_hash: str
     timestamp: datetime
     actor: Optional[str] = None

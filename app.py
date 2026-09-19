@@ -188,10 +188,12 @@ def _chain_integrity_error(exc: ChainIntegrityError) -> None:
     in core/state_store.py, per the rule that app.py holds no business logic."""
     st.error(str(exc))
     st.caption(
-        "The audit log is tamper-evident, not tamper-proof: the hash chain makes "
-        "a change detectable after the fact, but it cannot prevent one, identify "
-        "who made it, or establish when. Nothing has been altered or repaired in "
-        "response to this check."
+        "The audit log is tamper-evident, not tamper-proof: verification detects "
+        "protected-field changes and removal or reordering within the retained "
+        "chain. Without an external checkpoint, it cannot prove that the tail or "
+        "whole database was not truncated or replaced. It cannot prevent a change, "
+        "identify who made it, or establish when. Nothing has been altered or "
+        "repaired in response to this check."
     )
 
 

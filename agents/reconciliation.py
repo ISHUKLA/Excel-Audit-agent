@@ -780,7 +780,25 @@ def _max_evaluator(
     than treated as 0 — this matches Excel's own MAX, which only ever
     compares numbers actually present, not a padded-with-zero range. If no
     numeric value is found at all, returns 0.0 (Excel's own MAX() convention
-    for an all-blank/all-text range)."""
+    for an all-blank/all-text range).
+
+    An argument that is a bare cell reference or range (e.g. "C1:C3") is
+    expanded and each cell judged individually against the blank/non-numeric
+    skip rule above. An argument that is instead an EXPRESSION (e.g. "A1*2")
+    is not a range at all — `_CELL_REF_PATTERN.fullmatch` tells the two
+    apart, and an expression is evaluated as a whole through
+    `_resolve_and_eval_expr`, the same shared arithmetic path ABS/ROUND/etc.
+    already use for their own arguments. Before this distinction existed,
+    an expression argument had its cell reference extracted via
+    `_references_in` and the surrounding arithmetic silently discarded —
+    `A1*2` read as bare `A1`, a confident, silently wrong number rather
+    than a flagged failure. `_resolve_and_eval_expr` raises
+    `_UnresolvableReference` for an unresolvable expression (e.g. a
+    non-numeric cell inside it); that propagates out of this evaluator
+    uncaught, exactly like every other caller of that shared function, and
+    is caught by the outer dispatch loop, which fails the whole cell closed
+    rather than silently drop the argument from consideration.
+    """
     best = None
     for argument in args_text.split(","):
         argument = argument.strip()
@@ -790,11 +808,17 @@ def _max_evaluator(
             continue
         except ValueError:
             pass
-        for key in _references_in(argument, own_tab):
-            value = values.get(key)
-            if value is None or isinstance(value, bool) or not isinstance(value, (int, float)):
-                continue
-            best = value if best is None else max(best, value)
+        if _CELL_REF_PATTERN.fullmatch(argument):
+            for key in _references_in(argument, own_tab):
+                value = values.get(key)
+                if value is None or isinstance(value, bool) or not isinstance(value, (int, float)):
+                    continue
+                best = value if best is None else max(best, value)
+            continue
+        resolved = _resolve_and_eval_expr(argument, own_tab, values)
+        if resolved is None:
+            return None
+        best = resolved if best is None else max(best, resolved)
     return best if best is not None else 0.0
 
 
@@ -805,7 +829,13 @@ def _min_evaluator(
     arguments. Same blank/non-numeric skip behavior as MAX (see its
     docstring) — a blank cell is excluded from consideration, not treated
     as a candidate 0. If no numeric value is found at all, returns 0.0
-    (Excel's own MIN() convention for an all-blank/all-text range)."""
+    (Excel's own MIN() convention for an all-blank/all-text range).
+
+    Same bare-reference-vs-expression distinction as MAX (see its
+    docstring) — an expression argument is routed through
+    `_resolve_and_eval_expr` instead of having a cell reference extracted
+    from it and its surrounding arithmetic discarded.
+    """
     best = None
     for argument in args_text.split(","):
         argument = argument.strip()
@@ -815,11 +845,17 @@ def _min_evaluator(
             continue
         except ValueError:
             pass
-        for key in _references_in(argument, own_tab):
-            value = values.get(key)
-            if value is None or isinstance(value, bool) or not isinstance(value, (int, float)):
-                continue
-            best = value if best is None else min(best, value)
+        if _CELL_REF_PATTERN.fullmatch(argument):
+            for key in _references_in(argument, own_tab):
+                value = values.get(key)
+                if value is None or isinstance(value, bool) or not isinstance(value, (int, float)):
+                    continue
+                best = value if best is None else min(best, value)
+            continue
+        resolved = _resolve_and_eval_expr(argument, own_tab, values)
+        if resolved is None:
+            return None
+        best = resolved if best is None else min(best, resolved)
     return best if best is not None else 0.0
 
 
@@ -1975,6 +2011,18 @@ def _date_evaluator(
     All three arguments must resolve to numeric values (year, month, day
     integers). Out-of-range month/day roll over into adjacent year/month,
     matching Excel's documented DATE behavior.
+
+    The year argument gets Microsoft's documented DATE() adjustment applied
+    here, not inside the shared `excel_serial_from_date` kernel: if year is
+    between 0 and 1899 (inclusive), Excel adds 1900 to it (DATE(24,1,1) ->
+    1924-01-01). If year is between 1900 and 9999 (inclusive), Excel uses it
+    as entered. This is specifically about DATE()'s own year argument —
+    shorthand a user typed directly into the formula — not a general rule
+    about small years. `_edate_evaluator` also calls `excel_serial_from_date`,
+    but with a year computed from real calendar-date arithmetic (e.g.
+    stepping a date backward past 1900), which must never be reinterpreted
+    as two-digit shorthand; keeping the adjustment here, rather than in the
+    shared kernel, keeps EDATE's own year values untouched.
     """
     parts = _split_function_args(args_text)
     if len(parts) != 3:
@@ -1984,8 +2032,11 @@ def _date_evaluator(
     day = _resolve_and_eval_expr(parts[2], own_tab, values)
     if year is None or month is None or day is None:
         return None
+    year = int(year)
+    if 0 <= year <= 1899:
+        year += 1900
     try:
-        return excel_serial_from_date(int(year), int(month), int(day))
+        return excel_serial_from_date(year, int(month), int(day))
     except (ValueError, OverflowError):
         return None
 

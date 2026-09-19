@@ -137,7 +137,7 @@ def test_every_verdict_is_one_of_the_four_states(delta_pct):
 
 
 # ---------------------------------------------------------------------------
-# Work Package 2 — the freshness cap is applied last and overrides pass/warn
+# Work Package 2 — freshness is an evidence precondition, before materiality
 # ---------------------------------------------------------------------------
 
 
@@ -178,12 +178,13 @@ def test_stale_evidence_caps_a_warn_verdict_at_incomplete_too():
     )
 
 
-def test_stale_evidence_does_not_soften_a_genuine_block():
-    """A block from a large numeric disagreement is left as a block, not
-    softened to incomplete — staleness only ever caps pass/warn."""
+def test_stale_evidence_prevents_a_materiality_verdict_for_a_large_difference():
+    """A large discrepancy remains visible, but stale evidence means the tool
+    cannot characterize it as a current pass/warn/block comparison."""
     assert compute_verdict(5.0, 0.02, PCT, ABS, "complete") == "block"
     assert (
-        compute_verdict(5.0, 0.02, PCT, ABS, "complete", evidence_status="stale") == "block"
+        compute_verdict(5.0, 0.02, PCT, ABS, "complete", evidence_status="stale")
+        == "incomplete"
     )
 
 

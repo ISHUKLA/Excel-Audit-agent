@@ -149,9 +149,11 @@ These apply to every prompt, every session.
     first, and no section uses "validated" of the underlying methodology or
     assumptions. Only a named human actuary can make that claim, outside this tool.
 14. Never call the audit log tamper-proof — call it **tamper-evident**. The hash
-    chain makes modification detectable after the fact; it does not make
-    `audit.db` unmodifiable by someone with file access. State that distinction
-    in code comments, UI copy, and the report.
+    chain detects protected-field changes and removal or reordering within the
+    retained sequence; tail or whole-file truncation requires an externally
+    retained checkpoint. It does not make `audit.db` unmodifiable by someone
+    with file access. State those boundaries in code comments, UI copy, and the
+    report.
 15. Never call Gate 4's output a "signature," and never an "attestation" either.
     Both were caught in review as overstatement — "attestation" names a specific
     formal service in accounting practice. Call it a **named approval record**:
@@ -258,4 +260,5 @@ Running note, per the Diligence rules. Update it when you change a file.
 | Recommendation 3, Phase E3 — recalculation engine adapter and integration (`core/recalculation.py`, `tests/test_recalculation.py`, `tests/test_recalculation_qualification.py`) | AI-written | Engine-neutral adapter interface + LibreOffice subprocess implementation + preflight validation + formula inventory/manifest + output verification + RecalculationService 12-step orchestrator requiring approved profiles; unit tests with fake adapters only; synthetic workbook qualification setup with stale-cache preconditions, 2026-08-21 |
 | [agents/documentation.py](agents/documentation.py) | AI-written | Commit `21b4dbd`: extract text blocks by type instead of indexing `content[0]` |
 | Step 14 — negative reserve bounds heuristic (`agents/anomaly_detector.py`, `tests/test_negative_reserve_bounds.py`, `tests/test_competition_cases_7_8.py`) | AI-written | `_detect_negative_reserve_bounds`: flags a formula cell with a negative cached value in a reserve/provision/liability/technical/ultimate context (tab or covering named range, never bare `cell_ref`), suppressed when the formula carries a reinsurance-related term; severity `warning`; known false positive on the Case 7 IFRS17 fixture (`Reserve Summary!B7`) documented in its test rather than hidden, 2026-09-18 |
-| CLAUDE.md | AI-written | This file, 2026-08-10; "Current state vs. the standard" gap list re-verified as closed, 2026-08-15; Step 14 build-order row and provenance entry added, 2026-09-18 |
+| Audit metadata hash-chain closure and external checkpoint (`core/audit_log.py`, model/state/UI/report/documentation language, focused tests, validation defect log) | AI-written | Canonical event hash protects identifying metadata and payload hash; JSONL checkpoint detects tail truncation against a retained terminal record; limitation language corrected, 2026-09-19 |
+| CLAUDE.md | AI-written | This file, 2026-08-10; "Current state vs. the standard" gap list re-verified as closed, 2026-08-15; Step 14 build-order row and provenance entry added, 2026-09-18; tamper-evidence boundary corrected, 2026-09-19 |

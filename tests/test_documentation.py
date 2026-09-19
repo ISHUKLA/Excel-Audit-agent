@@ -145,6 +145,35 @@ def test_valid_json_is_validated_and_manifest_is_returned(monkeypatch):
     assert audit_log.calls[0]["payload"]["outcome"] == "success"
 
 
+def test_markdown_fenced_json_is_unwrapped_and_validated(monkeypatch):
+    """Claude models sometimes wrap a JSON reply in a ```/```json fence
+    despite the system prompt now explicitly forbidding it. This must still
+    validate successfully, not fall back to validation_failed."""
+    monkeypatch.setattr("agents.documentation.time.sleep", lambda _: None)
+    fenced = f"```json\n{_valid_json()}\n```"
+
+    (documents, _), audit_log = _run(_parsed_file(), _file_context(), _FakeClient([fenced]))
+
+    assert documents[0].method_summary == "Applies a 25% growth factor to the base reserve."
+    assert audit_log.calls[0]["payload"]["outcome"] == "success"
+
+
+def test_fenced_but_genuinely_invalid_content_still_fails_validation(monkeypatch):
+    """The fence-stripping is narrow: it only unwraps a fence around the
+    WHOLE response. Genuinely malformed content inside a fence must still
+    fall back to validation_failed, not be silently coerced into something
+    valid."""
+    monkeypatch.setattr("agents.documentation.time.sleep", lambda _: None)
+    fenced_garbage = "```json\nthis is not JSON at all\n```"
+
+    (documents, _), audit_log = _run(
+        _parsed_file(), _file_context(), _FakeClient([fenced_garbage])
+    )
+
+    assert documents[0].method_summary == "LLM output invalid — manual review required."
+    assert audit_log.calls[0]["payload"]["validation_failed"] is True
+
+
 def test_extended_thinking_block_before_text_is_ignored(monkeypatch):
     monkeypatch.setattr("agents.documentation.time.sleep", lambda _: None)
     client = _FakeClient(

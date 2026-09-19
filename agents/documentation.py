@@ -7,6 +7,7 @@ hashes, never workbook cell content or raw LLM responses.
 
 import hashlib
 import json
+import re
 import time
 from typing import Optional, Union
 
@@ -35,6 +36,9 @@ _BASE_SYSTEM_PROMPT = (
     "Analyse this Excel tab and return ONLY valid JSON with these fields:\n"
     "method_summary (str), assumptions (list of str), data_sources (list of str),\n"
     "anomalies_noted (list of str), role_notes (str).\n"
+    "Respond with the raw JSON object only — no markdown code fences (no ``` of "
+    "any kind), no leading or trailing prose, and no text before or after the "
+    "JSON object.\n"
     "Be specific. Reference actual cell values and formula patterns you see.\n"
     "Do not invent data that is not in the payload.\n"
     "Some cells were withheld from this payload for data-minimization reasons; "
@@ -144,10 +148,27 @@ def _system_prompt_for_role(role: str) -> str:
     return f"{_BASE_SYSTEM_PROMPT}{_ROLE_GUIDANCE[role]}"
 
 
+_MARKDOWN_FENCE_PATTERN = re.compile(r"^\s*```(?:json)?\s*\n?(.*?)\n?\s*```\s*$", re.DOTALL)
+
+
+def _strip_markdown_fence(text: str) -> str:
+    """Unwrap a single markdown code fence around the ENTIRE response.
+
+    The system prompt now explicitly forbids this, but a model can still
+    ignore an instruction. This only recognizes the exact well-known shape —
+    the whole response wrapped in one ```/```json fence — and returns the
+    text unchanged otherwise. It never trims, reformats, or otherwise
+    "repairs" a response; a genuinely malformed reply still fails JSON
+    parsing or schema validation below, exactly as before.
+    """
+    match = _MARKDOWN_FENCE_PATTERN.match(text)
+    return match.group(1) if match else text
+
+
 def _parse_response(tab_name: str, raw_response: str) -> tuple[TabDocumentation, Optional[str]]:
     """Validate one response without retaining invalid raw content."""
     try:
-        data = json.loads(raw_response)
+        data = json.loads(_strip_markdown_fence(raw_response))
         # The workbook's tab name is authoritative; model output cannot rename
         # the block by returning its own tab_name field.
         document = TabDocumentation.model_validate({**data, "tab_name": tab_name})

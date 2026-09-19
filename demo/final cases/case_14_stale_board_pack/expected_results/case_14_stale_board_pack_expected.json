@@ -1,0 +1,56 @@
+{
+  "case_id": "case_14_stale_board_pack",
+  "case_version": "1.0.0",
+  "synthetic_data": true,
+  "gate1_context": {
+    "entity": "Aurora General Insurance SA",
+    "period": "Q3:26",
+    "currency": "EUR",
+    "basis": "Synthetic general-insurance reserving demonstration"
+  },
+  "reference_context": {
+    "entity": "Aurora General Insurance SA",
+    "period": "Q3:26",
+    "currency": "EUR",
+    "basis": "Synthetic general-insurance reserving demonstration"
+  },
+  "authoritative_output_cells": [
+    "Board Summary!B4",
+    "Board Summary!B9"
+  ],
+  "tail_factor_cell": "Assumptions!C14",
+  "old_tail_factor": 1.042,
+  "current_tail_factor": 1.061,
+  "cached_ultimate_claims": 148200000,
+  "reconstructed_ultimate_claims": 157500000,
+  "summary_outputs": {
+    "opening_reserve": {
+      "cell": "Board Summary!B4",
+      "cached_value": 65000000,
+      "reconstructed_value": 65000000,
+      "delta": 0
+    },
+    "closing_ibnr": {
+      "cell": "Board Summary!B9",
+      "cached_value": 41700000,
+      "reconstructed_value": 51000000,
+      "delta": 9300000
+    }
+  },
+  "expected_internal_verdict": "incomplete",
+  "expected_external_verdict": "incomplete",
+  "expected_gate_block": 3,
+  "acknowledge_incomplete": false,
+  "pdf_available_after_gate4": false,
+  "workbook_file": "demo/final cases/case_14_stale_board_pack/workbooks/case_14_stale_board_pack.xlsx",
+  "workbook_sha256": "9ad19bf32d29366f11227f7f8f5efeb3f4a721be43e8dca5725d3ffdba4dc3bb",
+  "reference_file": "demo/final cases/case_14_stale_board_pack/reference_figures/case_14_stale_gl_extract.csv",
+  "reference_sha256": "564ce0a5ead415ddf6c6d83850b9b16c481dde857b04b56f92af0d6f7c7c1632",
+  "reference_control_total": 106700000,
+  "formula_inventory_file": "demo/final cases/case_14_stale_board_pack/formula_inventories/case_14_stale_board_pack_formula_inventory.json",
+  "formula_cell_count": 9,
+  "supported_formula_count": 9,
+  "unsupported_formula_count": 0,
+  "observed_findings": [],
+  "boundary": "Demonstrates calculation freshness only. It does not opine on the factor, reserve adequacy, or reserving methodology."
+}

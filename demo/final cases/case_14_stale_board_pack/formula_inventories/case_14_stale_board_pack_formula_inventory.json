@@ -1,0 +1,65 @@
+[
+  {
+    "cell_ref": "Board Summary!B4",
+    "formula": "='Reserve Calculation'!B4",
+    "functions": [],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Board Summary!B7",
+    "formula": "=Assumptions!C14",
+    "functions": [],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Board Summary!B8",
+    "formula": "='Reserve Calculation'!B8",
+    "functions": [],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Board Summary!B9",
+    "formula": "='Reserve Calculation'!B10",
+    "functions": [],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Reserve Calculation!B4",
+    "formula": "=Assumptions!C18",
+    "functions": [],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Reserve Calculation!B7",
+    "formula": "=(Assumptions!C14-Assumptions!B14)*Assumptions!C15",
+    "functions": [],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Reserve Calculation!B8",
+    "formula": "=Assumptions!C16+B7",
+    "functions": [],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Reserve Calculation!B9",
+    "formula": "=Assumptions!C17",
+    "functions": [],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  },
+  {
+    "cell_ref": "Reserve Calculation!B10",
+    "formula": "=B8-B9",
+    "functions": [],
+    "supported_by_catalogue": true,
+    "unsupported_functions": []
+  }
+]

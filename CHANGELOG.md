@@ -4,6 +4,12 @@ One line per meaningful change. This is the project's lightweight change-control
 record — it exists so that a reviewer can reconstruct what changed and when
 without reading the git log.
 
+## 2026-09-18 — Make calculation freshness a precondition to materiality
+
+- Changed `core/verdict_logic.compute_verdict` so `stale` or `unknown` calculation evidence returns `incomplete` before numerical thresholds are evaluated, including when the visible delta would otherwise be `block`.
+- The source value, reconstructed value, delta, delta percentage, and affected cell references remain visible. `incomplete` means the cache state cannot support a current materiality verdict; it does not hide or resolve the numerical discrepancy.
+- This explicitly revises the prior implementation, which preserved a numerical `block` over stale evidence. Gate 3's acknowledgement path remains the only way to continue from `incomplete`, and acknowledgement does not make the evidence current.
+
 ## 2026-08-27 — CI runs release checks on main pull requests
 
 - Replaced the frozen-branch-only workflow (`release/v1.0.0-freeze`) with `.github/workflows/ci.yml` triggering on push to `main`, pull requests targeting `main`, and manual `workflow_dispatch`.

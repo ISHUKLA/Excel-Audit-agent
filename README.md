@@ -154,7 +154,7 @@ After your audit completes (Gate 4), the **Governance Flight Recorder** displays
 
 **Cascading locks:** If Gate 3 blocks (e.g., due to reconciliation failure), all downstream nodes lock automatically — Gate 4 cannot approve and the PDF cannot export until the issue is resolved.
 
-**Tamper-evident audit chain:** All events are hash-chained. If any event is modified, the chain detects the change and refuses recovery. See [docs/FLIGHT_RECORDER.md](docs/FLIGHT_RECORDER.md) for details on how tamper-evidence works and [scripts/demo_tamper_detection.py](scripts/demo_tamper_detection.py) for a live demonstration.
+**Tamper-evident audit chain:** Protected event fields and ordering within the retained sequence are hash-chained, so verification detects changes to actor, event type, timestamp, decision content, and in-chain removal or reordering. The chain alone cannot prove that its tail or the whole database was not truncated or replaced; `verify_against_checkpoint()` adds that comparison when an external checkpoint has been retained. See [docs/FLIGHT_RECORDER.md](docs/FLIGHT_RECORDER.md) for details and [scripts/demo_tamper_detection.py](scripts/demo_tamper_detection.py) for a live demonstration.
 
 **Use the sidebar toggles** to show or hide the flight recorder, and expand evidence details to see hashes and rules. Auditors use the flight recorder to trace each decision and verify no step was skipped or overridden.
 
@@ -552,7 +552,7 @@ with this repo are entirely fictional (see "Six Demonstration Cases" above).
 
 ### Audit Log: Tamper-Evident, Not Tamper-Proof
 
-The log is append-only with hash-chain verification. Any later modification to a row breaks the chain and is detectable on verification. However, someone with file access can still modify or delete `audit.db`; the hash chain makes after-the-fact changes detectable but cannot prevent them. Recovery verifies the complete chain before any snapshot is loaded; one corrupt row makes every report in that `audit.db` unresumable.
+The log is append-only with hash-chain verification. Tamper-evident means: (1) any change to a protected field within the retained chain — including actor, event type, timestamps, and decision content — is detectable by re-verifying the hash chain, and (2) removal or reordering of rows within the retained sequence is detectable. Without an externally retained checkpoint recorded after the fact, the chain cannot by itself prove that its most recent rows, or the database as a whole, were not later truncated or replaced. This log does not mean the underlying file cannot be edited by someone with direct access to this machine — it means such edits become detectable when they violate the retained chain or its external checkpoint. Recovery verifies the complete retained chain before any snapshot is loaded; one detected corrupt row makes every report in that `audit.db` unresumable.
 
 Backups are an operational necessity, not merely good practice.
 
@@ -573,12 +573,13 @@ Backups are an operational necessity, not merely good practice.
 - **Only .xlsx and .xlsm workbooks are supported.** Both are OOXML (zip/XML) containers that openpyxl reads directly, capturing formula and cached value together per cell. `.xlsb` (Excel Binary Workbook) is rejected at upload with a message asking for a `.xlsx`/`.xlsm` re-save: it uses the same outer zip container but stores its workbook part as binary (BIFF12), which cannot be parsed for formula text — only cached values — and would force `CellRecord.formula` to `None` on genuine formula cells, silently breaking the formula-plus-cached-value guarantee every other format upholds. Legacy `.xls` is not supported at all.
 - **No independent reviewer enforced.** The same person can complete all four gates.
 - **No application-level authentication.** Gate 4 provides a visible local identity confirmation by matching a typed name to the authorized-approvers file and deriving the stored role from that entry. It does not authenticate who typed the name.
-- **Audit log is tamper-evident, not tamper-proof.** Someone with file access can modify `audit.db`; verification detects this after the fact.
-- **Chain verification does not defend against wholesale forgery.** Detecting that would require an anchor held outside the file.
+- **Audit log is tamper-evident, not tamper-proof.** Someone with file access can modify `audit.db`. `verify_chain()` detects protected-field changes and removal or reordering within the retained sequence, while `verify_against_checkpoint()` detects a missing or changed tail only when an external checkpoint was previously recorded and independently retained.
+- **An unanchored chain cannot prove its own completeness.** Without an external checkpoint, deleting the latest rows or replacing the entire database with an internally consistent copy remains indistinguishable from an intact shorter history.
 - **Whole workbook held in memory.** A very large file will consume proportional memory. No maximum upload size is enforced.
 - **Data minimization is informal, and only relevant if you opt in.** AI documentation is off until you explicitly choose it at Gate 3. When chosen, the local policy withholds long free text and external-link formulas and records a manifest, but cached numeric values and short text cells are sent, and the filter is a length/pattern heuristic — not a certified privacy or regulatory control.
 - **A "not flagged stale" cell is not proof of recalculation.** The tool does not perform fresh workbook recalculation of anything a reviewer uploads, and cannot prove when or with which engine an uploaded workbook was last calculated — only that no known staleness indicator was detected. An incomplete result (whether from staleness or partial formula support) is not validation, and acknowledging it does not change the verdict.
 - **Synthetic test fixtures only.** The test suite uses fictional workbooks; real-world performance and edge cases remain untested.
+- **Found and fixed: `MAX`/`MIN` silently mis-evaluated an argument that was an arithmetic expression rather than a bare cell/range (e.g. `MAX(A1*2,3)`), and `DATE` didn't apply Excel's documented 0–1899 → +1900 year-mapping rule — both capable of registering a false `block` against a correct cached value, the worst failure mode for an audit tool. See defect 5 in the [validation report](validation/VALIDATION_REPORT.md#real-implementation-defects-found-and-fixed) and `tests/test_bugfix_max_min_date.py`.
 
 ---
 
